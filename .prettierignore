@@ -1,0 +1,31 @@
+# dependencias, builds e dados locais
+node_modules/
+dist/
+build/
+coverage/
+.data/
+playwright-report/
+test-results/
+pnpm-lock.yaml
+
+# artefatos gerados (JSON Schemas do contrato) e fixtures privadas
+**/generated/
+fixtures-private/
+
+# PII real do perfil-piloto (ADR-0014)
+BASE_DE_DADOS_*
+
+# especificacoes na raiz (fonte de requisitos; nao reformatar)
+/ADENDO_*.md
+/MODELO_UNIVERSAL_*
+/PERFIL_PROFISSIONAL_SCHEMA.json
+/PLANO_DESENVOLVIMENTO_*.md
+/PROMPT_EXECUCAO_*.md
+/README_PACOTE_*.md
+/RESUMO_ROTEAMENTO_*.md
+
+# configuracao local do Claude Code
+.claude/
+
+# documentacao de arquitetura e ADRs (donos: orquestrador/arquitetura)
+docs/

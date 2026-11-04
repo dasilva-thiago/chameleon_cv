@@ -1,0 +1,11 @@
+packages:
+  - 'apps/*'
+  - 'packages/*'
+
+# Scripts de build (postinstall) permitidos explicitamente; todo o resto fica bloqueado.
+# - esbuild: baixa o binario nativo (tsup/tsx/vite).
+# - prisma e @prisma/engines: baixam o schema-engine usado por `prisma migrate` (S1.1a+).
+allowBuilds:
+  esbuild: true
+  prisma: true
+  '@prisma/engines': true
