@@ -1,68 +1,68 @@
 # ChameleonCV
 
-Plataforma para adaptar currículos a vagas a partir de um **perfil profissional estruturado**, de qualquer área e senioridade. O sistema só usa fatos que estão no perfil, e cada afirmação do currículo gerado aponta para o registro que a sustenta.
+A platform that adapts resumes to job postings from a **structured professional profile**, for any field and seniority. The system only uses facts that exist in the profile, and every claim in a generated resume points to the record that supports it.
 
-> Estado: scaffold do monorepo (fatia S0.1). Contrato do perfil, banco, autenticação e demais módulos entram nas fatias seguintes. Veja o roteiro em [`docs/implementation-plan.md`](docs/implementation-plan.md) e a arquitetura em [`docs/architecture.md`](docs/architecture.md).
+> Status: work in progress. Done so far: monorepo scaffold, universal profile contract (v2.1.0) with YAML/JSON import, database layer with per-user isolation, session-based authentication and the web shell with login. Profile editing, job analysis, matching, resume generation and DOCX/PDF export are next. See the roadmap in [`docs/implementation-plan.md`](docs/implementation-plan.md), the architecture in [`docs/architecture.md`](docs/architecture.md) and the progress log in [`docs/progress.md`](docs/progress.md).
 
-## Estrutura
+## Structure
 
-| Caminho                  | Conteúdo                                                     |
-| ------------------------ | ------------------------------------------------------------ |
-| `apps/api`               | API Express 5 (`createApp`, config validada por Zod, pino)   |
-| `apps/web`               | SPA React 19 + Vite + Tailwind 4                             |
-| `packages/contracts`     | Contratos Zod e JSON Schemas gerados                         |
-| `packages/domain`        | Regras de domínio puras                                      |
-| `packages/profile-io`    | Leitura/escrita YAML/JSON/MD e migração de versões           |
-| `packages/db`            | Prisma 7 + PostgreSQL (único pacote que importa `@prisma/*`) |
-| `packages/ai`            | Gateway e provedores de IA                                   |
-| `packages/documents`     | Geração de DOCX/PDF                                          |
-| `packages/test-fixtures` | Perfis e vagas sintéticos para testes                        |
+| Path                     | Contents                                                          |
+| ------------------------ | ----------------------------------------------------------------- |
+| `apps/api`               | Express 5 API (`createApp`, Zod-validated config, pino)           |
+| `apps/web`               | React 19 + Vite + Tailwind 4 SPA                                  |
+| `packages/contracts`     | Zod contracts and generated JSON Schemas                          |
+| `packages/domain`        | Pure domain rules                                                 |
+| `packages/profile-io`    | YAML/JSON/Markdown reading and writing, version migration         |
+| `packages/db`            | Prisma 7 + PostgreSQL (the only package that imports `@prisma/*`) |
+| `packages/ai`            | AI gateway and providers                                          |
+| `packages/documents`     | DOCX/PDF generation                                               |
+| `packages/test-fixtures` | Synthetic profiles and job postings for tests                     |
 
-## Requisitos
+## Requirements
 
-- Node.js 24 (veja `.node-version`)
-- pnpm 12 (`corepack enable` ou instalação própria)
-- PostgreSQL 16 ou superior. Para o banco local do projeto, os binários do PostgreSQL (`initdb`, `pg_ctl`, `psql`, `postgres`) precisam estar instalados; Docker **não** é necessário.
+- Node.js 24 (see `.node-version`)
+- pnpm 12 (`corepack enable` or a standalone install)
+- PostgreSQL 16 or later. To use the project's local database, the PostgreSQL binaries (`initdb`, `pg_ctl`, `psql`, `postgres`) must be installed. Docker is **not** required.
 
-## Instalação
+## Installation
 
 ```bash
 pnpm install
-cp .env.example .env   # ajuste se necessário; .env nunca é versionado
+cp .env.example .env   # adjust if needed; .env is never committed
 ```
 
-## Banco de dados local
+## Local database
 
-O projeto cria um cluster PostgreSQL próprio em `.data/pg`, escutando **somente** em `127.0.0.1:54329`, com autenticação `trust` (apenas para desenvolvimento local). Ele não interfere em nenhum PostgreSQL já instalado na máquina.
+The project creates its own PostgreSQL cluster in `.data/pg`, listening **only** on `127.0.0.1:54329`, with `trust` authentication (local development only). It does not interfere with any PostgreSQL already installed on the machine.
 
 ```bash
-pnpm db:local:init     # cria o cluster (uma vez)
-pnpm db:local:start    # inicia e garante os bancos chameleon e chameleon_dev
-pnpm db:local:status   # mostra estado e versão do servidor
-pnpm db:local:stop     # para o servidor
+pnpm db:local:init     # create the cluster (once)
+pnpm db:local:start    # start it and ensure the chameleon and chameleon_dev databases
+pnpm db:local:status   # show state and server version
+pnpm db:local:stop     # stop the server
 ```
 
-O script localiza os binários por `PG_BIN` (diretório `bin`), pelo `PATH` ou, no Windows, em `C:\Program Files\PostgreSQL\<versão>\bin`. Para usar outro PostgreSQL, basta ajustar `DATABASE_URL` e `TEST_DATABASE_ADMIN_URL` no `.env`.
+The script locates the binaries through `PG_BIN` (the `bin` directory), the `PATH` or, on Windows, `C:\Program Files\PostgreSQL\<version>\bin`. To use a different PostgreSQL, set `DATABASE_URL` and `TEST_DATABASE_ADMIN_URL` in `.env`.
 
-## Comandos
+## Commands
 
-| Comando                         | O que faz                                                                  |
-| ------------------------------- | -------------------------------------------------------------------------- |
-| `pnpm dev`                      | API e web em modo de desenvolvimento                                       |
-| `pnpm check`                    | formato, lint, tipos, contratos e testes (sem banco e sem rede)            |
-| `pnpm test`                     | testes unitários e de componente                                           |
-| `pnpm test:integration`         | testes com PostgreSQL real (exige `TEST_DATABASE_ADMIN_URL` e banco ativo) |
-| `pnpm format` / `pnpm lint:fix` | corrige formatação e lint                                                  |
-| `pnpm build`                    | build da API e da web                                                      |
+| Command                         | What it does                                                                             |
+| ------------------------------- | ---------------------------------------------------------------------------------------- |
+| `pnpm dev`                      | API and web in development mode                                                          |
+| `pnpm check`                    | formatting, lint, types, contracts and tests (no database, no network)                   |
+| `pnpm test`                     | unit and component tests                                                                 |
+| `pnpm test:integration`         | tests against a real PostgreSQL (needs `TEST_DATABASE_ADMIN_URL` and a running database) |
+| `pnpm format` / `pnpm lint:fix` | fix formatting and lint                                                                  |
+| `pnpm build`                    | build the API and the web app                                                            |
 
-Convenções de teste: `*.test.ts(x)` são unitários (ou de componente em `apps/web`); `*.int.test.ts` e `tests/integration/**` são de integração; `e2e/**/*.spec.ts` usa Playwright.
+Test conventions: `*.test.ts(x)` are unit tests (or component tests in `apps/web`); `*.int.test.ts` and `tests/integration/**` are integration tests; `e2e/**/*.spec.ts` uses Playwright.
 
-## Regras de arquitetura verificadas automaticamente
+## Architecture rules enforced automatically
 
-- `@prisma/*` só pode ser importado em `packages/db` (ESLint e `tests/architecture/deps.test.ts`).
-- `packages/contracts` e `packages/domain` não importam `apps/*`.
-- `apps/web` só importa `@chameleon/contracts`.
+- `@prisma/*` can only be imported in `packages/db` (ESLint and `tests/architecture/deps.test.ts`).
+- `packages/contracts` and `packages/domain` do not import `apps/*`.
+- `apps/web` only imports `@chameleon/contracts`.
 
-## Privacidade
+## Privacy
 
-Nenhum dado pessoal real deve entrar no repositório: fixtures são sintéticas e arquivos de perfil real ficam em `fixtures-private/` (ignorado pelo git). Segredos ficam apenas no `.env` local.
+No real personal data may enter the repository: fixtures are synthetic, and real profile files live in `fixtures-private/` (ignored by git). Secrets live only in the local `.env`.
