@@ -1,0 +1,39 @@
+{
+  "name": "@chameleon/api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "dev": "tsx watch --env-file-if-exists=../../.env src/main.ts",
+    "admin:invite": "tsx --env-file-if-exists=../../.env src/cli/admin-invite.main.ts",
+    "build": "tsup",
+    "start": "node --env-file-if-exists=../../.env dist/main.js",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@chameleon/ai": "workspace:*",
+    "@chameleon/contracts": "workspace:*",
+    "@chameleon/db": "workspace:*",
+    "@chameleon/documents": "workspace:*",
+    "@chameleon/domain": "workspace:*",
+    "@chameleon/profile-io": "workspace:*",
+    "@node-rs/argon2": "2.2.2",
+    "cookie": "2.0.1",
+    "express": "5.3.0",
+    "express-rate-limit": "8.7.3",
+    "helmet": "8.3.0",
+    "pino": "10.4.0",
+    "pino-http": "11.0.0",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@types/express": "5.0.6",
+    "@types/supertest": "7.2.1",
+    "supertest": "7.3.1",
+    "tsup": "9.0.0",
+    "tsx": "4.23.15"
+  }
+}
