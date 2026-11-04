@@ -1,0 +1,32 @@
+# dependencies / build
+node_modules/
+dist/
+build/
+coverage/
+.turbo/
+*.tsbuildinfo
+playwright-report/
+test-results/
+
+# client Prisma gerado (gerado no postinstall / pnpm db:generate)
+packages/db/src/generated/
+
+# local data (cluster Postgres local, storage de arquivos, segredos)
+.data/
+.env
+.env.*
+!.env.example
+
+# PII real do perfil-piloto (ADR-0014): nunca versionar
+BASE_DE_DADOS_CURRICULO_THIAGO.md
+fixtures-private/
+
+# Claude Code local
+.claude/settings.local.json
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
