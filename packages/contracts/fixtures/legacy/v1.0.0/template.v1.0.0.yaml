@@ -1,0 +1,437 @@
+# MODELO UNIVERSAL DE PERFIL PROFISSIONAL — versão 1.0.0
+# Preencha os campos conhecidos. Remova ou mantenha listas vazias quando não se aplicarem.
+# Datas: AAAA-MM-DD, AAAA-MM ou AAAA, conforme a precisão real disponível.
+# Não invente dados para preencher campos. Use null ou [] quando desconhecido/não aplicável.
+# Este arquivo é uma entrada de perfil; não é o currículo final.
+
+schema_version: '1.0.0'
+locale: 'pt-BR'
+profile:
+  identity:
+    full_name: ''
+    preferred_name: ''
+    pronunciation: ''
+    pronouns: '' # opcional; não publicar automaticamente
+    country_of_residence: ''
+    city: ''
+    region: ''
+    country_of_work_interest: []
+    timezone: ''
+    interface_languages: ['pt-BR']
+
+  contact:
+    professional_email: ''
+    phone: ''
+    links:
+      - type: 'linkedin' # linkedin, github, gitlab, portfolio, website, behance, dribbble, other
+        label: ''
+        url: ''
+        visibility: 'public' # public, private, conditional
+        include_by_default: true
+        notes: ''
+
+  positioning:
+    current_profession: ''
+    current_job_title: ''
+    current_seniority: 'not_assessed' # student, entry, junior, mid, senior, specialist, lead, manager, executive, not_assessed
+    professional_headline: ''
+    one_sentence_intro: ''
+    short_summary: ''
+    full_summary: ''
+    career_narrative: ''
+    primary_fields: []
+    secondary_fields: []
+    preferred_job_titles: []
+    excluded_job_titles: []
+    industries_of_interest: []
+    industries_to_avoid: []
+    professional_interests: []
+    preferred_problems_to_solve: []
+    short_term_goals: ''
+    long_term_goals: ''
+    demonstrable_differentiators: []
+    professional_values: []
+
+  competency_examples:
+    - competency: ''
+      situation: ''
+      action: ''
+      outcome_or_learning: ''
+      evidence_ids: []
+
+  experiences:
+    - id: 'EXP-001' # ID local sugerido; o sistema pode substituir por UUID
+      organization: ''
+      organization_public_name: ''
+      industry: ''
+      location:
+        city: ''
+        region: ''
+        country: ''
+      official_title: ''
+      resume_display_title: '' # título de apresentação; nunca deve falsear o cargo oficial
+      employment_type: '' # employee, internship, apprentice, contractor, freelance, self_employed, temporary, volunteer, public_service, other
+      department: ''
+      start_date: '' # AAAA-MM ou AAAA
+      end_date: null
+      is_current: false
+      work_mode: '' # onsite, hybrid, remote, not_specified
+      company_context: ''
+      role_objective: ''
+      products_services_users: ''
+      operational_scope: ''
+      team_interfaces: []
+      responsibilities:
+        - description: ''
+          frequency: '' # daily, weekly, occasional, project_based
+          autonomy: '' # supervised, partial, independent, not_assessed
+          tools: []
+          outcome: ''
+      achievements:
+        - description: ''
+          metric_name: ''
+          metric_value: ''
+          baseline: ''
+          period: ''
+          calculation_method: ''
+          personal_contribution: ''
+          evidence_ids: []
+          public_disclosure: 'not_confirmed' # approved, restricted, not_approved, not_confirmed
+      internal_deliveries:
+        - name: ''
+          problem: ''
+          personal_contribution: ''
+          collaborators: []
+          steps: []
+          technologies: []
+          outcome: ''
+          verification: ''
+          disclosure: 'not_confirmed'
+      technologies_used:
+        - name: ''
+          usage_context: 'professional' # professional, internal_project, study, training, other
+          tasks: []
+          usage_period: ''
+          self_assessed_level: 'not_assessed'
+      transferable_skills: []
+      lessons_learned: []
+      exit_reason_private: ''
+      reference_contact_permission: 'not_applicable'
+      fact_status: 'confirmed' # confirmed, needs_review, conflicting, archived
+      evidence_ids: []
+      notes: ''
+
+  projects:
+    - id: 'PRJ-001'
+      name: ''
+      category: 'personal' # personal, academic, open_source, freelance, professional, research, volunteer, entrepreneurial, other
+      status: 'in_progress' # idea, in_progress, active, completed, archived
+      start_date: ''
+      end_date: null
+      last_updated: ''
+      role: ''
+      team_based: false
+      collaborators:
+        - name_or_role: ''
+          contribution: ''
+      personal_contribution: ''
+      contributions_by_others: ''
+      decision_ownership: ''
+      problem: ''
+      target_audience: ''
+      need_addressed: ''
+      proposed_solution: ''
+      main_features: []
+      workflows: []
+      business_rules: []
+      constraints_and_decisions: []
+      architecture: ''
+      frontend: []
+      backend: []
+      databases: []
+      apis_and_integrations: []
+      authentication_authorization: ''
+      infrastructure_deployment: []
+      testing_quality: []
+      security_privacy: []
+      observability: []
+      documentation: []
+      methods_and_version_control: []
+      technologies:
+        - name: ''
+          usage: ''
+          personal_implementation: ''
+          context: 'project'
+          self_assessed_level: 'not_assessed'
+      deliverables: []
+      outcomes: []
+      metrics:
+        - name: ''
+          value: ''
+          method: ''
+          evidence_ids: []
+          disclosure: 'not_confirmed'
+      tests_performed: []
+      feedback: []
+      known_limitations: []
+      next_improvements: []
+      learning: []
+      public_url: ''
+      repository_url: ''
+      documentation_url: ''
+      demo_url: ''
+      license: ''
+      is_public: false
+      disclosure: 'not_confirmed' # approved, restricted, not_approved, not_confirmed
+      one_line_description: ''
+      short_description: ''
+      resume_keywords: []
+      evidence_ids: []
+      fact_status: 'confirmed'
+      notes: ''
+
+  education:
+    - id: 'EDU-001'
+      institution: ''
+      course_name: ''
+      degree_type: '' # secondary, technical, associate, bachelor, specialization, mba, masters, doctorate, postdoc, other
+      field_of_study: ''
+      status: 'in_progress' # completed, in_progress, suspended, incomplete
+      start_date: ''
+      completion_date: null
+      expected_completion_date: null
+      modality: '' # onsite, online, hybrid
+      location: ''
+      qualification_awarded: ''
+      thesis_title: ''
+      thesis_description: ''
+      supervisor: ''
+      relevant_coursework: []
+      academic_projects: []
+      honors_scholarships_distinctions: []
+      verification_url: ''
+      evidence_ids: []
+      fact_status: 'confirmed'
+      notes: ''
+
+  courses:
+    - id: 'CRS-001'
+      name: ''
+      provider: ''
+      topics: []
+      start_date: ''
+      completion_date: ''
+      workload_hours: null
+      status: 'completed' # completed, in_progress, incomplete
+      certificate_issued: false
+      verification_url: ''
+      main_topics: []
+      activities_projects: []
+      skills_developed: []
+      relevant_job_families: []
+      evidence_ids: []
+
+  skills:
+    - id: 'SKL-001'
+      name: ''
+      category: '' # language, framework, library, database, tool, method, domain, soft_skill, other
+      description: ''
+      self_assessed_level: 'not_assessed' # not_assessed, exposure, basic, intermediate, advanced, expert
+      acquisition_contexts: [] # employment, project, education, course, self_study, volunteer, other
+      related_experience_ids: []
+      related_project_ids: []
+      related_education_ids: []
+      tasks_can_perform: []
+      last_used: ''
+      duration_of_use: '' # preencher apenas se conhecido
+      evidence_ids: []
+      resume_usage: 'depending_on_job' # include, exclude, depending_on_job
+      limitations: ''
+      fact_status: 'confirmed'
+
+  developing_knowledge:
+    - topic: ''
+      study_scope: ''
+      learning_sources: []
+      practical_project: ''
+      perceived_level: ''
+      next_goal: ''
+
+  languages:
+    - language: ''
+      overall_level: 'not_assessed' # A1, A2, B1, B2, C1, C2, native, not_assessed
+      reading: 'not_assessed'
+      writing: 'not_assessed'
+      listening: 'not_assessed'
+      speaking: 'not_assessed'
+      professional_usage: ''
+      certification_name: ''
+      certification_score: ''
+      assessment_date: ''
+      include_in_resume: 'depending_on_job'
+      evidence_ids: []
+
+  certifications:
+    - id: 'CERT-001'
+      name: ''
+      issuer: ''
+      category: 'professional_certification' # professional_certification, license, credential, attendance, completion, other
+      issue_date: ''
+      expiration_date: null
+      public_identifier: ''
+      verification_url: ''
+      related_skills: []
+      status: 'valid' # valid, expired, renewal_in_progress, no_expiration
+      evidence_ids: []
+
+  awards:
+    - name: ''
+      organization: ''
+      date: ''
+      context_and_criteria: ''
+      personal_contribution: ''
+      scope: ''
+      evidence_ids: []
+      disclosure: 'not_confirmed'
+
+  publications_research_talks:
+    - title: ''
+      type: 'article' # article, research, thesis, dissertation, talk, lecture, book, chapter, documentation, other
+      date: ''
+      venue_or_institution: ''
+      authorship: ''
+      summary: ''
+      personal_contribution: ''
+      topics_methods: []
+      url_or_doi: ''
+      status: 'published' # published, presented, submitted, in_progress
+      evidence_ids: []
+
+  volunteering_and_leadership:
+    - organization: ''
+      role: ''
+      participation_type: 'volunteer' # volunteer, community, association, leadership, mentoring, student_activity, other
+      start_date: ''
+      end_date: null
+      responsibilities: []
+      audience: ''
+      outcomes: []
+      skills_demonstrated: []
+      evidence_ids: []
+      disclosure: 'not_confirmed'
+
+  freelance_and_business:
+    - business_or_professional_name: ''
+      activity: ''
+      start_date: ''
+      end_date: null
+      client_market_description: ''
+      services_scope: []
+      personal_responsibilities: []
+      tools_technologies: []
+      deliveries: []
+      verifiable_results: []
+      project_or_client_count: null
+      portfolio_url: ''
+      client_names_disclosure: 'not_approved'
+      evidence_ids: []
+
+  availability_preferences:
+    privacy: 'private'
+    preferred_work_modes: [] # remote, hybrid, onsite
+    accepted_work_modes: []
+    target_regions_countries: []
+    willing_to_relocate: 'not_specified' # yes, no, depends, not_specified
+    travel_availability: 'not_specified'
+    start_availability: ''
+    preferred_contract_types: []
+    preferred_workload: ''
+    compatible_timezones_hours: ''
+    salary_expectation:
+      amount: null
+      currency: ''
+      period: '' # hourly, monthly, yearly
+      notes: ''
+    desired_benefits: []
+    work_environment_preferences: []
+    work_conditions: [] # não registrar detalhes médicos/sensíveis desnecessários
+    deal_breakers: []
+
+  career_preferences:
+    priority_job_titles: []
+    secondary_job_titles: []
+    fields_of_interest: []
+    preferred_industries: []
+    excluded_industries: []
+    target_seniority_levels: []
+    accepted_equivalent_titles: []
+    misleading_titles_to_avoid: []
+    preferred_responsibilities: []
+    responsibilities_to_avoid: []
+    interest_in_adjacent_fields: 'depends'
+
+  resume_preferences:
+    default_language: 'pt-BR'
+    regional_variant: 'pt-BR'
+    tone: 'professional_direct'
+    preferred_length: 'content_based' # one_page, two_pages, content_based
+    output_formats: ['docx', 'pdf']
+    visual_style: 'ats_simple' # ats_simple, traditional, modern_discreet, academic, portfolio
+    include_photo: false
+    default_headline: ''
+    preferred_sections: []
+    sections_to_omit: []
+    older_experiences_to_summarize: []
+    highlight_when_relevant: []
+    preferred_vocabulary: []
+    expressions_to_avoid: []
+    additional_style_notes: ''
+
+  additional_professional_context:
+    industry_knowledge: []
+    standards_regulations: []
+    specialized_equipment: []
+    methods_processes_frameworks: []
+    international_experience: ''
+    distributed_team_experience: ''
+    stakeholder_experience: ''
+    other: ''
+
+  evidence_registry:
+    - id: 'EVD-001'
+      type: 'repository' # repository, certificate, portfolio, document, publication, demo, reference, other
+      title: ''
+      url_or_location: ''
+      supported_claims: []
+      evidence_date: ''
+      is_public: false
+      approved_for_recruiter_sharing: false
+      notes: ''
+
+  pending_items:
+    - id: 'PEND-001'
+      subject: ''
+      current_information: ''
+      uncertainty_reason: ''
+      known_variants: []
+      safe_statement_for_now: ''
+      confirmation_method: ''
+      priority: 'medium' # low, medium, high
+      status: 'open' # open, resolved, ignored
+
+  usage_rules:
+    never_include_in_resume: []
+    require_approval_before_inclusion: []
+    confidential_employers_or_projects: []
+    links_not_to_share: []
+    private_career_guidance_only: []
+    additional_restrictions: []
+
+  review:
+    profile_created_date: ''
+    last_reviewed_date: ''
+    reviewed_by: 'self'
+    reviewed_sections: []
+    items_to_update: []
+    processing_consent: 'not_recorded' # granted, denied, not_recorded
+    consent_notes: ''

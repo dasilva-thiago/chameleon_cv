@@ -1,0 +1,626 @@
+# MODELO UNIVERSAL DE PERFIL PROFISSIONAL — versão 2.1.0
+#
+# Este arquivo é um FORMULÁRIO DE COLETA, não um currículo. Preencha apenas o que souber.
+# Contrato: packages/contracts (Zod 4) → JSON Schema em packages/contracts/generated/.
+# Importado sem alterações, este modelo gera ZERO registros.
+#
+# REGRAS
+#  1. Ausência: omita o campo ou use null quando não souber. Lista vazia ([]) significa "nenhum
+#     item informado", nunca "a pessoa não tem experiência". Texto vazio ("") NÃO é aceito: use null.
+#  2. Datas: AAAA, AAAA-MM ou AAAA-MM-DD, conforme a precisão real. Não complete com dia ou mês
+#     inventados. Em fim de período use "present" para "atual" (não existe campo is_current).
+#     Em YAML, escreva SEMPRE entre aspas: "2020" (sem aspas, 2020 seria um número e é rejeitado).
+#  3. Não invente números, clientes, cargos, tecnologias ou níveis de domínio.
+#  4. Para dizer que um campo NÃO SE APLICA, que você NÃO QUER informar ou que precisa CONFIRMAR,
+#     use meta.field_states (nos blocos: field_states): not_applicable | declined | not_assessed |
+#     needs_confirmation. Não escreva "Não informado" como valor de texto. A chave pode ser um
+#     caminho dentro do registro, ex.: business.portfolio_url ou metric.value.
+#     Telefones: escreva como preferir, ex. (12) 91234-5678 ou +55 12 91234-5678; o importador
+#     guarda só os dígitos (e o +). Idiomas: use overall_level (A1..C2, native) quando souber o nível
+#     CEFR, ou self_described_level (texto livre, ex.: "avançado") com suas próprias palavras.
+#  5. Coleções (contact_points, experiences, projects, ...): copie o exemplo comentado, preencha e
+#     troque o "[]" pela lista. "id" é opcional e livre (ex.: EXP-001); use ids para ligar registros
+#     (competências usadas em experiências, evidências, pendências). O sistema converte para UUID.
+#  6. Tecnologias e competências: cadastre em skills[] e registre ONDE foram usadas em
+#     skill_usages[] (usage_context + experiência/projeto/formação/curso/certificação/voluntariado).
+#  7. Tudo o que for importado entra como needs_review; o status declarado fica em meta.declared_status.
+#     Defaults de visibilidade e de uso em currículo são aplicados pelo importador, não por este arquivo.
+#  8. Privados por construção (nunca vão a currículos nem à IA): availability_preferences,
+#     career_preferences, usage_rules, identity.pronouns, experiences[].exit_reason, meta.private_notes.
+#  9. Não inclua CPF/RG, endereço residencial completo, dados bancários, saúde, religião ou política.
+# 10. O consentimento de processamento NÃO é registrado neste arquivo (é dado na aplicação).
+
+schema_version: '2.1.0'
+locale: null # BCP-47, ex.: pt-BR
+
+profile:
+  identity:
+    full_name: null # texto
+    preferred_name: null # texto
+    pronunciation: null # texto
+    pronouns: null # texto
+    country_of_residence: null # texto
+    city: null # texto
+    region: null # texto
+    countries_of_work_interest: [] # lista de textos
+    timezone: null # texto
+    interface_languages: [] # lista BCP-47, ex.: pt-BR
+    field_visibility:
+      full_name: null # public | private | conditional
+      preferred_name: null # public | private | conditional
+      pronunciation: null # public | private | conditional
+      country_of_residence: null # public | private | conditional
+      city: null # public | private | conditional
+      region: null # public | private | conditional
+      timezone: null # public | private | conditional
+    field_states: {} # campo: not_provided | not_applicable | not_assessed | declined | needs_confirmation
+
+  contact_points: []
+  # Exemplo de registro (descomente, preencha e remova o "[]" acima):
+  # - id: null  # opcional; id local livre
+  #   kind: null  # email | phone | link
+  #   subtype: null  # professional | personal | mobile | landline | whatsapp | linkedin | github | gitlab | bitbucket | portfolio | website | behance | dribbble | artstation | other
+  #   value: null  # e-mail, telefone (ex.: (12) 91234-5678 ou +55 12 91234-5678) ou URL
+  #   label: null  # texto
+  #   visibility: null  # public | private | conditional
+  #   include_by_default: null  # true | false
+  #   is_primary: null  # true | false
+  #   notes: null  # texto
+
+  positioning:
+    current_profession: null # texto
+    current_job_title: null # texto
+    current_seniority: null # student | entry | junior | mid | senior | specialist | lead | manager | executive | not_assessed
+    professional_headline: null # texto
+    field_states: {} # campo: not_provided | not_applicable | not_assessed | declined | needs_confirmation
+
+  statements: []
+  # Exemplo de registro (descomente, preencha e remova o "[]" acima):
+  # - id: null  # opcional; id local livre
+  #   kind: null  # one_sentence_intro | short_summary | full_summary | career_narrative | differentiator | value
+  #   text: null  # texto
+  #   locale: null  # BCP-47, ex.: pt-BR
+  #   meta:
+  #     status: null  # confirmed | needs_review | conflicting | archived
+  #     declared_status: null  # confirmed | needs_review | conflicting | archived
+  #     visibility: null  # public | private | conditional
+  #     resume_use: null  # allowed | requires_approval | never
+  #     source: null  # user_declared | form_entry | profile_import | resume_import | document | repository | certificate | interview | api | ai_extraction | other
+  #     source_detail: null  # texto
+  #     source_excerpt: null  # texto
+  #     evidence_ids: []  # lista de ids de evidencias
+  #     field_states: {}  # campo: not_provided | not_applicable | not_assessed | declined | needs_confirmation
+  #     private_notes: null  # texto
+
+  competency_examples: []
+  # Exemplo de registro (descomente, preencha e remova o "[]" acima):
+  # - id: null  # opcional; id local livre
+  #   competency: null  # texto
+  #   situation: null  # texto
+  #   action: null  # texto
+  #   outcome_or_learning: null  # texto
+  #   related_skill_ids: []  # lista de ids de registros
+  #   meta:
+  #     status: null  # confirmed | needs_review | conflicting | archived
+  #     declared_status: null  # confirmed | needs_review | conflicting | archived
+  #     visibility: null  # public | private | conditional
+  #     resume_use: null  # allowed | requires_approval | never
+  #     source: null  # user_declared | form_entry | profile_import | resume_import | document | repository | certificate | interview | api | ai_extraction | other
+  #     source_detail: null  # texto
+  #     source_excerpt: null  # texto
+  #     evidence_ids: []  # lista de ids de evidencias
+  #     field_states: {}  # campo: not_provided | not_applicable | not_assessed | declined | needs_confirmation
+  #     private_notes: null  # texto
+
+  experiences: []
+  # Exemplo de registro (descomente, preencha e remova o "[]" acima):
+  # - id: null  # opcional; id local livre
+  #   organization_name: null  # texto
+  #   organization_public_name: null  # texto
+  #   organization_group: null  # texto
+  #   industry: null  # texto
+  #   location:
+  #     city: null  # texto
+  #     region: null  # texto
+  #     country: null  # texto
+  #   official_title: null  # texto
+  #   display_title: null  # texto
+  #   employment_type: null  # employee | internship | apprenticeship | contractor | freelance | self_employed | business_owner | temporary | public_service | volunteer | other
+  #   department: null  # texto
+  #   manager_or_team: null  # texto
+  #   workload: null  # texto
+  #   start_date: null  # AAAA | AAAA-MM | AAAA-MM-DD
+  #   end_date: null  # AAAA | AAAA-MM | AAAA-MM-DD | present
+  #   work_mode: null  # onsite | hybrid | remote
+  #   company_context: null  # texto
+  #   role_objective: null  # texto
+  #   products_services_users: null  # texto
+  #   operational_scope: null  # texto
+  #   team_interfaces: []  # lista de textos
+  #   transferable_skills: []  # lista de textos
+  #   lessons_learned: []  # lista de textos
+  #   exit_reason: null  # texto
+  #   reference_contact_permission: null  # allowed | not_allowed | ask_first
+  #   business:
+  #     activity: null  # texto
+  #     client_market_description: null  # texto
+  #     services_scope: []  # lista de textos
+  #     client_count: null  # número
+  #     portfolio_url: null  # URL http(s)
+  #   items:
+  #     - id: null  # opcional; id local livre
+  #       kind: null  # responsibility | achievement | delivery
+  #       text: null  # texto
+  #       frequency: null  # daily | weekly | occasional | project_based
+  #       autonomy: null  # supervised | partial | independent | not_assessed
+  #       outcome: null  # texto
+  #       metric:
+  #         name: null  # texto
+  #         value: null  # texto
+  #         baseline: null  # texto
+  #         period: null  # texto
+  #         method: null  # texto
+  #       personal_contribution: null  # texto
+  #       problem: null  # texto
+  #       collaborators: []  # lista de textos
+  #       steps: []  # lista de textos
+  #       verification: null  # texto
+  #       meta:
+  #         status: null  # confirmed | needs_review | conflicting | archived
+  #         declared_status: null  # confirmed | needs_review | conflicting | archived
+  #         visibility: null  # public | private | conditional
+  #         resume_use: null  # allowed | requires_approval | never
+  #         source: null  # user_declared | form_entry | profile_import | resume_import | document | repository | certificate | interview | api | ai_extraction | other
+  #         source_detail: null  # texto
+  #         source_excerpt: null  # texto
+  #         evidence_ids: []  # lista de ids de evidencias
+  #         field_states: {}  # campo: not_provided | not_applicable | not_assessed | declined | needs_confirmation
+  #         private_notes: null  # texto
+  #   meta:
+  #     status: null  # confirmed | needs_review | conflicting | archived
+  #     declared_status: null  # confirmed | needs_review | conflicting | archived
+  #     visibility: null  # public | private | conditional
+  #     resume_use: null  # allowed | requires_approval | never
+  #     source: null  # user_declared | form_entry | profile_import | resume_import | document | repository | certificate | interview | api | ai_extraction | other
+  #     source_detail: null  # texto
+  #     source_excerpt: null  # texto
+  #     evidence_ids: []  # lista de ids de evidencias
+  #     field_states: {}  # campo: not_provided | not_applicable | not_assessed | declined | needs_confirmation
+  #     private_notes: null  # texto
+
+  projects: []
+  # Exemplo de registro (descomente, preencha e remova o "[]" acima):
+  # - id: null  # opcional; id local livre
+  #   name: null  # texto
+  #   category: null  # personal | academic | open_source | freelance | professional | research | volunteer | entrepreneurial | other
+  #   team_based: null  # true | false
+  #   status: null  # idea | in_progress | active | completed | archived
+  #   start_date: null  # AAAA | AAAA-MM | AAAA-MM-DD
+  #   end_date: null  # AAAA | AAAA-MM | AAAA-MM-DD | present
+  #   last_updated: null  # AAAA | AAAA-MM | AAAA-MM-DD
+  #   role: null  # texto
+  #   public_access: null  # public | partial | not_public
+  #   license: null  # texto
+  #   public_url: null  # URL http(s)
+  #   repository_url: null  # URL http(s)
+  #   documentation_url: null  # URL http(s)
+  #   demo_url: null  # URL http(s)
+  #   related_experience_id: null  # id de um registro deste arquivo
+  #   related_education_id: null  # id de um registro deste arquivo
+  #   collaborators:
+  #     - id: null  # opcional; id local livre
+  #       name_or_role: null  # texto
+  #       contribution: null  # texto
+  #   personal_contribution: null  # texto
+  #   contributions_by_others: null  # texto
+  #   decision_ownership: null  # texto
+  #   problem: null  # texto
+  #   target_audience: null  # texto
+  #   need_addressed: null  # texto
+  #   proposed_solution: null  # texto
+  #   architecture: null  # texto
+  #   authentication_authorization: null  # texto
+  #   known_limitations: []  # lista de textos
+  #   next_improvements: []  # lista de textos
+  #   learning: []  # lista de textos
+  #   feedback: []  # lista de textos
+  #   one_line_description: null  # texto
+  #   short_description: null  # texto
+  #   resume_keywords: []  # lista de textos
+  #   items:
+  #     - id: null  # opcional; id local livre
+  #       kind: null  # feature | contribution | deliverable | outcome | metric | business_rule | workflow | decision | test | integration
+  #       text: null  # texto
+  #       metric:
+  #         name: null  # texto
+  #         value: null  # texto
+  #         baseline: null  # texto
+  #         period: null  # texto
+  #         method: null  # texto
+  #       meta:
+  #         status: null  # confirmed | needs_review | conflicting | archived
+  #         declared_status: null  # confirmed | needs_review | conflicting | archived
+  #         visibility: null  # public | private | conditional
+  #         resume_use: null  # allowed | requires_approval | never
+  #         source: null  # user_declared | form_entry | profile_import | resume_import | document | repository | certificate | interview | api | ai_extraction | other
+  #         source_detail: null  # texto
+  #         source_excerpt: null  # texto
+  #         evidence_ids: []  # lista de ids de evidencias
+  #         field_states: {}  # campo: not_provided | not_applicable | not_assessed | declined | needs_confirmation
+  #         private_notes: null  # texto
+  #   meta:
+  #     status: null  # confirmed | needs_review | conflicting | archived
+  #     declared_status: null  # confirmed | needs_review | conflicting | archived
+  #     visibility: null  # public | private | conditional
+  #     resume_use: null  # allowed | requires_approval | never
+  #     source: null  # user_declared | form_entry | profile_import | resume_import | document | repository | certificate | interview | api | ai_extraction | other
+  #     source_detail: null  # texto
+  #     source_excerpt: null  # texto
+  #     evidence_ids: []  # lista de ids de evidencias
+  #     field_states: {}  # campo: not_provided | not_applicable | not_assessed | declined | needs_confirmation
+  #     private_notes: null  # texto
+
+  education: []
+  # Exemplo de registro (descomente, preencha e remova o "[]" acima):
+  # - id: null  # opcional; id local livre
+  #   institution: null  # texto
+  #   course_name: null  # texto
+  #   degree_type: null  # secondary | technical | associate | bachelor | specialization | mba | masters | doctorate | postdoc | other
+  #   field_of_study: null  # texto
+  #   status: null  # completed | in_progress | suspended | incomplete
+  #   start_date: null  # AAAA | AAAA-MM | AAAA-MM-DD
+  #   completion_date: null  # AAAA | AAAA-MM | AAAA-MM-DD
+  #   expected_completion_date: null  # AAAA | AAAA-MM | AAAA-MM-DD
+  #   modality: null  # onsite | online | hybrid
+  #   location: null  # texto
+  #   qualification_awarded: null  # texto
+  #   thesis_title: null  # texto
+  #   thesis_description: null  # texto
+  #   supervisor: null  # texto
+  #   relevant_coursework: []  # lista de textos
+  #   academic_projects: []  # lista de textos
+  #   honors_scholarships_distinctions: []  # lista de textos
+  #   verification_url: null  # URL http(s)
+  #   meta:
+  #     status: null  # confirmed | needs_review | conflicting | archived
+  #     declared_status: null  # confirmed | needs_review | conflicting | archived
+  #     visibility: null  # public | private | conditional
+  #     resume_use: null  # allowed | requires_approval | never
+  #     source: null  # user_declared | form_entry | profile_import | resume_import | document | repository | certificate | interview | api | ai_extraction | other
+  #     source_detail: null  # texto
+  #     source_excerpt: null  # texto
+  #     evidence_ids: []  # lista de ids de evidencias
+  #     field_states: {}  # campo: not_provided | not_applicable | not_assessed | declined | needs_confirmation
+  #     private_notes: null  # texto
+
+  courses: []
+  # Exemplo de registro (descomente, preencha e remova o "[]" acima):
+  # - id: null  # opcional; id local livre
+  #   name: null  # texto
+  #   provider: null  # texto
+  #   topics: []  # lista de textos
+  #   start_date: null  # AAAA | AAAA-MM | AAAA-MM-DD
+  #   completion_date: null  # AAAA | AAAA-MM | AAAA-MM-DD
+  #   workload_hours: null  # número
+  #   status: null  # completed | in_progress | incomplete
+  #   certificate_issued: null  # true | false
+  #   verification_url: null  # URL http(s)
+  #   activities_projects: []  # lista de textos
+  #   skills_developed: []  # lista de textos
+  #   relevant_job_families: []  # lista de textos
+  #   meta:
+  #     status: null  # confirmed | needs_review | conflicting | archived
+  #     declared_status: null  # confirmed | needs_review | conflicting | archived
+  #     visibility: null  # public | private | conditional
+  #     resume_use: null  # allowed | requires_approval | never
+  #     source: null  # user_declared | form_entry | profile_import | resume_import | document | repository | certificate | interview | api | ai_extraction | other
+  #     source_detail: null  # texto
+  #     source_excerpt: null  # texto
+  #     evidence_ids: []  # lista de ids de evidencias
+  #     field_states: {}  # campo: not_provided | not_applicable | not_assessed | declined | needs_confirmation
+  #     private_notes: null  # texto
+
+  skills: []
+  # Exemplo de registro (descomente, preencha e remova o "[]" acima):
+  # - id: null  # opcional; id local livre
+  #   name: null  # texto
+  #   category: null  # language | framework | library | database | tool | method | domain | soft_skill | spoken_language | other
+  #   aliases: []  # lista de textos
+  #   description: null  # texto
+  #   self_assessed_level: null  # not_assessed | exposure | basic | intermediate | advanced | expert
+  #   tasks_can_perform: []  # lista de textos
+  #   last_used: null  # AAAA | AAAA-MM | AAAA-MM-DD
+  #   duration_of_use: null  # texto
+  #   limitations: null  # texto
+  #   study_plan:
+  #     scope: null  # texto
+  #     sources: []  # lista de textos
+  #     practical_project: null  # texto
+  #     perceived_level: null  # texto
+  #     next_goal: null  # texto
+  #   meta:
+  #     status: null  # confirmed | needs_review | conflicting | archived
+  #     declared_status: null  # confirmed | needs_review | conflicting | archived
+  #     visibility: null  # public | private | conditional
+  #     resume_use: null  # allowed | requires_approval | never
+  #     source: null  # user_declared | form_entry | profile_import | resume_import | document | repository | certificate | interview | api | ai_extraction | other
+  #     source_detail: null  # texto
+  #     source_excerpt: null  # texto
+  #     evidence_ids: []  # lista de ids de evidencias
+  #     field_states: {}  # campo: not_provided | not_applicable | not_assessed | declined | needs_confirmation
+  #     private_notes: null  # texto
+
+  skill_usages: []
+  # Exemplo de registro (descomente, preencha e remova o "[]" acima):
+  # - id: null  # opcional; id local livre
+  #   skill_id: null  # id de um registro deste arquivo
+  #   usage_context: null  # professional_experience | project_experience | volunteer_experience | coursework | certification | self_declared_knowledge | conceptual_familiarity | unverified
+  #   experience_id: null  # id de um registro deste arquivo
+  #   project_id: null  # id de um registro deste arquivo
+  #   education_id: null  # id de um registro deste arquivo
+  #   course_id: null  # id de um registro deste arquivo
+  #   certification_id: null  # id de um registro deste arquivo
+  #   volunteering_id: null  # id de um registro deste arquivo
+  #   facet: null  # texto
+  #   usage_description: null  # texto
+  #   personal_implementation: null  # texto
+  #   level_in_context: null  # not_assessed | exposure | basic | intermediate | advanced | expert
+  #   start_date: null  # AAAA | AAAA-MM | AAAA-MM-DD
+  #   end_date: null  # AAAA | AAAA-MM | AAAA-MM-DD | present
+  #   tasks: []  # lista de textos
+  #   meta:
+  #     status: null  # confirmed | needs_review | conflicting | archived
+  #     declared_status: null  # confirmed | needs_review | conflicting | archived
+  #     visibility: null  # public | private | conditional
+  #     resume_use: null  # allowed | requires_approval | never
+  #     source: null  # user_declared | form_entry | profile_import | resume_import | document | repository | certificate | interview | api | ai_extraction | other
+  #     source_detail: null  # texto
+  #     source_excerpt: null  # texto
+  #     evidence_ids: []  # lista de ids de evidencias
+  #     field_states: {}  # campo: not_provided | not_applicable | not_assessed | declined | needs_confirmation
+  #     private_notes: null  # texto
+
+  languages: []
+  # Exemplo de registro (descomente, preencha e remova o "[]" acima):
+  # - id: null  # opcional; id local livre
+  #   language: null  # texto
+  #   language_code: null  # BCP-47, ex.: pt-BR
+  #   overall_level: null  # A1 | A2 | B1 | B2 | C1 | C2 | native | not_assessed
+  #   self_described_level: null  # texto livre com suas palavras (ex.: avançado, nível médio); nunca vira CEFR sozinho
+  #   reading: null  # A1 | A2 | B1 | B2 | C1 | C2 | native | not_assessed
+  #   writing: null  # A1 | A2 | B1 | B2 | C1 | C2 | native | not_assessed
+  #   listening: null  # A1 | A2 | B1 | B2 | C1 | C2 | native | not_assessed
+  #   speaking: null  # A1 | A2 | B1 | B2 | C1 | C2 | native | not_assessed
+  #   professional_usage: null  # texto
+  #   certification:
+  #     name: null  # texto
+  #     issuer: null  # texto
+  #     score: null  # texto
+  #     assessment_date: null  # AAAA | AAAA-MM | AAAA-MM-DD
+  #     valid_until: null  # AAAA | AAAA-MM | AAAA-MM-DD
+  #   certification_id: null  # id de um registro deste arquivo
+  #   meta:
+  #     status: null  # confirmed | needs_review | conflicting | archived
+  #     declared_status: null  # confirmed | needs_review | conflicting | archived
+  #     visibility: null  # public | private | conditional
+  #     resume_use: null  # allowed | requires_approval | never
+  #     source: null  # user_declared | form_entry | profile_import | resume_import | document | repository | certificate | interview | api | ai_extraction | other
+  #     source_detail: null  # texto
+  #     source_excerpt: null  # texto
+  #     evidence_ids: []  # lista de ids de evidencias
+  #     field_states: {}  # campo: not_provided | not_applicable | not_assessed | declined | needs_confirmation
+  #     private_notes: null  # texto
+
+  certifications: []
+  # Exemplo de registro (descomente, preencha e remova o "[]" acima):
+  # - id: null  # opcional; id local livre
+  #   name: null  # texto
+  #   issuer: null  # texto
+  #   category: null  # professional_certification | license | credential | attendance | completion | other
+  #   issue_date: null  # AAAA | AAAA-MM | AAAA-MM-DD
+  #   expiration_date: null  # AAAA | AAAA-MM | AAAA-MM-DD
+  #   public_identifier: null  # texto
+  #   verification_url: null  # URL http(s)
+  #   status: null  # valid | expired | renewal_in_progress | no_expiration
+  #   meta:
+  #     status: null  # confirmed | needs_review | conflicting | archived
+  #     declared_status: null  # confirmed | needs_review | conflicting | archived
+  #     visibility: null  # public | private | conditional
+  #     resume_use: null  # allowed | requires_approval | never
+  #     source: null  # user_declared | form_entry | profile_import | resume_import | document | repository | certificate | interview | api | ai_extraction | other
+  #     source_detail: null  # texto
+  #     source_excerpt: null  # texto
+  #     evidence_ids: []  # lista de ids de evidencias
+  #     field_states: {}  # campo: not_provided | not_applicable | not_assessed | declined | needs_confirmation
+  #     private_notes: null  # texto
+
+  awards: []
+  # Exemplo de registro (descomente, preencha e remova o "[]" acima):
+  # - id: null  # opcional; id local livre
+  #   name: null  # texto
+  #   organization: null  # texto
+  #   date: null  # AAAA | AAAA-MM | AAAA-MM-DD
+  #   context_and_criteria: null  # texto
+  #   personal_contribution: null  # texto
+  #   scope: null  # institutional | regional | national | international | other
+  #   meta:
+  #     status: null  # confirmed | needs_review | conflicting | archived
+  #     declared_status: null  # confirmed | needs_review | conflicting | archived
+  #     visibility: null  # public | private | conditional
+  #     resume_use: null  # allowed | requires_approval | never
+  #     source: null  # user_declared | form_entry | profile_import | resume_import | document | repository | certificate | interview | api | ai_extraction | other
+  #     source_detail: null  # texto
+  #     source_excerpt: null  # texto
+  #     evidence_ids: []  # lista de ids de evidencias
+  #     field_states: {}  # campo: not_provided | not_applicable | not_assessed | declined | needs_confirmation
+  #     private_notes: null  # texto
+
+  publications: []
+  # Exemplo de registro (descomente, preencha e remova o "[]" acima):
+  # - id: null  # opcional; id local livre
+  #   title: null  # texto
+  #   type: null  # article | research | thesis | dissertation | talk | lecture | book | chapter | documentation | other
+  #   date: null  # AAAA | AAAA-MM | AAAA-MM-DD
+  #   venue_or_institution: null  # texto
+  #   authorship: null  # texto
+  #   summary: null  # texto
+  #   personal_contribution: null  # texto
+  #   topics_methods: []  # lista de textos
+  #   url: null  # URL http(s)
+  #   doi: null  # texto
+  #   status: null  # published | presented | submitted | in_progress
+  #   meta:
+  #     status: null  # confirmed | needs_review | conflicting | archived
+  #     declared_status: null  # confirmed | needs_review | conflicting | archived
+  #     visibility: null  # public | private | conditional
+  #     resume_use: null  # allowed | requires_approval | never
+  #     source: null  # user_declared | form_entry | profile_import | resume_import | document | repository | certificate | interview | api | ai_extraction | other
+  #     source_detail: null  # texto
+  #     source_excerpt: null  # texto
+  #     evidence_ids: []  # lista de ids de evidencias
+  #     field_states: {}  # campo: not_provided | not_applicable | not_assessed | declined | needs_confirmation
+  #     private_notes: null  # texto
+
+  volunteering: []
+  # Exemplo de registro (descomente, preencha e remova o "[]" acima):
+  # - id: null  # opcional; id local livre
+  #   organization: null  # texto
+  #   role: null  # texto
+  #   participation_type: null  # volunteer | community | association | leadership | mentoring | student_activity | other
+  #   start_date: null  # AAAA | AAAA-MM | AAAA-MM-DD
+  #   end_date: null  # AAAA | AAAA-MM | AAAA-MM-DD | present
+  #   responsibilities: []  # lista de textos
+  #   audience: null  # texto
+  #   outcomes: []  # lista de textos
+  #   meta:
+  #     status: null  # confirmed | needs_review | conflicting | archived
+  #     declared_status: null  # confirmed | needs_review | conflicting | archived
+  #     visibility: null  # public | private | conditional
+  #     resume_use: null  # allowed | requires_approval | never
+  #     source: null  # user_declared | form_entry | profile_import | resume_import | document | repository | certificate | interview | api | ai_extraction | other
+  #     source_detail: null  # texto
+  #     source_excerpt: null  # texto
+  #     evidence_ids: []  # lista de ids de evidencias
+  #     field_states: {}  # campo: not_provided | not_applicable | not_assessed | declined | needs_confirmation
+  #     private_notes: null  # texto
+
+  evidence: []
+  # Exemplo de registro (descomente, preencha e remova o "[]" acima):
+  # - id: null  # opcional; id local livre
+  #   type: null  # repository | certificate | portfolio | document | publication | demo | reference | self_declaration | other
+  #   title: null  # texto
+  #   url_or_location: null  # texto
+  #   supports: []  # lista de ids de registros
+  #   evidence_date: null  # AAAA | AAAA-MM | AAAA-MM-DD
+  #   is_public: null  # true | false
+  #   recruiter_sharing: null  # allowed | restricted | not_allowed
+  #   notes: null  # texto
+
+  pending_items: []
+  # Exemplo de registro (descomente, preencha e remova o "[]" acima):
+  # - id: null  # opcional; id local livre
+  #   subject: null  # texto
+  #   target:
+  #     record_id: null  # id de um registro deste arquivo
+  #     field: null  # texto
+  #   current_information: null  # texto
+  #   reason: null  # missing | conflict | stale | unclear
+  #   reason_detail: null  # texto
+  #   known_variants: []  # lista de textos
+  #   safe_statement_for_now: null  # texto
+  #   confirmation_method: null  # texto
+  #   priority: null  # low | medium | high
+  #   status: null  # open | resolved | dismissed
+
+  availability_preferences:
+    preferred_work_modes: [] # lista de: onsite | hybrid | remote
+    accepted_work_modes: [] # lista de: onsite | hybrid | remote
+    target_regions_countries: [] # lista de textos
+    willing_to_relocate: null # yes | no | depends
+    travel_availability: null # yes | no | depends
+    travel_notes: null # texto
+    start_availability: null # texto
+    preferred_contract_types: [] # lista de: employee | internship | apprenticeship | contractor | freelance | self_employed | business_owner | temporary | public_service | volunteer | other
+    preferred_workload: null # texto
+    compatible_timezones_hours: null # texto
+    salary_expectation:
+      amount: null # número
+      currency: null # texto
+      period: null # hourly | monthly | yearly
+      notes: null # texto
+    desired_benefits: [] # lista de textos
+    work_environment_preferences: [] # lista de textos
+    work_conditions: [] # lista de textos
+    deal_breakers: [] # lista de textos
+    field_states: {} # campo: not_provided | not_applicable | not_assessed | declined | needs_confirmation
+
+  career_preferences:
+    priority_job_titles: [] # lista de textos
+    secondary_job_titles: [] # lista de textos
+    excluded_job_titles: [] # lista de textos
+    fields_of_interest: [] # lista de textos
+    preferred_industries: [] # lista de textos
+    excluded_industries: [] # lista de textos
+    target_seniority_levels: [] # lista de: student | entry | junior | mid | senior | specialist | lead | manager | executive | not_assessed
+    accepted_equivalent_titles: [] # lista de textos
+    misleading_titles_to_avoid: [] # lista de textos
+    preferred_responsibilities: [] # lista de textos
+    responsibilities_to_avoid: [] # lista de textos
+    professional_interests: [] # lista de textos
+    problems_to_solve: [] # lista de textos
+    short_term_goals: null # texto
+    long_term_goals: null # texto
+    what_makes_a_job_interesting: null # texto
+    work_balance_preference: null # texto
+    interest_in_adjacent_fields: null # yes | no | depends
+    adjacent_fields_conditions: null # texto
+    field_states: {} # campo: not_provided | not_applicable | not_assessed | declined | needs_confirmation
+
+  resume_preferences:
+    default_language: null # BCP-47, ex.: pt-BR
+    regional_variant: null # BCP-47, ex.: pt-BR
+    tone: null # formal | professional_direct | technical | executive | academic | other
+    preferred_length: null # one_page | two_pages | content_based
+    output_formats: [] # lista de: docx | pdf
+    visual_style: null # ats_simple | traditional | modern_discreet | academic | portfolio
+    photo_preference: null # never | when_appropriate
+    default_headline: null # texto
+    preferred_sections: [] # lista de: summary | experience | projects | education | courses | skills | languages | certifications | awards | publications | volunteering
+    sections_to_omit: [] # lista de: summary | experience | projects | education | courses | skills | languages | certifications | awards | publications | volunteering
+    older_experience_ids: [] # lista de ids de registros
+    highlight_record_ids: [] # lista de ids de registros
+    preferred_vocabulary: [] # lista de textos
+    expressions_to_avoid: [] # lista de textos
+    additional_style_notes: null # texto
+    field_states: {} # campo: not_provided | not_applicable | not_assessed | declined | needs_confirmation
+
+  additional_professional_context:
+    industry_knowledge: [] # lista de textos
+    standards_regulations: [] # lista de textos
+    specialized_equipment: [] # lista de textos
+    methods_processes_frameworks: [] # lista de textos
+    international_experience: null # texto
+    distributed_team_experience: null # texto
+    stakeholder_experience: null # texto
+    other: null # texto
+    field_states: {} # campo: not_provided | not_applicable | not_assessed | declined | needs_confirmation
+
+  usage_rules:
+    restrictions: []
+    # Exemplo de restricao (descomente, preencha e remova o "[]" acima):
+    # - id: null  # opcional; id local livre
+    #   target:
+    #     record_id: null  # id de um registro deste arquivo (com field opcional)...
+    #     field: null  # campo do registro ou do perfil (ex.: organization_name, identity.pronouns)
+    #     term: null  # ...OU um termo a filtrar (texto livre)
+    #   rule: null  # never_include | require_approval | private_guidance_only
+    #   reason: null  # texto
+    field_states: {} # campo: not_provided | not_applicable | not_assessed | declined | needs_confirmation
+
+  review:
+    profile_created_date: null # AAAA | AAAA-MM | AAAA-MM-DD
+    last_reviewed_date: null # AAAA | AAAA-MM | AAAA-MM-DD
+    reviewed_by: null # self | other_authorized
+    reviewed_sections: [] # lista de textos
+    items_to_update: [] # lista de textos
+    field_states: {} # campo: not_provided | not_applicable | not_assessed | declined | needs_confirmation

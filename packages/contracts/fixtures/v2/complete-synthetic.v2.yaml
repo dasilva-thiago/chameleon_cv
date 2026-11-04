@@ -1,0 +1,442 @@
+# FIXTURE SINTETICA do contrato 2.1.0 (dados totalmente ficticios): perfil de enfermagem.
+# Exercita todas as secoes, ids locais, referencias, contextos de uso, estados explicitos e metadados.
+
+schema_version: '2.1.0'
+locale: pt-BR
+profile:
+  identity:
+    full_name: Marina Teixeira Lopes
+    preferred_name: Marina Lopes
+    pronouns: ela/dela
+    country_of_residence: Brasil
+    city: Recife
+    region: PE
+    countries_of_work_interest: [Brasil, Portugal]
+    timezone: America/Recife
+    interface_languages: [pt-BR, en-US]
+    field_visibility:
+      full_name: public
+      city: public
+      region: conditional
+    field_states:
+      pronunciation: declined
+
+  contact_points:
+    - id: CTT-001
+      kind: email
+      subtype: professional
+      value: marina.lopes@exemplo.test
+      visibility: public
+      include_by_default: true
+      is_primary: true
+    - id: CTT-002
+      kind: phone
+      subtype: mobile
+      value: '(81) 90000-0000'
+      visibility: conditional
+      include_by_default: false
+    - id: CTT-003
+      kind: link
+      subtype: linkedin
+      value: https://www.linkedin.com/in/marina-exemplo
+      label: LinkedIn
+      visibility: public
+      include_by_default: true
+
+  positioning:
+    current_profession: Enfermagem
+    current_job_title: Enfermeira assistencial
+    current_seniority: senior
+    professional_headline: Enfermeira assistencial com foco em terapia intensiva adulta
+
+  statements:
+    - id: STM-001
+      kind: one_sentence_intro
+      text: Enfermeira de terapia intensiva com experiência em cuidado a pacientes críticos.
+      meta: { status: confirmed, visibility: public, resume_use: allowed, source: user_declared }
+    - id: STM-002
+      kind: career_narrative
+      text: Atuo em UTI adulto desde a graduação e assumi a coordenação de turno em 2021.
+      meta: { status: needs_review, visibility: private, resume_use: never, source: form_entry }
+    - id: STM-003
+      kind: differentiator
+      text: Implantação de protocolo de prevenção de lesão por pressão na unidade.
+      meta:
+        status: confirmed
+        source: user_declared
+        evidence_ids: [EVD-001]
+
+  competency_examples:
+    - id: CMP-001
+      competency: Comunicação com famílias
+      situation: Familiares ansiosos durante a internação prolongada de um paciente.
+      action: Estabeleci boletins diários padronizados e canal único de contato.
+      outcome_or_learning: Redução de ligações repetidas ao posto de enfermagem.
+      related_skill_ids: [SKL-003]
+      meta: { status: needs_review, source: form_entry }
+
+  experiences:
+    - id: EXP-001
+      organization_name: Hospital Exemplo do Recife
+      organization_public_name: Hospital Exemplo
+      organization_group: hospital-exemplo
+      industry: Saúde
+      location: { city: Recife, region: PE, country: Brasil }
+      official_title: Enfermeira Coordenadora de Turno
+      display_title: Enfermeira Coordenadora de UTI
+      employment_type: employee
+      department: UTI Adulto
+      workload: 36 horas semanais
+      start_date: '2021-03'
+      end_date: present
+      work_mode: onsite
+      company_context: Hospital de alta complexidade com 20 leitos de UTI adulto.
+      role_objective: Coordenar a equipe de enfermagem do turno e garantir a segurança do paciente.
+      operational_scope: Equipe de 12 profissionais por turno.
+      team_interfaces: [Médicos intensivistas, Fisioterapia, Farmácia clínica]
+      lessons_learned: [Passagem de plantão estruturada reduz falhas de comunicação]
+      reference_contact_permission: ask_first
+      items:
+        - id: ITM-001
+          kind: responsibility
+          text: Distribuir a equipe e supervisionar a assistência aos pacientes críticos do turno.
+          frequency: daily
+          autonomy: independent
+          meta: { status: confirmed, source: user_declared }
+        - id: ITM-002
+          kind: achievement
+          text: Redução de lesões por pressão na unidade após implantação de protocolo.
+          metric:
+            name: Incidência de lesão por pressão
+            value: '-40%'
+            baseline: '5 casos/mês'
+            period: '2022'
+            method: Notificações do núcleo de segurança do paciente
+          personal_contribution: Elaborei o protocolo e treinei os três turnos.
+          meta:
+            status: confirmed
+            resume_use: requires_approval
+            visibility: conditional
+            evidence_ids: [EVD-001]
+            field_states:
+              metric.value: needs_confirmation
+        - id: ITM-003
+          kind: delivery
+          text: Padronização da passagem de plantão
+          problem: Informações incompletas na troca de turno.
+          steps: [Mapear falhas, Criar modelo, Treinar equipe]
+          meta: { status: needs_review, source: form_entry }
+      meta:
+        status: confirmed
+        source: user_declared
+        evidence_ids: [EVD-002]
+        field_states:
+          exit_reason: not_applicable
+    - id: EXP-002
+      organization_name: Clínica Exemplo
+      official_title: Enfermeira
+      employment_type: employee
+      start_date: '2017-02'
+      end_date: '2021-02'
+      meta:
+        status: confirmed
+        source: user_declared
+    - id: EXP-003
+      organization_name: Cuidados Domiciliares Marina Lopes
+      employment_type: self_employed
+      start_date: '2016'
+      end_date: '2017'
+      business:
+        activity: Cuidado domiciliar de pacientes crônicos
+        client_market_description: Famílias da região metropolitana
+        client_count: 6
+      items:
+        - id: ITM-004
+          kind: responsibility
+          text: Avaliar necessidades e planejar a rotina de cuidados em domicílio.
+          meta: { status: needs_review, source: form_entry }
+      meta:
+        status: needs_review
+        source: form_entry
+        field_states:
+          end_date: needs_confirmation
+          business.portfolio_url: declined
+
+  projects:
+    - id: PRJ-001
+      name: Cartilha de segurança do paciente
+      category: professional
+      team_based: true
+      status: completed
+      start_date: '2022-02'
+      end_date: '2022-11'
+      role: Autora e revisora
+      public_access: partial
+      related_experience_id: EXP-001
+      personal_contribution: Escrevi o conteúdo e coordenei a revisão técnica.
+      collaborators:
+        - id: COL-001
+          name_or_role: Equipe de design institucional
+          contribution: Diagramação
+      items:
+        - id: PIT-001
+          kind: deliverable
+          text: Cartilha impressa e digital para familiares.
+          meta: { status: confirmed, source: user_declared }
+      meta:
+        status: confirmed
+        source: user_declared
+
+  education:
+    - id: EDU-001
+      institution: Universidade Federal Exemplo
+      course_name: Enfermagem
+      degree_type: bachelor
+      status: completed
+      start_date: '2012'
+      completion_date: '2016-12'
+      modality: onsite
+      qualification_awarded: Bacharel em Enfermagem
+      meta: { status: confirmed, source: user_declared }
+    - id: EDU-002
+      institution: Instituto Exemplo de Saúde
+      course_name: Especialização em Terapia Intensiva
+      degree_type: specialization
+      status: in_progress
+      start_date: '2024-03'
+      expected_completion_date: '2025-12'
+      modality: hybrid
+      meta: { status: needs_review, source: form_entry }
+
+  courses:
+    - id: CRS-001
+      name: Suporte avançado de vida
+      provider: Associação Exemplo de Medicina Intensiva
+      start_date: '2022-05'
+      completion_date: '2022-05'
+      workload_hours: 16
+      status: completed
+      certificate_issued: true
+      meta: { status: confirmed, source: certificate }
+
+  skills:
+    - id: SKL-001
+      name: Ventilação mecânica
+      category: domain
+      self_assessed_level: advanced
+      tasks_can_perform:
+        [Ajuste de parâmetros em conjunto com a equipe médica, Prevenção de pneumonia associada]
+      meta: { status: confirmed, source: user_declared }
+    - id: SKL-002
+      name: Monitoramento hemodinâmico
+      category: method
+      self_assessed_level: intermediate
+      meta: { status: needs_review, source: form_entry }
+    - id: SKL-003
+      name: Comunicação com famílias
+      category: soft_skill
+      meta: { status: needs_review, source: form_entry }
+    - id: SKL-004
+      name: Gestão de equipes de enfermagem
+      category: method
+      study_plan:
+        scope: Liderança em saúde
+        sources: [Especialização em andamento]
+        next_goal: Coordenação de unidade
+      meta:
+        status: needs_review
+        source: form_entry
+        resume_use: requires_approval
+
+  skill_usages:
+    - id: USG-001
+      skill_id: SKL-001
+      usage_context: professional_experience
+      experience_id: EXP-001
+      level_in_context: advanced
+      start_date: '2017-02'
+      end_date: present
+      meta: { status: confirmed, source: user_declared }
+    - id: USG-002
+      skill_id: SKL-002
+      usage_context: professional_experience
+      experience_id: EXP-002
+      meta: { status: needs_review, source: form_entry }
+    - id: USG-003
+      skill_id: SKL-003
+      usage_context: project_experience
+      project_id: PRJ-001
+      facet: comunicação com famílias
+      meta: { status: needs_review, source: form_entry }
+    - id: USG-004
+      skill_id: SKL-001
+      usage_context: coursework
+      course_id: CRS-001
+      meta: { status: confirmed, source: certificate }
+    - id: USG-005
+      skill_id: SKL-004
+      usage_context: conceptual_familiarity
+      meta: { status: needs_review, source: form_entry, resume_use: requires_approval }
+    - id: USG-006
+      skill_id: SKL-002
+      usage_context: certification
+      certification_id: CERT-001
+      meta: { status: confirmed, source: certificate }
+
+  languages:
+    - id: LNG-001
+      language: Português
+      language_code: pt-BR
+      overall_level: native
+      meta: { status: confirmed, source: user_declared }
+    - id: LNG-002
+      language: Inglês
+      language_code: en
+      overall_level: B1
+      reading: B2
+      writing: B1
+      listening: B1
+      speaking: A2
+      professional_usage: Leitura de protocolos internacionais.
+      certification:
+        {
+          name: Teste de proficiência Exemplo,
+          score: B1,
+          assessment_date: '2023-08',
+          valid_until: '2025-08',
+        }
+      meta: { status: needs_review, source: form_entry, resume_use: requires_approval }
+    - id: LNG-003
+      language: Espanhol
+      language_code: es
+      self_described_level: nível médio
+      meta: { status: needs_review, source: form_entry }
+
+  certifications:
+    - id: CERT-001
+      name: Suporte Básico em Terapia Intensiva
+      issuer: Associação Exemplo de Medicina Intensiva
+      category: professional_certification
+      issue_date: '2021-09'
+      expiration_date: '2025-09'
+      public_identifier: SBTI-0001
+      verification_url: https://exemplo.test/verificar/SBTI-0001
+      status: valid
+      meta: { status: confirmed, source: certificate, evidence_ids: [EVD-003] }
+
+  awards:
+    - id: AWD-001
+      name: Reconhecimento por segurança do paciente
+      organization: Hospital Exemplo do Recife
+      date: '2022'
+      scope: institutional
+      meta: { status: confirmed, source: document }
+
+  publications:
+    - id: PUB-001
+      title: Protocolo de prevenção de lesão por pressão em UTI
+      type: talk
+      date: '2023-06'
+      venue_or_institution: Congresso Exemplo de Enfermagem
+      authorship: Autora principal
+      url: https://exemplo.test/congresso/protocolo
+      status: presented
+      meta: { status: confirmed, source: user_declared }
+
+  volunteering:
+    - id: VOL-001
+      organization: Projeto Saúde na Comunidade
+      role: Voluntária em ações de triagem
+      participation_type: volunteer
+      start_date: '2019'
+      end_date: '2021'
+      responsibilities: [Aferição de sinais vitais em ações comunitárias]
+      meta: { status: confirmed, source: user_declared }
+
+  evidence:
+    - id: EVD-001
+      type: document
+      title: Relatório do núcleo de segurança do paciente
+      url_or_location: Arquivo interno do hospital (confidencial)
+      supports: [ITM-002]
+      evidence_date: '2022-12'
+      is_public: false
+      recruiter_sharing: not_allowed
+    - id: EVD-002
+      type: reference
+      title: Declaração de vínculo atual
+      is_public: false
+      recruiter_sharing: restricted
+    - id: EVD-003
+      type: certificate
+      title: Certificado do curso
+      url_or_location: https://exemplo.test/certificados/sbti-0001
+      is_public: true
+      recruiter_sharing: allowed
+
+  pending_items:
+    - id: PND-001
+      subject: Data de término do trabalho autônomo
+      target: { record_id: EXP-003, field: end_date }
+      current_information: '2017'
+      reason: unclear
+      reason_detail: Memória incompleta
+      known_variants: ['2017', '2018']
+      safe_statement_for_now: Atuou como enfermeira autônoma entre 2016 e 2017.
+      confirmation_method: Recibos de prestação de serviço
+      priority: medium
+      status: open
+
+  availability_preferences:
+    preferred_work_modes: [onsite]
+    accepted_work_modes: [onsite, hybrid]
+    willing_to_relocate: depends
+    travel_availability: no
+    start_availability: 60 dias
+    preferred_contract_types: [employee]
+    salary_expectation:
+      currency: BRL
+      period: monthly
+    desired_benefits: [Plano de saúde]
+    field_states:
+      deal_breakers: declined
+
+  career_preferences:
+    priority_job_titles: [Enfermeira Coordenadora, Enfermeira de Terapia Intensiva]
+    fields_of_interest: [Terapia intensiva, Segurança do paciente]
+    preferred_industries: [Saúde]
+    target_seniority_levels: [senior, lead]
+    interest_in_adjacent_fields: depends
+
+  resume_preferences:
+    default_language: pt-BR
+    regional_variant: pt-BR
+    tone: professional_direct
+    preferred_length: two_pages
+    output_formats: [docx, pdf]
+    visual_style: ats_simple
+    photo_preference: never
+    preferred_sections: [experience, education, certifications]
+    sections_to_omit: [volunteering]
+    older_experience_ids: [EXP-003]
+    highlight_record_ids: [EXP-001, PRJ-001]
+
+  additional_professional_context:
+    standards_regulations: [NR-32, Protocolos de segurança do paciente]
+    methods_processes_frameworks: [Passagem de plantão estruturada]
+
+  usage_rules:
+    restrictions:
+      - id: RST-001
+        target: { record_id: EXP-001, field: organization_name }
+        rule: require_approval
+        reason: Usar o nome público do hospital.
+      - id: RST-002
+        target: { term: pretensão salarial }
+        rule: private_guidance_only
+
+  review:
+    profile_created_date: '2024-01-15'
+    last_reviewed_date: '2024-06-01'
+    reviewed_by: self
+    reviewed_sections: [experiences, education]
