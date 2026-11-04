@@ -1,0 +1,564 @@
+// Agregado de perfil (S1.1b): enums, raiz do perfil, camada de governanca (ProfileFact) e registros
+// nao citaveis (contatos, evidencias, pendencias, restricoes). docs/domain-model.md §3, ADR-0005/0006/0007.
+//
+// Convencoes (ADR-0008): todo model tem `ownerId` + @@unique([id, ownerId]); toda FK entre tabelas
+// privadas e composta (xId, ownerId). Os enums espelham `@chameleon/contracts/common/enums` (um teste
+// confere a igualdade). CHECKs, triggers e funcoes ficam em `migrations/*_profile_constraints`.
+
+enum FactKind {
+  statement
+  competency_example
+  experience
+  experience_item
+  project
+  project_item
+  education
+  course
+  skill
+  skill_usage
+  language
+  certification
+  award
+  publication
+  volunteering
+}
+
+enum FactStatus {
+  confirmed
+  needs_review
+  conflicting
+  archived
+}
+
+enum Visibility {
+  public
+  private
+  conditional
+}
+
+enum ResumeUse {
+  allowed
+  requires_approval
+  never
+}
+
+enum FactSource {
+  user_declared
+  form_entry
+  profile_import
+  resume_import
+  document
+  repository
+  certificate
+  interview
+  api
+  ai_extraction
+  other
+}
+
+enum DatePrecision {
+  year
+  month
+  day
+}
+
+enum UsageContext {
+  professional_experience
+  project_experience
+  volunteer_experience
+  coursework
+  certification
+  self_declared_knowledge
+  conceptual_familiarity
+  unverified
+}
+
+enum EmploymentType {
+  employee
+  internship
+  apprenticeship
+  contractor
+  freelance
+  self_employed
+  business_owner
+  temporary
+  public_service
+  volunteer
+  other
+}
+
+enum WorkMode {
+  onsite
+  hybrid
+  remote
+}
+
+enum ProjectCategory {
+  personal
+  academic
+  open_source
+  freelance
+  professional
+  research
+  volunteer
+  entrepreneurial
+  other
+}
+
+enum ProjectStatus {
+  idea
+  in_progress
+  active
+  completed
+  archived
+}
+
+enum PublicAccess {
+  public
+  partial
+  not_public
+}
+
+enum SelfAssessedLevel {
+  not_assessed
+  exposure
+  basic
+  intermediate
+  advanced
+  expert
+}
+
+enum LanguageLevel {
+  A1
+  A2
+  B1
+  B2
+  C1
+  C2
+  native
+  not_assessed
+}
+
+enum EducationStatus {
+  completed
+  in_progress
+  suspended
+  incomplete
+}
+
+enum DegreeType {
+  secondary
+  technical
+  associate
+  bachelor
+  specialization
+  mba
+  masters
+  doctorate
+  postdoc
+  other
+}
+
+enum StudyModality {
+  onsite
+  online
+  hybrid
+}
+
+enum CourseStatus {
+  completed
+  in_progress
+  incomplete
+}
+
+enum SkillCategory {
+  language
+  framework
+  library
+  database
+  tool
+  method
+  domain
+  soft_skill
+  spoken_language
+  other
+}
+
+enum CertificationCategory {
+  professional_certification
+  license
+  credential
+  attendance
+  completion
+  other
+}
+
+enum CertificationStatus {
+  valid
+  expired
+  renewal_in_progress
+  no_expiration
+}
+
+enum AwardScope {
+  institutional
+  regional
+  national
+  international
+  other
+}
+
+enum PublicationType {
+  article
+  research
+  thesis
+  dissertation
+  talk
+  lecture
+  book
+  chapter
+  documentation
+  other
+}
+
+enum PublicationStatus {
+  published
+  presented
+  submitted
+  in_progress
+}
+
+enum ParticipationType {
+  volunteer
+  community
+  association
+  leadership
+  mentoring
+  student_activity
+  other
+}
+
+enum ContactKind {
+  email
+  phone
+  link
+}
+
+enum ContactSubtype {
+  professional
+  personal
+  mobile
+  landline
+  whatsapp
+  linkedin
+  github
+  gitlab
+  bitbucket
+  portfolio
+  website
+  behance
+  dribbble
+  artstation
+  other
+}
+
+enum StatementKind {
+  one_sentence_intro
+  short_summary
+  full_summary
+  career_narrative
+  differentiator
+  value
+}
+
+enum ExperienceItemKind {
+  responsibility
+  achievement
+  delivery
+}
+
+enum ProjectItemKind {
+  feature
+  contribution
+  deliverable
+  outcome
+  metric
+  business_rule
+  workflow
+  decision
+  test
+  integration
+}
+
+enum PendingReason {
+  missing
+  conflict
+  stale
+  unclear
+}
+
+enum PendingStatus {
+  open
+  resolved
+  dismissed
+}
+
+enum Priority {
+  low
+  medium
+  high
+}
+
+enum EvidenceType {
+  repository
+  certificate
+  portfolio
+  document
+  publication
+  demo
+  reference
+  self_declaration
+  other
+}
+
+enum RecruiterSharing {
+  allowed
+  restricted
+  not_allowed
+}
+
+enum RestrictionRule {
+  never_include
+  require_approval
+  private_guidance_only
+}
+
+/// Raiz do agregado de perfil. Os blocos singleton (identity, preferencias...) sao JSONB validados
+/// pelo contrato Zod; NULL = bloco ausente, `{}` = bloco presente e vazio. Privados por construcao
+/// (availability, career, usage_rules) nunca entram no contexto de geracao.
+model ProfessionalProfile {
+  id                      String   @id @default(uuid(7)) @db.Uuid
+  ownerId                 String   @db.Uuid
+  /// No MVP ha um perfil por dono; o indice parcial garante no maximo um primario.
+  isPrimary               Boolean  @default(true)
+  locale                  String?
+  /// Versao do contrato do documento persistido (2.0.0 ou 2.1.0; a leitura sempre emite a corrente).
+  schemaVersion           String
+  identity                Json?
+  positioning             Json?
+  availabilityPreferences Json?
+  careerPreferences       Json?
+  resumePreferences       Json?
+  additionalContext       Json?
+  /// Sem `restrictions` (estao em UsageRestriction); guarda `field_states` e o marcador `restrictions: []`.
+  usageRules              Json?
+  review                  Json?
+  /// Colecoes de topo declaradas explicitamente como `[]` ("nenhum item fornecido", ADR-0005).
+  emptyCollections        String[] @default([])
+  createdAt               DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt               DateTime @updatedAt @db.Timestamptz(3)
+
+  owner User @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  facts         ProfileFact[]
+  skills        Skill[]
+  contactPoints ContactPoint[]
+  evidence      Evidence[]
+  pendingItems  PendingItem[]
+  restrictions  UsageRestriction[]
+  revisions     ProfileRevision[]
+  imports       ImportRecord[]
+
+  @@unique([id, ownerId])
+  @@index([ownerId])
+}
+
+/// Camada de governanca (ADR-0005/0006): uma linha por registro citavel, com PK compartilhada com
+/// a tabela tipada (`Experience.id = ProfileFact.id`). Os 4 campos efetivos (status, visibility,
+/// resumeUse, source) sao sempre concretos; `metaKeys` lembra quais chaves o documento declarou
+/// (para a leitura reproduzir exatamente o `meta` original) e `metaPresent` se havia `meta`.
+model ProfileFact {
+  id             String      @id @db.Uuid
+  ownerId        String      @db.Uuid
+  profileId      String      @db.Uuid
+  kind           FactKind
+  status         FactStatus  @default(needs_review)
+  declaredStatus FactStatus?
+  /// Sem `meta` declarado, o efetivo e o mais restritivo: nada vai para um curriculo sem decisao do dono.
+  visibility     Visibility  @default(private)
+  resumeUse      ResumeUse   @default(requires_approval)
+  source         FactSource  @default(other)
+  sourceDetail   String?
+  sourceExcerpt  String?
+  /// Nunca enviado a IA nem a documentos.
+  privateNotes   String?
+  /// Mapa esparso campo -> estado (chaves aninhadas como `metric.value`; CHECK de formato).
+  fieldStates    Json        @default("{}")
+  metaPresent    Boolean     @default(true)
+  metaKeys       String[]    @default([])
+  /// Posicao dentro da colecao (ou do pai, para itens).
+  sortOrder      Int         @default(0)
+  confirmedAt    DateTime?   @db.Timestamptz(3)
+  archivedAt     DateTime?   @db.Timestamptz(3)
+  createdAt      DateTime    @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime    @updatedAt @db.Timestamptz(3)
+
+  profile ProfessionalProfile @relation(fields: [profileId, ownerId], references: [id, ownerId], onDelete: Cascade)
+
+  statement         ProfileStatement?
+  competencyExample CompetencyExample?
+  experience        Experience?
+  experienceItem    ExperienceItem?
+  project           Project?
+  projectItem       ProjectItem?
+  education         Education?
+  course            Course?
+  skill             Skill?
+  skillUsage        SkillUsage?
+  language          LanguageProficiency?
+  certification     Certification?
+  award             Award?
+  publication       Publication?
+  volunteering      Volunteering?
+
+  evidenceLinks      EvidenceLink[]
+  pendingTargets     PendingItem[]      @relation("PendingTargetFact")
+  restrictionTargets UsageRestriction[] @relation("RestrictionTargetFact")
+
+  @@unique([id, ownerId])
+  @@index([ownerId, profileId, status])
+  @@index([profileId, kind])
+}
+
+/// Contato repetivel (e-mail, telefone, link). Telefone na forma canonica (CHECK).
+model ContactPoint {
+  id               String          @id @default(uuid(7)) @db.Uuid
+  ownerId          String          @db.Uuid
+  profileId        String          @db.Uuid
+  kind             ContactKind
+  subtype          ContactSubtype?
+  value            String
+  label            String?
+  /// Ausente no documento = NULL (o consumidor trata como privado).
+  visibility       Visibility?
+  includeByDefault Boolean?
+  isPrimary        Boolean?
+  notes            String?
+  sortOrder        Int             @default(0)
+  createdAt        DateTime        @default(now()) @db.Timestamptz(3)
+  updatedAt        DateTime        @updatedAt @db.Timestamptz(3)
+
+  profile ProfessionalProfile @relation(fields: [profileId, ownerId], references: [id, ownerId], onDelete: Cascade)
+
+  pendingTargets     PendingItem[]      @relation("PendingTargetContact")
+  restrictionTargets UsageRestriction[] @relation("RestrictionTargetContact")
+
+  @@unique([id, ownerId])
+  @@index([ownerId, profileId, sortOrder])
+}
+
+model Evidence {
+  id                    String            @id @default(uuid(7)) @db.Uuid
+  ownerId               String            @db.Uuid
+  profileId             String            @db.Uuid
+  type                  EvidenceType
+  title                 String?
+  urlOrLocation         String?
+  evidenceDate          DateTime?         @db.Date
+  evidenceDatePrecision DatePrecision?
+  isPublic              Boolean?
+  recruiterSharing      RecruiterSharing?
+  notes                 String?
+  /// Marcadores de lista vazia explicita (`supports: []`).
+  details               Json?
+  sortOrder             Int               @default(0)
+  createdAt             DateTime          @default(now()) @db.Timestamptz(3)
+  updatedAt             DateTime          @updatedAt @db.Timestamptz(3)
+
+  profile ProfessionalProfile @relation(fields: [profileId, ownerId], references: [id, ownerId], onDelete: Cascade)
+
+  links              EvidenceLink[]
+  pendingTargets     PendingItem[]      @relation("PendingTargetEvidence")
+  restrictionTargets UsageRestriction[] @relation("RestrictionTargetEvidence")
+
+  @@unique([id, ownerId])
+  @@index([ownerId, profileId, sortOrder])
+}
+
+/// Vinculo evidencia <-> fato. O documento declara a relacao em dois lugares (`evidence.supports` e
+/// `meta.evidence_ids`); as posicoes registram de que lado veio (ao menos um) para a leitura
+/// reproduzir cada lista na ordem original.
+model EvidenceLink {
+  id                  String @id @default(uuid(7)) @db.Uuid
+  evidenceId          String @db.Uuid
+  factId              String @db.Uuid
+  ownerId             String @db.Uuid
+  supportsPosition    Int?
+  evidenceIdsPosition Int?
+
+  evidence Evidence    @relation(fields: [evidenceId, ownerId], references: [id, ownerId], onDelete: Cascade)
+  fact     ProfileFact @relation(fields: [factId, ownerId], references: [id, ownerId], onDelete: Cascade)
+
+  @@unique([id, ownerId])
+  @@unique([evidenceId, factId])
+  @@index([ownerId, factId])
+}
+
+/// Pendencia com alvo estruturado: um fato, um contato, uma evidencia ou um campo absoluto do perfil.
+model PendingItem {
+  id                   String         @id @default(uuid(7)) @db.Uuid
+  ownerId              String         @db.Uuid
+  profileId            String         @db.Uuid
+  targetFactId         String?        @db.Uuid
+  targetContactPointId String?        @db.Uuid
+  targetEvidenceId     String?        @db.Uuid
+  targetField          String?
+  subject              String
+  currentInformation   String?
+  reason               PendingReason?
+  reasonDetail         String?
+  safeStatement        String?
+  confirmationMethod   String?
+  priority             Priority?
+  /// Ausente no documento = NULL (o consumidor trata como `open`).
+  status               PendingStatus?
+  resolvedAt           DateTime?      @db.Timestamptz(3)
+  /// known_variants e marcador de `target: {}`.
+  details              Json?
+  sortOrder            Int            @default(0)
+  createdAt            DateTime       @default(now()) @db.Timestamptz(3)
+  updatedAt            DateTime       @updatedAt @db.Timestamptz(3)
+
+  profile        ProfessionalProfile @relation(fields: [profileId, ownerId], references: [id, ownerId], onDelete: Cascade)
+  targetFact     ProfileFact?        @relation("PendingTargetFact", fields: [targetFactId, ownerId], references: [id, ownerId], onDelete: Cascade)
+  targetContact  ContactPoint?       @relation("PendingTargetContact", fields: [targetContactPointId, ownerId], references: [id, ownerId], onDelete: Cascade)
+  targetEvidence Evidence?           @relation("PendingTargetEvidence", fields: [targetEvidenceId, ownerId], references: [id, ownerId], onDelete: Cascade)
+
+  @@unique([id, ownerId])
+  @@index([ownerId, profileId, status])
+}
+
+/// Regra de uso estruturada (usage_rules.restrictions[]).
+model UsageRestriction {
+  id                   String          @id @default(uuid(7)) @db.Uuid
+  ownerId              String          @db.Uuid
+  profileId            String          @db.Uuid
+  targetFactId         String?         @db.Uuid
+  targetContactPointId String?         @db.Uuid
+  targetEvidenceId     String?         @db.Uuid
+  targetField          String?
+  term                 String?
+  rule                 RestrictionRule
+  reason               String?
+  sortOrder            Int             @default(0)
+  createdAt            DateTime        @default(now()) @db.Timestamptz(3)
+  updatedAt            DateTime        @updatedAt @db.Timestamptz(3)
+
+  profile        ProfessionalProfile @relation(fields: [profileId, ownerId], references: [id, ownerId], onDelete: Cascade)
+  targetFact     ProfileFact?        @relation("RestrictionTargetFact", fields: [targetFactId, ownerId], references: [id, ownerId], onDelete: Cascade)
+  targetContact  ContactPoint?       @relation("RestrictionTargetContact", fields: [targetContactPointId, ownerId], references: [id, ownerId], onDelete: Cascade)
+  targetEvidence Evidence?           @relation("RestrictionTargetEvidence", fields: [targetEvidenceId, ownerId], references: [id, ownerId], onDelete: Cascade)
+
+  @@unique([id, ownerId])
+  @@index([ownerId, profileId])
+}

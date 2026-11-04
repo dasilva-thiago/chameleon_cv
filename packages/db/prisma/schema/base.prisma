@@ -1,0 +1,14 @@
+// Schema multi-arquivo (Prisma 7). Um arquivo por bloco de dominio:
+//   base.prisma      generator + datasource
+//   identity.prisma  identidade e conta (S1.1a)
+// Convencoes (ADR-0006/0008): tabelas PascalCase e colunas camelCase (sem @map); todo dado
+// privado tem `ownerId` + @@unique([id, ownerId]) e FKs compostas (xId, ownerId). Registre cada
+// model novo em src/private-models.ts (o teste do registro falha se faltar).
+generator client {
+  provider = "prisma-client"
+  output   = "../../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}

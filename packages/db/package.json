@@ -1,0 +1,25 @@
+{
+  "name": "@chameleon/db",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./testing": "./src/testing/index.ts"
+  },
+  "scripts": {
+    "generate": "prisma generate",
+    "typecheck": "prisma generate && tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@chameleon/contracts": "workspace:*",
+    "@prisma/adapter-pg": "7.10.1",
+    "@prisma/client": "7.10.1",
+    "pg": "8.23.1"
+  },
+  "devDependencies": {
+    "@chameleon/test-fixtures": "workspace:*",
+    "@types/pg": "8.23.1",
+    "prisma": "7.10.1"
+  }
+}

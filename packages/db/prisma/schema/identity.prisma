@@ -1,0 +1,120 @@
+// Identidade e conta (docs/domain-model.md §3.2, ADR-0008, ADR-0009, ADR-0014).
+// `User.id` e o `ownerId` de todo dado privado. Segredos nunca em claro: senha = argon2id (o hash
+// e calculado no backend), token de sessao/convite = SHA-256 hex (64 caracteres). Os CHECKs de
+// formato e o indice parcial de convites ficam na migracao SQL manual `identity_constraints`.
+
+enum UserStatus {
+  active
+  disabled
+}
+
+enum CredentialKind {
+  password
+}
+
+/// Raiz do dono. Modelo GLOBAL no forOwner (acessado pela camada de auth); nao tem ownerId.
+model User {
+  id          String     @id @default(uuid(7)) @db.Uuid
+  /// citext: unico sem diferenciar maiusculas/minusculas.
+  email       String     @unique @db.Citext
+  displayName String?
+  status      UserStatus @default(active)
+  createdAt   DateTime   @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime   @updatedAt @db.Timestamptz(3)
+  deletedAt   DateTime?  @db.Timestamptz(3)
+
+  credentials    Credential[]
+  sessions       Session[]
+  consentRecords ConsentRecord[]
+  auditEvents    AuditEvent[]
+  invitesUsed    Invite[]
+  profiles       ProfessionalProfile[]
+}
+
+/// Credencial de login. Somente o hash argon2id (string PHC) e armazenado.
+model Credential {
+  id           String         @id @default(uuid(7)) @db.Uuid
+  ownerId      String         @db.Uuid
+  kind         CredentialKind @default(password)
+  passwordHash String
+  createdAt    DateTime       @default(now()) @db.Timestamptz(3)
+  updatedAt    DateTime       @updatedAt @db.Timestamptz(3)
+
+  owner User @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@unique([id, ownerId])
+  @@unique([ownerId, kind])
+}
+
+/// Sessao no servidor (ADR-0009). So existe o SHA-256 do token; o token em claro vive no cookie.
+model Session {
+  id                String    @id @default(uuid(7)) @db.Uuid
+  ownerId           String    @db.Uuid
+  /// SHA-256 hex (64) do token de 32 bytes. Unico: e a chave de lookup.
+  tokenHash         String    @unique
+  createdAt         DateTime  @default(now()) @db.Timestamptz(3)
+  lastSeenAt        DateTime  @default(now()) @db.Timestamptz(3)
+  /// Expiracao deslizante (7 dias).
+  expiresAt         DateTime  @db.Timestamptz(3)
+  /// Expiracao absoluta (30 dias a partir da criacao).
+  absoluteExpiresAt DateTime  @db.Timestamptz(3)
+  revokedAt         DateTime? @db.Timestamptz(3)
+  /// Truncado pela aplicacao. Nao ha coluna de IP (minimizacao, ADR-0014).
+  userAgent         String?
+
+  owner User @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@unique([id, ownerId])
+  @@index([ownerId])
+  @@index([expiresAt])
+}
+
+/// Convite de cadastro (SIGNUP_MODE=invite). GLOBAL: existe antes de haver dono.
+model Invite {
+  id           String    @id @default(uuid(7)) @db.Uuid
+  email        String    @db.Citext
+  /// SHA-256 hex (64) do token do convite.
+  tokenHash    String    @unique
+  createdAt    DateTime  @default(now()) @db.Timestamptz(3)
+  expiresAt    DateTime  @db.Timestamptz(3)
+  usedAt       DateTime? @db.Timestamptz(3)
+  usedByUserId String?   @db.Uuid
+
+  usedBy User? @relation(fields: [usedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([email])
+}
+
+/// Consentimento registrado na UI (ADR-0014). Append-only por convencao: cada mudanca e uma linha.
+model ConsentRecord {
+  id            String   @id @default(uuid(7)) @db.Uuid
+  ownerId       String   @db.Uuid
+  /// `profile_processing`, `ai_processing:<provider>`, `ai_provider:<id>` (formato validado por CHECK).
+  purpose       String
+  granted       Boolean
+  /// Versao do texto da politica aceita.
+  policyVersion String
+  recordedAt    DateTime @default(now()) @db.Timestamptz(3)
+
+  owner User @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@unique([id, ownerId])
+  @@index([ownerId, purpose, recordedAt(sort: Desc)])
+}
+
+/// Trilha de auditoria sem PII (ADR-0014): `metadata` nunca carrega conteudo pessoal.
+model AuditEvent {
+  id            String   @id @default(uuid(7)) @db.Uuid
+  ownerId       String   @db.Uuid
+  action        String
+  entityType    String
+  entityId      String?
+  at            DateTime @default(now()) @db.Timestamptz(3)
+  correlationId String?
+  metadata      Json     @default("{}")
+
+  owner User @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@unique([id, ownerId])
+  @@index([ownerId, at(sort: Desc)])
+}

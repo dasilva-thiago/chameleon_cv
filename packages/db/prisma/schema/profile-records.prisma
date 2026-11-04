@@ -1,0 +1,386 @@
+// Tabelas tipadas dos registros citaveis (ADR-0006). PK COMPARTILHADA com ProfileFact:
+// `Experience.id = ProfileFact.id`, FK composta (id, ownerId) -> ProfileFact. Colunas para o que e
+// filtrado, ordenado, juntado ou validado; os demais atributos descritivos (validados pelo contrato
+// Zod) ficam em `details` JSONB com as chaves do contrato (snake_case). Nada citavel fica em JSONB:
+// todo item citavel (itens de experiencia/projeto, usos de competencia...) e uma linha com UUID.
+//
+// Datas parciais: `xDate` (date, primeiro dia do periodo) + `xPrecision` (year|month|day). Fim de
+// periodo: `endDate`/`endPrecision` ou `isCurrent` (= "present"). A coerencia kind x tabela e
+// verificada por trigger (migracao profile_constraints).
+
+model ProfileStatement {
+  id      String        @id @db.Uuid
+  ownerId String        @db.Uuid
+  kind    StatementKind
+  text    String
+  locale  String?
+
+  fact ProfileFact @relation(fields: [id, ownerId], references: [id, ownerId], onDelete: Cascade)
+
+  @@unique([id, ownerId])
+  @@index([ownerId, kind])
+}
+
+model CompetencyExample {
+  id         String  @id @db.Uuid
+  ownerId    String  @db.Uuid
+  competency String?
+  /// situation, action, outcome_or_learning e marcador de `related_skill_ids: []`.
+  details    Json?
+
+  fact   ProfileFact              @relation(fields: [id, ownerId], references: [id, ownerId], onDelete: Cascade)
+  skills CompetencyExampleSkill[]
+
+  @@unique([id, ownerId])
+}
+
+/// related_skill_ids de um exemplo de competencia (ordenado).
+model CompetencyExampleSkill {
+  id        String @id @default(uuid(7)) @db.Uuid
+  ownerId   String @db.Uuid
+  exampleId String @db.Uuid
+  skillId   String @db.Uuid
+  position  Int    @default(0)
+
+  example CompetencyExample @relation(fields: [exampleId, ownerId], references: [id, ownerId], onDelete: Cascade)
+  skill   Skill             @relation(fields: [skillId, ownerId], references: [id, ownerId], onDelete: Cascade)
+
+  @@unique([id, ownerId])
+  @@unique([exampleId, skillId])
+  @@index([ownerId, skillId])
+}
+
+model Experience {
+  id                     String          @id @db.Uuid
+  ownerId                String          @db.Uuid
+  organizationName       String?
+  organizationPublicName String?
+  /// Agrupa varios cargos no mesmo empregador (promocoes).
+  organizationGroup      String?
+  industry               String?
+  city                   String?
+  region                 String?
+  country                String?
+  officialTitle          String?
+  displayTitle           String?
+  employmentType         EmploymentType?
+  workMode               WorkMode?
+  startDate              DateTime?       @db.Date
+  startPrecision         DatePrecision?
+  endDate                DateTime?       @db.Date
+  endPrecision           DatePrecision?
+  /// `end_date: present`.
+  isCurrent              Boolean         @default(false)
+  /// department, manager_or_team, workload, company_context, role_objective, products_services_users,
+  /// operational_scope, team_interfaces, transferable_skills, lessons_learned, exit_reason (privado),
+  /// reference_contact_permission, business{...}, marcadores (`items: []`, `location: {}`).
+  details                Json?
+
+  fact ProfileFact @relation(fields: [id, ownerId], references: [id, ownerId], onDelete: Cascade)
+
+  items       ExperienceItem[]
+  relatedBy   Project[]        @relation("ProjectRelatedExperience")
+  skillUsages SkillUsage[]     @relation("UsageExperience")
+
+  @@unique([id, ownerId])
+  @@index([ownerId, organizationGroup])
+}
+
+model ExperienceItem {
+  id           String             @id @db.Uuid
+  ownerId      String             @db.Uuid
+  experienceId String             @db.Uuid
+  kind         ExperienceItemKind
+  text         String
+  /// frequency, autonomy, outcome, metric{name,value,baseline,period,method}, personal_contribution,
+  /// problem, collaborators, steps, verification.
+  details      Json?
+
+  fact       ProfileFact @relation(fields: [id, ownerId], references: [id, ownerId], onDelete: Cascade)
+  experience Experience  @relation(fields: [experienceId, ownerId], references: [id, ownerId], onDelete: Cascade)
+
+  @@unique([id, ownerId])
+  @@index([ownerId, experienceId])
+}
+
+model Project {
+  id                  String           @id @db.Uuid
+  ownerId             String           @db.Uuid
+  name                String?
+  category            ProjectCategory?
+  teamBased           Boolean?
+  status              ProjectStatus?
+  startDate           DateTime?        @db.Date
+  startPrecision      DatePrecision?
+  endDate             DateTime?        @db.Date
+  endPrecision        DatePrecision?
+  isCurrent           Boolean          @default(false)
+  role                String?
+  publicAccess        PublicAccess?
+  license             String?
+  publicUrl           String?
+  repositoryUrl       String?
+  documentationUrl    String?
+  demoUrl             String?
+  relatedExperienceId String?          @db.Uuid
+  relatedEducationId  String?          @db.Uuid
+  /// last_updated, personal_contribution, contributions_by_others, decision_ownership, problem,
+  /// target_audience, need_addressed, proposed_solution, architecture, authentication_authorization,
+  /// known_limitations, next_improvements, learning, feedback, one_line_description, short_description,
+  /// resume_keywords e marcadores (`items: []`, `collaborators: []`).
+  details             Json?
+
+  fact              ProfileFact @relation(fields: [id, ownerId], references: [id, ownerId], onDelete: Cascade)
+  relatedExperience Experience? @relation("ProjectRelatedExperience", fields: [relatedExperienceId, ownerId], references: [id, ownerId], onDelete: NoAction)
+  relatedEducation  Education?  @relation("ProjectRelatedEducation", fields: [relatedEducationId, ownerId], references: [id, ownerId], onDelete: NoAction)
+
+  items         ProjectItem[]
+  collaborators ProjectCollaborator[]
+  skillUsages   SkillUsage[]          @relation("UsageProject")
+
+  @@unique([id, ownerId])
+  @@index([ownerId, category])
+}
+
+model ProjectItem {
+  id        String          @id @db.Uuid
+  ownerId   String          @db.Uuid
+  projectId String          @db.Uuid
+  kind      ProjectItemKind
+  text      String
+  /// metric{name,value,baseline,period,method}.
+  details   Json?
+
+  fact    ProfileFact @relation(fields: [id, ownerId], references: [id, ownerId], onDelete: Cascade)
+  project Project     @relation(fields: [projectId, ownerId], references: [id, ownerId], onDelete: Cascade)
+
+  @@unique([id, ownerId])
+  @@index([ownerId, projectId])
+}
+
+/// Colaborador de projeto (sub-registro com id, sem `meta`).
+model ProjectCollaborator {
+  id           String  @id @default(uuid(7)) @db.Uuid
+  ownerId      String  @db.Uuid
+  projectId    String  @db.Uuid
+  nameOrRole   String?
+  contribution String?
+  sortOrder    Int     @default(0)
+
+  project Project @relation(fields: [projectId, ownerId], references: [id, ownerId], onDelete: Cascade)
+
+  @@unique([id, ownerId])
+  @@index([ownerId, projectId, sortOrder])
+}
+
+model Education {
+  id                          String           @id @db.Uuid
+  ownerId                     String           @db.Uuid
+  institution                 String?
+  courseName                  String?
+  degreeType                  DegreeType?
+  fieldOfStudy                String?
+  status                      EducationStatus?
+  modality                    StudyModality?
+  location                    String?
+  qualificationAwarded        String?
+  startDate                   DateTime?        @db.Date
+  startPrecision              DatePrecision?
+  completionDate              DateTime?        @db.Date
+  completionPrecision         DatePrecision?
+  expectedCompletionDate      DateTime?        @db.Date
+  expectedCompletionPrecision DatePrecision?
+  /// thesis_title, thesis_description, supervisor, relevant_coursework, academic_projects,
+  /// honors_scholarships_distinctions, verification_url.
+  details                     Json?
+
+  fact ProfileFact @relation(fields: [id, ownerId], references: [id, ownerId], onDelete: Cascade)
+
+  relatedBy   Project[]    @relation("ProjectRelatedEducation")
+  skillUsages SkillUsage[] @relation("UsageEducation")
+
+  @@unique([id, ownerId])
+}
+
+model Course {
+  id                  String         @id @db.Uuid
+  ownerId             String         @db.Uuid
+  name                String?
+  provider            String?
+  status              CourseStatus?
+  startDate           DateTime?      @db.Date
+  startPrecision      DatePrecision?
+  completionDate      DateTime?      @db.Date
+  completionPrecision DatePrecision?
+  workloadHours       Float?
+  certificateIssued   Boolean?
+  /// topics, verification_url, activities_projects, skills_developed, relevant_job_families.
+  details             Json?
+
+  fact ProfileFact @relation(fields: [id, ownerId], references: [id, ownerId], onDelete: Cascade)
+
+  skillUsages SkillUsage[] @relation("UsageCourse")
+
+  @@unique([id, ownerId])
+}
+
+/// Catalogo de competencias por perfil (ADR-0007). `normalizedKey` unico por perfil.
+model Skill {
+  id                String             @id @db.Uuid
+  ownerId           String             @db.Uuid
+  profileId         String             @db.Uuid
+  name              String
+  /// normalizeTerm(name): NFKD sem acentos, minusculo.
+  normalizedKey     String
+  category          SkillCategory?
+  selfAssessedLevel SelfAssessedLevel?
+  /// aliases, description, tasks_can_perform, last_used, duration_of_use, limitations, study_plan.
+  details           Json?
+
+  fact    ProfileFact         @relation(fields: [id, ownerId], references: [id, ownerId], onDelete: Cascade)
+  profile ProfessionalProfile @relation(fields: [profileId, ownerId], references: [id, ownerId], onDelete: Cascade)
+
+  usages   SkillUsage[]
+  examples CompetencyExampleSkill[]
+
+  @@unique([id, ownerId])
+  @@unique([profileId, normalizedKey])
+  @@index([ownerId, category])
+}
+
+/// Contexto de uso de uma competencia (ADR-0007): estrutural e verificado no banco por CHECK
+/// (`professional_experience` exige `experienceId`, etc.).
+model SkillUsage {
+  id              String             @id @db.Uuid
+  ownerId         String             @db.Uuid
+  skillId         String             @db.Uuid
+  usageContext    UsageContext
+  experienceId    String?            @db.Uuid
+  projectId       String?            @db.Uuid
+  educationId     String?            @db.Uuid
+  courseId        String?            @db.Uuid
+  certificationId String?            @db.Uuid
+  volunteeringId  String?            @db.Uuid
+  facet           String?
+  levelInContext  SelfAssessedLevel?
+  startDate       DateTime?          @db.Date
+  startPrecision  DatePrecision?
+  endDate         DateTime?          @db.Date
+  endPrecision    DatePrecision?
+  isCurrent       Boolean            @default(false)
+  /// usage_description, personal_implementation, tasks.
+  details         Json?
+
+  fact          ProfileFact    @relation(fields: [id, ownerId], references: [id, ownerId], onDelete: Cascade)
+  skill         Skill          @relation(fields: [skillId, ownerId], references: [id, ownerId], onDelete: Cascade)
+  experience    Experience?    @relation("UsageExperience", fields: [experienceId, ownerId], references: [id, ownerId], onDelete: Cascade)
+  project       Project?       @relation("UsageProject", fields: [projectId, ownerId], references: [id, ownerId], onDelete: Cascade)
+  education     Education?     @relation("UsageEducation", fields: [educationId, ownerId], references: [id, ownerId], onDelete: Cascade)
+  course        Course?        @relation("UsageCourse", fields: [courseId, ownerId], references: [id, ownerId], onDelete: Cascade)
+  certification Certification? @relation("UsageCertification", fields: [certificationId, ownerId], references: [id, ownerId], onDelete: Cascade)
+  volunteering  Volunteering?  @relation("UsageVolunteering", fields: [volunteeringId, ownerId], references: [id, ownerId], onDelete: Cascade)
+
+  @@unique([id, ownerId])
+  @@index([ownerId, skillId, usageContext])
+}
+
+model LanguageProficiency {
+  id                 String         @id @db.Uuid
+  ownerId            String         @db.Uuid
+  /// Nome da lingua como a pessoa escreve ("Ingles").
+  languageLabel      String
+  languageCode       String?
+  overallLevel       LanguageLevel?
+  /// Nivel descritivo em texto livre (contrato 2.1.0); nunca promovido a CEFR.
+  selfDescribedLevel String?
+  reading            LanguageLevel?
+  writing            LanguageLevel?
+  listening          LanguageLevel?
+  speaking           LanguageLevel?
+  certificationId    String?        @db.Uuid
+  /// professional_usage e certification{name,issuer,score,assessment_date,valid_until}.
+  details            Json?
+
+  fact          ProfileFact    @relation(fields: [id, ownerId], references: [id, ownerId], onDelete: Cascade)
+  certification Certification? @relation("LanguageCertification", fields: [certificationId, ownerId], references: [id, ownerId], onDelete: NoAction)
+
+  @@unique([id, ownerId])
+}
+
+model Certification {
+  id                  String                 @id @db.Uuid
+  ownerId             String                 @db.Uuid
+  name                String?
+  issuer              String?
+  category            CertificationCategory?
+  status              CertificationStatus?
+  issueDate           DateTime?              @db.Date
+  issuePrecision      DatePrecision?
+  expirationDate      DateTime?              @db.Date
+  expirationPrecision DatePrecision?
+  publicIdentifier    String?
+  verificationUrl     String?
+
+  fact ProfileFact @relation(fields: [id, ownerId], references: [id, ownerId], onDelete: Cascade)
+
+  skillUsages SkillUsage[]          @relation("UsageCertification")
+  languages   LanguageProficiency[] @relation("LanguageCertification")
+
+  @@unique([id, ownerId])
+}
+
+model Award {
+  id            String         @id @db.Uuid
+  ownerId       String         @db.Uuid
+  name          String?
+  organization  String?
+  date          DateTime?      @db.Date
+  datePrecision DatePrecision?
+  scope         AwardScope?
+  /// context_and_criteria, personal_contribution.
+  details       Json?
+
+  fact ProfileFact @relation(fields: [id, ownerId], references: [id, ownerId], onDelete: Cascade)
+
+  @@unique([id, ownerId])
+}
+
+model Publication {
+  id                 String             @id @db.Uuid
+  ownerId            String             @db.Uuid
+  title              String?
+  type               PublicationType?
+  status             PublicationStatus?
+  date               DateTime?          @db.Date
+  datePrecision      DatePrecision?
+  venueOrInstitution String?
+  url                String?
+  doi                String?
+  /// authorship, summary, personal_contribution, topics_methods.
+  details            Json?
+
+  fact ProfileFact @relation(fields: [id, ownerId], references: [id, ownerId], onDelete: Cascade)
+
+  @@unique([id, ownerId])
+}
+
+model Volunteering {
+  id                String             @id @db.Uuid
+  ownerId           String             @db.Uuid
+  organization      String?
+  role              String?
+  participationType ParticipationType?
+  startDate         DateTime?          @db.Date
+  startPrecision    DatePrecision?
+  endDate           DateTime?          @db.Date
+  endPrecision      DatePrecision?
+  isCurrent         Boolean            @default(false)
+  /// responsibilities, audience, outcomes.
+  details           Json?
+
+  fact ProfileFact @relation(fields: [id, ownerId], references: [id, ownerId], onDelete: Cascade)
+
+  skillUsages SkillUsage[] @relation("UsageVolunteering")
+
+  @@unique([id, ownerId])
+}
