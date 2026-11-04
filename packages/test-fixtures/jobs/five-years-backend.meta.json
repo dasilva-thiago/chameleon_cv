@@ -1,0 +1,42 @@
+{
+  "id": "five-years-backend",
+  "title": "Pessoa Desenvolvedora Backend Node.js (Pleno/Sênior)",
+  "locale": "pt-BR",
+  "description": "Exige 5 anos de experiência PROFISSIONAL em backend. Perfil só com projetos/curso: nunca converter projetos em anos de emprego; status diferente de direct e 0 anos (ADR-0011).",
+  "scenario_ids": ["neg-five-years-backend", "same-profile-different-jobs"],
+  "target_profiles": ["student-no-employment", "experienced-promotions-same-employer"],
+  "expectations": {
+    "company": "Aurora Fibra Telecom",
+    "salary": "R$ 12.000 a R$ 15.000 (CLT)",
+    "work_mode": "remote",
+    "location": null,
+    "mandatory": [
+      {
+        "text": "5 anos de experiência profissional em backend",
+        "excerpt": "Pelo menos 5 anos de experiência profissional em desenvolvimento backend"
+      },
+      { "text": "Node.js e TypeScript", "excerpt": "Node.js e TypeScript no dia a dia" },
+      { "text": "PostgreSQL e APIs REST", "excerpt": "PostgreSQL e desenho de APIs REST" }
+    ],
+    "desirable": [
+      { "text": "Mensageria", "excerpt": "Experiência com mensageria (RabbitMQ ou similar)" },
+      { "text": "Inglês técnico", "excerpt": "Inglês para leitura técnica" }
+    ],
+    "responsibilities": [
+      {
+        "text": "Projetar e manter APIs",
+        "excerpt": "Projetar e manter APIs do portal de clientes"
+      }
+    ],
+    "years_required": [
+      {
+        "term": "backend",
+        "years": 5,
+        "professional_only": true,
+        "excerpt": "Pelo menos 5 anos de experiência profissional em desenvolvimento backend"
+      }
+    ]
+  },
+  "forbidden_output_markers": [],
+  "notes": "student-no-employment: anos profissionais = 0, no máximo partial/transferable. experienced-promotions-same-employer: Java, não Node.js; Node.js = missing."
+}

@@ -1,0 +1,25 @@
+Platform Engineer (Python / AWS)
+
+Company: Lumenpath Data Co.
+Location: Austin, TX (hybrid, 2 days on site) or remote within the US
+Salary range: $150,000 - $175,000 per year
+
+About the role
+You will build the internal platform that runs our customers' data pipelines.
+
+What you will do
+- Design and operate Kubernetes-based job infrastructure on AWS.
+- Write Python services and tooling used by data engineering teams.
+- Improve reliability through observability, alerting, and runbooks.
+
+Requirements
+- 5+ years of professional software engineering experience.
+- Strong Python and PostgreSQL skills.
+- Hands-on experience with AWS and Kubernetes.
+- Bachelor's degree in Computer Science or equivalent experience.
+
+Nice to have
+- Terraform.
+- Contributions to open source projects.
+
+We are an equal opportunity employer.

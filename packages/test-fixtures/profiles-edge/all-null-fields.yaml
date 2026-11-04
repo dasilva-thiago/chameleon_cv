@@ -1,0 +1,16 @@
+# Edge case sintetico: campos null e listas vazias em todo lugar. Deve ser ACEITO (null = not_provided).
+schema_version: '2.1.0'
+locale: null
+profile:
+  identity:
+    full_name: null
+    preferred_name: null
+    city: null
+  contact_points: []
+  positioning: null
+  experiences: []
+  education: []
+  skills: []
+  projects: []
+  availability_preferences: null
+  career_preferences: null

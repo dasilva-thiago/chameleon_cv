@@ -1,0 +1,58 @@
+{
+  "id": "sales-b2b",
+  "title": "Executivo(a) de Contas B2B",
+  "locale": "pt-BR",
+  "description": "Vaga comercial não-TI. Combina com o perfil de vendas com fatos conflitantes e com a autônoma de clientes confidenciais: conflitos só saem como texto seguro e nomes de clientes sob NDA não aparecem.",
+  "scenario_ids": [
+    "neg-conflicting-date-safe-precision",
+    "a11-10-conflicting-facts",
+    "a11-03-freelancer-confidential-clients"
+  ],
+  "target_profiles": ["conflicting-facts", "freelancer-confidential-clients"],
+  "expectations": {
+    "company": "Campo Digital Soluções Agrícolas",
+    "salary": null,
+    "work_mode": "hybrid",
+    "location": "Goiânia, GO",
+    "mandatory": [
+      {
+        "text": "3 anos ou mais em vendas B2B",
+        "excerpt": "Experiência de 3 anos ou mais em vendas B2B"
+      },
+      {
+        "text": "Negociação de contratos",
+        "excerpt": "Vivência em negociação de contratos de maior valor"
+      },
+      { "text": "CRM", "excerpt": "Uso diário de CRM" },
+      { "text": "CNH B", "excerpt": "CNH categoria B" }
+    ],
+    "desirable": [
+      { "text": "Agronegócio", "excerpt": "Experiência no agronegócio" },
+      { "text": "Inglês intermediário", "excerpt": "Inglês intermediário" }
+    ],
+    "responsibilities": [
+      {
+        "text": "Vendas consultivas a cooperativas e produtores",
+        "excerpt": "Prospectar e conduzir vendas consultivas a cooperativas e produtores de médio e grande porte"
+      },
+      {
+        "text": "Gestão de carteira e CRM",
+        "excerpt": "Gerir uma carteira de contas e manter o CRM atualizado"
+      },
+      {
+        "text": "Forecast mensal e metas",
+        "excerpt": "Elaborar previsão de vendas (forecast) mensal e bater metas trimestrais"
+      }
+    ],
+    "years_required": [
+      {
+        "term": "vendas B2B",
+        "years": 3,
+        "professional_only": true,
+        "excerpt": "Experiência de 3 anos ou mais em vendas B2B"
+      }
+    ]
+  },
+  "forbidden_output_markers": [],
+  "notes": "conflicting-facts: título, início de EXP-002 e percentual de crescimento estão em pendência aberta; usar safe_statement_for_now. Intervalo de anos: períodos conflitantes geram mínimo e máximo."
+}

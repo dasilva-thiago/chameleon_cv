@@ -1,0 +1,604 @@
+# Fixture 100% sintetica (nenhum dado real). Ver packages/test-fixtures/README.md.
+# FORMATO LEGADO 1.0.0 PREENCHIDO (para migracao v1 -> v2; NAO e um documento v2).
+# Propositalmente contem os padroes que a migracao deve tratar (docs/domain-model.md secao 4):
+#  - "" em campos (EMPTY_STRING_NORMALIZED) e registros fantasmas com so "" (EMPTY_RECORD_DROPPED);
+#  - fact_status: confirmed/needs_review/conflicting  -> meta.declared_status; meta.status = needs_review;
+#  - usage_context: professional | internal_project | study | training | other;
+#  - skills[].acquisition_contexts incl. "employment" SEM related_experience_ids (-> unverified + pendencia);
+#  - disclosure: approved | restricted | not_approved | not_confirmed;
+#  - developing_knowledge, freelance_and_business, evidence_registry.supported_claims (texto livre);
+#  - positioning duplicado em career_preferences; usage_rules em texto livre; pending status "ignored";
+#  - review.processing_consent: "granted" (-> aviso CONSENT_IN_FILE_NOT_RECORDED; nao conta como consentimento).
+schema_version: '1.0.0'
+locale: 'pt-BR'
+profile:
+  identity:
+    full_name: 'Valentina Seixas Ortiz'
+    preferred_name: 'Vale'
+    pronunciation: ''
+    pronouns: 'ela/dela CANARY-legacy-100-filled-pronouns'
+    country_of_residence: 'BR'
+    city: 'Ribeirão Preto'
+    region: 'SP'
+    country_of_work_interest: ['BR', 'PY']
+    timezone: 'America/Sao_Paulo'
+    interface_languages: ['pt-BR']
+
+  contact:
+    professional_email: 'valentina.ortiz@example.invalid'
+    phone: '+55 (00) 90000-0109'
+    links:
+      - type: 'linkedin'
+        label: 'LinkedIn'
+        url: 'https://network.example.test/in/valentina-ortiz'
+        visibility: 'public'
+        include_by_default: true
+        notes: ''
+      - type: 'portfolio'
+        label: 'Relatórios técnicos'
+        url: 'https://relatorios.example.test/vale'
+        visibility: 'private'
+        include_by_default: false
+        notes: 'Contém dados de clientes. CANARY-legacy-100-filled-link_notes'
+
+  positioning:
+    current_profession: 'Engenheira Agrônoma'
+    current_job_title: 'Consultora de Agricultura de Precisão'
+    current_seniority: 'senior'
+    professional_headline: 'Engenheira agrônoma com foco em agricultura de precisão e análise de dados de campo'
+    one_sentence_intro: 'Engenheira agrônoma que usa dados de campo para reduzir custo e perdas na lavoura.'
+    short_summary: 'Dez anos de experiência em consultoria agronômica, mapeamento de produtividade e recomendação de insumos em taxa variável.'
+    full_summary: ''
+    career_narrative: 'Comecei em extensão rural e migrei para agricultura de precisão. CANARY-legacy-100-filled-career_narrative'
+    primary_fields: ['agricultura de precisão', 'agronomia']
+    secondary_fields: ['análise de dados']
+    preferred_job_titles: ['Consultora de Agricultura de Precisão', 'Agrônoma de Dados']
+    excluded_job_titles: ['Vendedora de insumos']
+    industries_of_interest: ['agronegócio', 'agtech']
+    industries_to_avoid: []
+    professional_interests: ['sensoriamento remoto']
+    preferred_problems_to_solve: ['redução de custo de insumos']
+    short_term_goals: ''
+    long_term_goals: ''
+    demonstrable_differentiators: ['Usa dados de campo e estatística para recomendar insumos']
+    professional_values: ['rigor técnico']
+
+  competency_examples:
+    - competency: 'Recomendação em taxa variável'
+      situation: 'Talhões com forte variabilidade de solo recebiam adubação uniforme.'
+      action: 'Gerou mapas de zonas de manejo e prescrições de adubação em taxa variável.'
+      outcome_or_learning: 'Menor consumo de fertilizante com produtividade mantida.'
+      evidence_ids: ['EVD-001']
+
+  experiences:
+    - id: 'EXP-001'
+      organization: 'Cooperativa de Extensão Vale Fértil'
+      organization_public_name: ''
+      industry: 'Cooperativismo agrícola'
+      location: { city: 'Ribeirão Preto', region: 'SP', country: 'BR' }
+      official_title: 'Extensionista Rural'
+      resume_display_title: ''
+      employment_type: 'employee'
+      department: ''
+      start_date: '2014-02'
+      end_date: '2018-06'
+      is_current: false
+      work_mode: 'onsite'
+      company_context: 'Cooperativa com cerca de 800 associados produtores de cana e soja.'
+      role_objective: ''
+      products_services_users: ''
+      operational_scope: ''
+      team_interfaces: []
+      responsibilities:
+        - description: 'Assistência técnica a produtores associados e visitas de campo.'
+          frequency: 'daily'
+          autonomy: 'independent'
+          tools: ['QGIS']
+          outcome: ''
+      achievements:
+        - description: 'Implantação de amostragem de solo georreferenciada em 40 propriedades.'
+          metric_name: 'Propriedades atendidas'
+          metric_value: '40'
+          baseline: ''
+          period: '2016-2017'
+          calculation_method: 'Contagem de contratos de serviço'
+          personal_contribution: 'Coordenação das coletas e dos laudos.'
+          evidence_ids: []
+          public_disclosure: 'approved'
+      internal_deliveries: []
+      technologies_used:
+        - name: 'QGIS'
+          usage_context: 'professional'
+          tasks: ['mapas de fertilidade']
+          usage_period: '2015-2018'
+          self_assessed_level: 'advanced'
+        - name: 'Planilhas de adubação'
+          usage_context: 'internal_project'
+          tasks: []
+          usage_period: ''
+          self_assessed_level: 'not_assessed'
+      transferable_skills: ['comunicação com produtores']
+      lessons_learned: []
+      exit_reason_private: 'Proposta de consultoria própria. CANARY-legacy-100-filled-exit_reason'
+      reference_contact_permission: 'not_applicable'
+      fact_status: 'confirmed'
+      evidence_ids: []
+      notes: ''
+
+    - id: 'EXP-002'
+      organization: 'AgroSensor Soluções em Campo Ltda.'
+      organization_public_name: ''
+      industry: 'Agtech'
+      location: { city: 'Ribeirão Preto', region: 'SP', country: 'BR' }
+      official_title: 'Consultora de Agricultura de Precisão'
+      resume_display_title: ''
+      employment_type: 'employee'
+      department: ''
+      start_date: '2018-07'
+      end_date: null
+      is_current: true
+      work_mode: 'hybrid'
+      company_context: ''
+      role_objective: ''
+      products_services_users: ''
+      operational_scope: ''
+      team_interfaces: []
+      responsibilities:
+        - description: 'Mapeamento de produtividade e prescrição de insumos em taxa variável.'
+          frequency: 'daily'
+          autonomy: 'independent'
+          tools: ['QGIS', 'R']
+          outcome: ''
+      achievements:
+        - description: 'Redução do consumo de fertilizante em talhões de cana em taxa variável.'
+          metric_name: 'Consumo de fertilizante'
+          metric_value: '-12%'
+          baseline: 'Adubação uniforme anterior'
+          period: 'safra 2021'
+          calculation_method: ''
+          personal_contribution: ''
+          evidence_ids: ['EVD-001']
+          public_disclosure: 'restricted'
+      internal_deliveries:
+        - name: 'Rotina de limpeza de dados de colhedora'
+          problem: 'Dados de monitor de produtividade com ruído'
+          personal_contribution: 'Script em R de filtragem e interpolação'
+          collaborators: []
+          steps: ['filtrar outliers', 'interpolar', 'gerar mapa']
+          technologies: ['R']
+          outcome: ''
+          verification: ''
+          disclosure: 'not_confirmed'
+      technologies_used:
+        - name: 'R'
+          usage_context: 'professional'
+          tasks: ['interpolação', 'estatística']
+          usage_period: ''
+          self_assessed_level: 'intermediate'
+        - name: 'Python'
+          usage_context: 'study'
+          tasks: []
+          usage_period: ''
+          self_assessed_level: 'basic'
+        - name: 'Google Earth Engine'
+          usage_context: 'training'
+          tasks: []
+          usage_period: ''
+          self_assessed_level: 'exposure'
+        - name: 'Drones de mapeamento'
+          usage_context: 'other'
+          tasks: []
+          usage_period: ''
+          self_assessed_level: 'not_assessed'
+      transferable_skills: []
+      lessons_learned: []
+      exit_reason_private: ''
+      reference_contact_permission: 'not_applicable'
+      fact_status: 'needs_review'
+      evidence_ids: []
+      notes: ''
+
+    - id: 'EXP-003'
+      organization: 'Fazenda Experimental Três Rios'
+      organization_public_name: ''
+      industry: 'Agropecuária'
+      location: { city: '', region: '', country: 'BR' }
+      official_title: 'Gerente Agrícola'
+      resume_display_title: ''
+      employment_type: 'employee'
+      department: ''
+      start_date: '2012'
+      end_date: '2014-01'
+      is_current: false
+      work_mode: 'onsite'
+      company_context: ''
+      role_objective: ''
+      products_services_users: ''
+      operational_scope: ''
+      team_interfaces: []
+      responsibilities: []
+      achievements: []
+      internal_deliveries: []
+      technologies_used: []
+      transferable_skills: []
+      lessons_learned: []
+      exit_reason_private: ''
+      reference_contact_permission: 'not_applicable'
+      fact_status: 'conflicting'
+      evidence_ids: []
+      notes: 'Datas diferem entre CV antigo e carteira de trabalho.'
+
+  projects:
+    - id: 'PRJ-001'
+      name: 'Zonas de manejo de talhões de cana'
+      category: 'professional'
+      status: 'completed'
+      start_date: '2021-03'
+      end_date: '2021-12'
+      last_updated: ''
+      role: 'Consultora responsável'
+      team_based: true
+      collaborators:
+        - name_or_role: 'Equipe de campo'
+          contribution: 'Coleta de amostras'
+      personal_contribution: 'Análise geoestatística e prescrições'
+      contributions_by_others: 'Coleta de amostras e aplicação feitas pela equipe de campo'
+      decision_ownership: ''
+      problem: 'Variabilidade de solo dentro de talhões de cana'
+      target_audience: ''
+      need_addressed: ''
+      proposed_solution: 'Zonas de manejo e adubação em taxa variável'
+      main_features: ['mapas de zonas de manejo']
+      workflows: []
+      business_rules: []
+      constraints_and_decisions: []
+      architecture: ''
+      frontend: []
+      backend: ['R']
+      databases: []
+      apis_and_integrations: []
+      authentication_authorization: ''
+      infrastructure_deployment: []
+      testing_quality: []
+      security_privacy: []
+      observability: []
+      documentation: []
+      methods_and_version_control: ['Git']
+      technologies:
+        - name: 'QGIS'
+          usage: 'Mapas'
+          personal_implementation: 'Todos os mapas'
+          context: 'project'
+          self_assessed_level: 'advanced'
+      deliverables: ['relatório técnico']
+      outcomes: ['menor consumo de fertilizante']
+      metrics:
+        - name: 'Redução de fertilizante'
+          value: '12%'
+          method: ''
+          evidence_ids: ['EVD-001']
+          disclosure: 'restricted'
+      tests_performed: []
+      feedback: []
+      known_limitations: []
+      next_improvements: []
+      learning: []
+      public_url: ''
+      repository_url: ''
+      documentation_url: ''
+      demo_url: ''
+      license: ''
+      is_public: false
+      disclosure: 'not_approved'
+      one_line_description: ''
+      short_description: ''
+      resume_keywords: ['taxa variável']
+      evidence_ids: ['EVD-001']
+      fact_status: 'confirmed'
+      notes: ''
+
+  education:
+    - id: 'EDU-001'
+      institution: 'Universidade Estadual do Cerrado Paulista'
+      course_name: 'Engenharia Agronômica'
+      degree_type: 'bachelor'
+      field_of_study: 'Agronomia'
+      status: 'completed'
+      start_date: '2007-02'
+      completion_date: '2011-12'
+      expected_completion_date: null
+      modality: 'onsite'
+      location: ''
+      qualification_awarded: 'Engenheira Agrônoma'
+      thesis_title: ''
+      thesis_description: ''
+      supervisor: ''
+      relevant_coursework: ['Fertilidade do Solo', 'Estatística Experimental']
+      academic_projects: []
+      honors_scholarships_distinctions: []
+      verification_url: ''
+      evidence_ids: []
+      fact_status: 'confirmed'
+      notes: ''
+
+  courses:
+    - id: 'CRS-001'
+      name: 'Geoestatística Aplicada à Agricultura'
+      provider: 'Instituto de Agricultura Digital Exemplo'
+      topics: ['variograma', 'krigagem']
+      start_date: '2019-03'
+      completion_date: '2019-06'
+      workload_hours: 40
+      status: 'completed'
+      certificate_issued: true
+      verification_url: ''
+      main_topics: ['variograma', 'interpolação']
+      activities_projects: []
+      skills_developed: ['geoestatística']
+      relevant_job_families: []
+      evidence_ids: []
+
+  skills:
+    - id: 'SKL-001'
+      name: 'QGIS'
+      category: 'tool'
+      description: ''
+      self_assessed_level: 'advanced'
+      acquisition_contexts: ['employment', 'project']
+      related_experience_ids: ['EXP-001']
+      related_project_ids: ['PRJ-001']
+      related_education_ids: []
+      tasks_can_perform: ['mapas de fertilidade', 'zonas de manejo']
+      last_used: '2026'
+      duration_of_use: ''
+      evidence_ids: []
+      resume_usage: 'include'
+      limitations: ''
+      fact_status: 'confirmed'
+    - id: 'SKL-002'
+      name: 'R'
+      category: 'language'
+      description: ''
+      self_assessed_level: 'intermediate'
+      acquisition_contexts: ['employment']
+      related_experience_ids: []
+      related_project_ids: []
+      related_education_ids: []
+      tasks_can_perform: []
+      last_used: ''
+      duration_of_use: ''
+      evidence_ids: []
+      resume_usage: 'depending_on_job'
+      limitations: ''
+      fact_status: 'needs_review'
+    - id: 'SKL-003'
+      name: 'Geoestatística'
+      category: 'method'
+      description: ''
+      self_assessed_level: 'intermediate'
+      acquisition_contexts: ['course', 'self_study', 'volunteer']
+      related_experience_ids: []
+      related_project_ids: []
+      related_education_ids: []
+      tasks_can_perform: []
+      last_used: ''
+      duration_of_use: ''
+      evidence_ids: []
+      resume_usage: 'exclude'
+      limitations: ''
+      fact_status: 'confirmed'
+
+  developing_knowledge:
+    - topic: 'Sensoriamento remoto com Google Earth Engine'
+      study_scope: 'Introdução, índices de vegetação'
+      learning_sources: ['curso online', 'documentação']
+      practical_project: ''
+      perceived_level: 'iniciante'
+      next_goal: 'Aplicar em um talhão real'
+    - topic: 'Aprendizado de máquina para previsão de produtividade'
+      study_scope: 'Regressão'
+      learning_sources: ['livro']
+      practical_project: 'Notebook de previsão com dados públicos'
+      perceived_level: 'iniciante'
+      next_goal: ''
+
+  languages:
+    - language: 'Português'
+      overall_level: 'native'
+      reading: 'native'
+      writing: 'native'
+      listening: 'native'
+      speaking: 'native'
+      professional_usage: ''
+      certification_name: ''
+      certification_score: ''
+      assessment_date: ''
+      include_in_resume: 'include'
+      evidence_ids: []
+    - language: 'Espanhol'
+      overall_level: 'B2'
+      reading: 'C1'
+      writing: 'B1'
+      listening: 'B2'
+      speaking: 'B2'
+      professional_usage: 'Consultoria para produtores no Paraguai'
+      certification_name: 'DELE'
+      certification_score: 'B2'
+      assessment_date: '2020-11'
+      include_in_resume: 'depending_on_job'
+      evidence_ids: []
+
+  certifications:
+    - id: 'CERT-001'
+      name: 'Registro profissional de Engenheira Agrônoma'
+      issuer: 'Conselho Regional de Engenharia (fictício)'
+      category: 'license'
+      issue_date: '2012'
+      expiration_date: null
+      public_identifier: 'CREA-UF 000000'
+      verification_url: ''
+      related_skills: []
+      status: 'valid'
+      evidence_ids: []
+
+  awards:
+    - name: ''
+      organization: ''
+      date: ''
+      context_and_criteria: ''
+      personal_contribution: ''
+      scope: ''
+      evidence_ids: []
+      disclosure: 'not_confirmed'
+
+  publications_research_talks:
+    - title: 'Zonas de manejo em cana-de-açúcar: estudo de caso'
+      type: 'talk'
+      date: '2022-09'
+      venue_or_institution: 'Encontro Regional de Agricultura de Precisão (fictício)'
+      authorship: 'autora principal'
+      summary: ''
+      personal_contribution: ''
+      topics_methods: ['zonas de manejo']
+      url_or_doi: ''
+      status: 'presented'
+      evidence_ids: []
+
+  volunteering_and_leadership:
+    - organization: 'Associação de Jovens Produtores Rurais'
+      role: 'Mentora voluntária'
+      participation_type: 'mentoring'
+      start_date: '2020'
+      end_date: null
+      responsibilities: ['Mentoria de jovens produtores sobre análise de solo']
+      audience: ''
+      outcomes: []
+      skills_demonstrated: ['geoestatística']
+      evidence_ids: []
+      disclosure: 'approved'
+
+  freelance_and_business:
+    - business_or_professional_name: 'Vale Ortiz Consultoria Agronômica'
+      activity: 'Consultoria de agricultura de precisão para produtores'
+      start_date: '2019'
+      end_date: null
+      client_market_description: 'Produtores de grãos e cana de pequeno e médio porte'
+      services_scope: ['amostragem de solo', 'mapas de fertilidade']
+      personal_responsibilities: ['atendimento', 'laudos']
+      tools_technologies: ['QGIS', 'R']
+      deliveries: ['laudos de fertilidade']
+      verifiable_results: []
+      project_or_client_count: 9
+      portfolio_url: ''
+      client_names_disclosure: 'not_approved'
+      evidence_ids: []
+
+  availability_preferences:
+    privacy: 'private'
+    preferred_work_modes: ['hybrid']
+    accepted_work_modes: ['onsite', 'hybrid']
+    target_regions_countries: ['SP', 'MG', 'PY']
+    willing_to_relocate: 'depends'
+    travel_availability: 'yes'
+    start_availability: '60 dias'
+    preferred_contract_types: ['CLT']
+    preferred_workload: ''
+    compatible_timezones_hours: ''
+    salary_expectation:
+      amount: 14000
+      currency: 'BRL'
+      period: 'monthly'
+      notes: 'Piso aceitável. CANARY-legacy-100-filled-salary_notes'
+    desired_benefits: ['veículo da empresa']
+    work_environment_preferences: []
+    work_conditions: []
+    deal_breakers: []
+
+  career_preferences:
+    priority_job_titles: ['Consultora de Agricultura de Precisão']
+    secondary_job_titles: ['Agrônoma de Dados']
+    fields_of_interest: ['agricultura de precisão']
+    preferred_industries: ['agtech']
+    excluded_industries: []
+    target_seniority_levels: ['senior']
+    accepted_equivalent_titles: []
+    misleading_titles_to_avoid: []
+    preferred_responsibilities: []
+    responsibilities_to_avoid: []
+    interest_in_adjacent_fields: 'depends'
+
+  resume_preferences:
+    default_language: 'pt-BR'
+    regional_variant: 'pt-BR'
+    tone: 'professional_direct'
+    preferred_length: 'two_pages'
+    output_formats: ['docx', 'pdf']
+    visual_style: 'ats_simple'
+    include_photo: false
+    default_headline: ''
+    preferred_sections: []
+    sections_to_omit: []
+    older_experiences_to_summarize: []
+    highlight_when_relevant: []
+    preferred_vocabulary: []
+    expressions_to_avoid: []
+    additional_style_notes: ''
+
+  additional_professional_context:
+    industry_knowledge: ['cana-de-açúcar', 'soja']
+    standards_regulations: []
+    specialized_equipment: ['monitor de produtividade', 'amostrador de solo']
+    methods_processes_frameworks: []
+    international_experience: 'Consultorias pontuais no Paraguai'
+    distributed_team_experience: ''
+    stakeholder_experience: ''
+    other: ''
+
+  evidence_registry:
+    - id: 'EVD-001'
+      type: 'document'
+      title: 'Relatório técnico de zonas de manejo (versão sem nomes de clientes)'
+      url_or_location: 'Arquivo local'
+      supported_claims:
+        ['Redução de 12% no consumo de fertilizante', 'Zonas de manejo em talhões de cana']
+      evidence_date: '2021-12'
+      is_public: false
+      approved_for_recruiter_sharing: false
+      notes: ''
+
+  pending_items:
+    - id: 'PEND-001'
+      subject: 'Datas de Gerente Agrícola'
+      current_information: 'CV antigo diz 2012-2014; carteira de trabalho ainda não conferida.'
+      uncertainty_reason: 'Datas divergentes'
+      known_variants: ['2012-2014', '2013-2014']
+      safe_statement_for_now: 'Gerente Agrícola (até 2014).'
+      confirmation_method: 'Conferir carteira de trabalho'
+      priority: 'high'
+      status: 'open'
+    - id: 'PEND-002'
+      subject: 'Número do registro profissional'
+      current_information: ''
+      uncertainty_reason: ''
+      known_variants: []
+      safe_statement_for_now: ''
+      confirmation_method: ''
+      priority: 'low'
+      status: 'ignored'
+
+  usage_rules:
+    never_include_in_resume: ['Fazenda Experimental Três Rios CANARY-legacy-100-filled-never_term']
+    require_approval_before_inclusion: ['Consultorias no Paraguai']
+    confidential_employers_or_projects: ['Clientes da consultoria própria']
+    links_not_to_share: ['Relatórios técnicos']
+    private_career_guidance_only: ['Quero migrar para dados. CANARY-legacy-100-filled-guidance']
+    additional_restrictions: []
+
+  review:
+    profile_created_date: '2026-03-01'
+    last_reviewed_date: '2026-09-15'
+    reviewed_by: 'self'
+    reviewed_sections: ['experiences', 'skills']
+    items_to_update: ['datas de Gerente Agrícola']
+    processing_consent: 'granted'
+    consent_notes: ''

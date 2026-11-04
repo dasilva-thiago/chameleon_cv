@@ -1,0 +1,16 @@
+# Edge case sintetico: tipos errados (numero onde se espera string/enum, objeto opaco, lista no lugar de objeto,
+# valor negativo). REJEITADO.
+schema_version: '2.1.0'
+profile:
+  experiences:
+    - id: EXP-001
+      organization_name: Empresa Fictícia Teta
+      official_title: Analista
+      location: Niterói
+  skills:
+    - { id: SKL-001, name: 123 }
+  skill_usages:
+    - { id: USE-001, skill_id: SKL-001, usage_context: 123 }
+  availability_preferences:
+    salary_expectation: { amount: -5, currency: BRL, period: monthly }
+  identity: [Nome, Sobrenome]

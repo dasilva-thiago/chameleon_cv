@@ -1,0 +1,39 @@
+{
+  "id": "k8s-gap",
+  "title": "Engenheiro(a) de Plataforma (DevOps)",
+  "locale": "pt-BR",
+  "description": "Vaga com Kubernetes obrigatório. Perfil sem evidência de Kubernetes em produção: registrar lacuna (missing); só estudo declarado não vira experiência.",
+  "scenario_ids": ["neg-kubernetes-gap", "same-profile-different-jobs"],
+  "target_profiles": [
+    "student-no-employment",
+    "experienced-promotions-same-employer",
+    "international-en-US"
+  ],
+  "expectations": {
+    "company": null,
+    "salary": null,
+    "work_mode": "remote",
+    "location": "Brasil",
+    "mandatory": [
+      {
+        "text": "Kubernetes em produção",
+        "excerpt": "Experiência comprovada com Kubernetes em produção"
+      },
+      { "text": "AWS e Terraform", "excerpt": "Experiência com AWS e Terraform" },
+      { "text": "CI/CD", "excerpt": "Vivência com pipelines de CI/CD" }
+    ],
+    "desirable": [
+      { "text": "CKA ou CKAD", "excerpt": "Certificação CKA ou CKAD" },
+      { "text": "Prometheus e Grafana", "excerpt": "Conhecimento de Prometheus e Grafana" }
+    ],
+    "responsibilities": [
+      {
+        "text": "Operar clusters Kubernetes",
+        "excerpt": "Operar clusters Kubernetes em produção e definir políticas de deploy"
+      }
+    ],
+    "years_required": []
+  },
+  "forbidden_output_markers": [],
+  "notes": "experienced-promotions-same-employer: Kubernetes só self_declared_knowledge (partial, mention_carefully). student-no-employment: missing. international-en-US: professional_experience (direct)."
+}

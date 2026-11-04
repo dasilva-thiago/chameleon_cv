@@ -1,0 +1,45 @@
+# Fixture 100% sintetica (nenhum dado real). Ver packages/test-fixtures/README.md.
+# Cenario: perfil MINIMO/PARCIAL. So o essencial; o resto e omitido, null ou lista vazia.
+#  - omitido ou null = not_provided; [] = o usuario nao tem itens (nao e afirmacao negativa).
+#  - Nenhuma lista vazia pode virar texto negativo ("sem experiencia", "nao possui") em plano ou curriculo.
+#  - A importacao deve gerar pendencias (datas, formacao, competencias), nunca valores preenchidos.
+schema_version: '2.0.0'
+locale: pt-BR
+profile:
+  identity:
+    full_name: Tatiane Moura Queiroz
+    city: null
+
+  contact_points:
+    - id: CP-001
+      kind: email
+      subtype: professional
+      value: tatiane.queiroz@example.invalid
+      visibility: public
+      include_by_default: true
+
+  positioning:
+    current_profession: Atendente de loja
+    current_seniority: not_assessed
+
+  experiences:
+    - id: EXP-001
+      organization_name: Mercadinho Bom Preço Ltda.
+      official_title: Atendente
+      start_date: null
+      end_date: null
+      meta:
+        status: needs_review
+        source: form_entry
+        field_states:
+          { start_date: not_provided, end_date: needs_confirmation, employment_type: not_assessed }
+        private_notes: Preencher datas depois. CANARY-minimal-partial-private_note
+
+  education: []
+  skills: []
+  projects: []
+
+  availability_preferences:
+    salary_expectation: { amount: null, notes: CANARY-minimal-partial-salary_notes }
+
+  career_preferences: null

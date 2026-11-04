@@ -1,0 +1,15 @@
+# Edge case sintetico: valores fora dos enums canonicos. REJEITADO (um erro por campo, com caminho).
+schema_version: '2.1.0'
+profile:
+  experiences:
+    - id: EXP-001
+      organization_name: Empresa Fictícia Beta
+      official_title: Analista
+      employment_type: banana
+      start_date: '2020-01'
+  skills:
+    - { id: SKL-001, name: Excel, self_assessed_level: super }
+  skill_usages:
+    - { id: USE-001, skill_id: SKL-001, usage_context: employment }
+  languages:
+    - { id: LNG-001, language: Inglês, overall_level: B3 }

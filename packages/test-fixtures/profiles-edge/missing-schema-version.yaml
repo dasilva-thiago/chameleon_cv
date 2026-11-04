@@ -1,0 +1,4 @@
+# Edge case sintetico: sem schema_version. REJEITADO (formato nao identificavel).
+profile:
+  identity:
+    full_name: Diego Exemplo Brandt

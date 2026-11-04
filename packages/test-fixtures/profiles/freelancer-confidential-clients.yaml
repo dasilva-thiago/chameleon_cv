@@ -1,0 +1,327 @@
+# Fixture 100% sintetica (nenhum dado real). Ver packages/test-fixtures/README.md.
+# Cenario: autonoma com clientes CONFIDENCIAIS (NDA). Nomes de clientes aparecem apenas em campos
+# privados e em usage_rules (canarios); o curriculo so pode usar descricoes genericas do setor.
+schema_version: '2.1.0'
+locale: pt-BR
+profile:
+  identity:
+    full_name: Beatriz Salgado Montenegro
+    preferred_name: Bia
+    country_of_residence: BR
+    region: RJ
+    city: Niterói
+    timezone: America/Sao_Paulo
+
+  contact_points:
+    - id: CP-001
+      kind: email
+      subtype: professional
+      value: bia.montenegro@example.invalid
+      visibility: public
+      include_by_default: true
+    - id: CP-002
+      kind: link
+      subtype: website
+      label: Site profissional
+      value: https://bia-montenegro.example.test
+      visibility: public
+      include_by_default: true
+
+  positioning:
+    current_profession: Consultora de marketing digital B2B
+    current_job_title: Consultora autônoma
+    current_seniority: senior
+    professional_headline: Consultora autônoma de marketing digital B2B, com foco em geração de demanda para indústrias
+
+  statements:
+    - id: STM-001
+      kind: short_summary
+      text: Consultora autônoma desde 2020, com 14 clientes B2B atendidos, antes analista de marketing em editora. Especialista em funis de geração de demanda e automação de e-mail.
+      meta: { status: confirmed, visibility: public, resume_use: allowed, source: user_declared }
+
+  competency_examples: []
+
+  experiences:
+    - id: EXP-001
+      organization_name: Bia Montenegro Consultoria em Marketing (MEI)
+      organization_public_name: Consultoria própria
+      industry: Marketing e publicidade
+      location: { city: Niterói, region: RJ, country: BR }
+      official_title: Consultora autônoma de marketing digital B2B
+      employment_type: self_employed
+      start_date: '2020-06'
+      end_date: present
+      work_mode: remote
+      company_context: Consultoria individual que atende pequenas e médias indústrias e empresas de serviços B2B.
+      business:
+        activity: Consultoria e execução de marketing digital B2B
+        client_market_description: Pequenas e médias indústrias e empresas de serviços profissionais, sem nomes divulgáveis.
+        services_scope:
+          [estratégia de geração de demanda, automação de e-mail, SEO, relatórios de performance]
+        client_count: 14
+        # O contrato (field_states) so aceita campos de nivel superior: nao ha como marcar business.portfolio_url como "declined".
+        # Portfolio ausente = portfolio_url null (not_provided).
+        portfolio_url: null
+      meta:
+        status: confirmed
+        visibility: public
+        resume_use: allowed
+        source: user_declared
+        evidence_ids: [EVD-001]
+      items:
+        - id: EXP-001-I1
+          kind: delivery
+          text: Funil de geração de leads para uma indústria de embalagens (cliente sob NDA), com landing pages, e-mail automatizado e relatório mensal.
+          personal_contribution: Estratégia, copy, configuração da automação e relatórios.
+          meta:
+            status: confirmed
+            visibility: public
+            resume_use: allowed
+            source: user_declared
+            private_notes: Cliente real - Embalagens Pedra Alta. CANARY-freelancer-confidential-clients-client_a_name
+        - id: EXP-001-I2
+          kind: achievement
+          text: Aumento de oportunidades qualificadas geradas por marketing para um cliente do setor de serviços contábeis (sob NDA).
+          metric:
+            name: Oportunidades qualificadas por mês
+            value: '+40%'
+            baseline: 15 por mês
+            period: '2023'
+            method: Contagem de leads aceitos pelo comercial do cliente, média de seis meses antes e depois.
+          meta:
+            status: confirmed
+            visibility: public
+            resume_use: requires_approval
+            source: user_declared
+            evidence_ids: [EVD-001]
+            private_notes: Cliente real - Contabilidade Horizonte Claro. CANARY-freelancer-confidential-clients-client_b_name
+        - id: EXP-001-I3
+          kind: responsibility
+          text: Relatórios mensais de performance para donos e gerentes comerciais dos clientes.
+          meta:
+            { status: confirmed, visibility: public, resume_use: allowed, source: user_declared }
+
+    - id: EXP-002
+      organization_name: Grupo Lume Editora Ltda.
+      industry: Editorial
+      location: { city: Rio de Janeiro, region: RJ, country: BR }
+      official_title: Analista de Marketing
+      employment_type: employee
+      start_date: '2016-08'
+      end_date: '2020-05'
+      work_mode: hybrid
+      meta: { status: confirmed, visibility: public, resume_use: allowed, source: user_declared }
+      items:
+        - id: EXP-002-I1
+          kind: responsibility
+          text: Planejamento e execução de campanhas de e-mail marketing para livrarias e assinantes.
+          meta:
+            { status: confirmed, visibility: public, resume_use: allowed, source: user_declared }
+        - id: EXP-002-I2
+          kind: responsibility
+          text: Análise de métricas de campanhas e relatórios para a diretoria comercial.
+          meta:
+            { status: confirmed, visibility: public, resume_use: allowed, source: user_declared }
+
+  projects:
+    - id: PRJ-001
+      name: Automação de funil de e-mails para indústria (cliente sob NDA)
+      category: freelance
+      team_based: false
+      status: completed
+      start_date: '2022-02'
+      end_date: '2022-08'
+      related_experience_id: EXP-001
+      role: Consultora responsável
+      personal_contribution: Todo o desenho do funil, redação dos e-mails e configuração da automação.
+      public_access: not_public
+      meta:
+        status: confirmed
+        visibility: conditional
+        resume_use: requires_approval
+        source: user_declared
+        private_notes: Cliente real - Embalagens Pedra Alta. CANARY-freelancer-confidential-clients-project_client
+
+  education:
+    - id: EDU-001
+      institution: Universidade Federal da Baía Imaginária
+      course_name: Bacharelado em Comunicação Social, habilitação em Publicidade
+      degree_type: bachelor
+      field_of_study: Comunicação Social
+      status: completed
+      start_date: '2012-02'
+      completion_date: '2016-07'
+      meta: { status: confirmed, visibility: public, resume_use: allowed, source: certificate }
+
+  courses:
+    - id: CRS-001
+      name: Marketing de Conteúdo e Inbound
+      provider: Escola de Marketing Exemplo
+      topics: [funil de vendas, SEO, automação de marketing]
+      start_date: '2019-09'
+      completion_date: '2019-12'
+      workload_hours: 48
+      status: completed
+      certificate_issued: true
+      meta: { status: confirmed, visibility: public, resume_use: allowed, source: certificate }
+
+  skills:
+    - {
+        id: SKL-001,
+        name: Automação de e-mail marketing,
+        category: method,
+        self_assessed_level: advanced,
+      }
+    - { id: SKL-002, name: SEO, category: method, self_assessed_level: intermediate }
+    - { id: SKL-003, name: HubSpot, category: tool, self_assessed_level: advanced }
+    - { id: SKL-004, name: Google Analytics, category: tool, self_assessed_level: advanced }
+    - {
+        id: SKL-005,
+        name: Negociação comercial,
+        category: soft_skill,
+        self_assessed_level: intermediate,
+      }
+    - {
+        id: SKL-006,
+        name: Prospecção ativa de clientes,
+        category: method,
+        self_assessed_level: intermediate,
+      }
+
+  skill_usages:
+    - {
+        id: USE-001,
+        skill_id: SKL-001,
+        usage_context: professional_experience,
+        experience_id: EXP-001,
+      }
+    - {
+        id: USE-002,
+        skill_id: SKL-001,
+        usage_context: professional_experience,
+        experience_id: EXP-002,
+      }
+    - { id: USE-003, skill_id: SKL-001, usage_context: project_experience, project_id: PRJ-001 }
+    - { id: USE-004, skill_id: SKL-002, usage_context: coursework, course_id: CRS-001 }
+    - {
+        id: USE-005,
+        skill_id: SKL-002,
+        usage_context: professional_experience,
+        experience_id: EXP-001,
+      }
+    - {
+        id: USE-006,
+        skill_id: SKL-003,
+        usage_context: professional_experience,
+        experience_id: EXP-001,
+      }
+    - {
+        id: USE-007,
+        skill_id: SKL-004,
+        usage_context: professional_experience,
+        experience_id: EXP-002,
+      }
+    - {
+        id: USE-008,
+        skill_id: SKL-005,
+        usage_context: professional_experience,
+        experience_id: EXP-001,
+      }
+    - {
+        id: USE-009,
+        skill_id: SKL-006,
+        usage_context: professional_experience,
+        experience_id: EXP-001,
+      }
+
+  languages:
+    - {
+        id: LNG-001,
+        language: Português,
+        language_code: pt-BR,
+        overall_level: native,
+        reading: native,
+        writing: native,
+        listening: native,
+        speaking: native,
+      }
+    - {
+        id: LNG-002,
+        language: Inglês,
+        language_code: en,
+        overall_level: B2,
+        reading: C1,
+        writing: B2,
+        listening: B2,
+        speaking: B1,
+      }
+
+  certifications: []
+  awards: []
+  publications: []
+  volunteering: []
+
+  evidence:
+    - id: EVD-001
+      type: reference
+      title: Cartas de recomendação de clientes (sem divulgação de nomes)
+      url_or_location: Arquivo local (não publicado)
+      evidence_date: '2024-03'
+      is_public: false
+      recruiter_sharing: not_allowed
+      supports: [EXP-001, EXP-001-I2]
+
+  pending_items:
+    - id: PEND-001
+      target: { record_id: EXP-001-I2, field: metric.value }
+      subject: Autorização do cliente para divulgar o ganho percentual
+      reason: unclear
+      current_information: O cliente autorizou citar o setor, mas não confirmou a divulgação do percentual.
+      known_variants: ['+40%']
+      safe_statement_for_now: Aumento de oportunidades qualificadas para um cliente do setor de serviços contábeis.
+      confirmation_method: Perguntar ao cliente por escrito.
+      priority: high
+      status: open
+
+  availability_preferences:
+    preferred_work_modes: [remote]
+    preferred_contract_types: [employee, contractor]
+    salary_expectation:
+      {
+        amount: null,
+        currency: BRL,
+        period: monthly,
+        notes: CANARY-freelancer-confidential-clients-salary_notes,
+      }
+
+  career_preferences:
+    priority_job_titles: [Executiva de Contas B2B, Analista de Marketing de Performance]
+    fields_of_interest: [vendas B2B, marketing de performance]
+    target_seniority_levels: [mid, senior]
+
+  resume_preferences:
+    default_language: pt-BR
+    preferred_length: one_page
+
+  additional_professional_context: null
+
+  usage_rules:
+    restrictions:
+      - target:
+          { term: 'Embalagens Pedra Alta CANARY-freelancer-confidential-clients-restricted_term_a' }
+        rule: never_include
+        reason: Cliente sob NDA.
+      - target:
+          {
+            term: 'Contabilidade Horizonte Claro CANARY-freelancer-confidential-clients-restricted_term_b',
+          }
+        rule: never_include
+        reason: Cliente sob NDA.
+      - target: { record_id: PRJ-001 }
+        rule: require_approval
+        reason: Descrição pública só com aprovação do cliente.
+
+  review:
+    profile_created_date: '2026-06-18'
+    last_reviewed_date: '2026-10-12'
+    reviewed_by: self

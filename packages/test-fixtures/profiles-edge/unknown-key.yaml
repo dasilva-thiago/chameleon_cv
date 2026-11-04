@@ -1,0 +1,10 @@
+# Edge case sintetico: chave desconhecida (typo) dentro de profile. Modo estrito: REJEITADO com caminho
+# profile.typo_experinces. Modo lenient: aviso + valor preservado em `unmapped` (nada se perde em silencio).
+schema_version: '2.1.0'
+profile:
+  identity:
+    full_name: Ana Exemplo de Teste
+  typo_experinces:
+    - id: EXP-001
+      organization_name: Empresa Fictícia Alfa
+      official_title: Analista

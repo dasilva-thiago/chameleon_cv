@@ -1,0 +1,46 @@
+{
+  "id": "english-posting",
+  "title": "Platform Engineer (Python / AWS)",
+  "locale": "en-US",
+  "description": "Vaga em inglês para perfil en-US com formação brasileira. Nomes de tecnologias, empresas, instituições e cursos não podem ser traduzidos ou \"corrigidos\" (ex.: \"Bacharelado em Engenharia de Computação\" permanece).",
+  "scenario_ids": ["neg-english-posting-names", "same-profile-different-jobs"],
+  "target_profiles": ["international-en-US"],
+  "expectations": {
+    "company": "Lumenpath Data Co.",
+    "salary": "$150,000 - $175,000 per year",
+    "work_mode": "hybrid",
+    "location": "Austin, TX",
+    "mandatory": [
+      {
+        "text": "5+ years of professional software engineering",
+        "excerpt": "5+ years of professional software engineering experience"
+      },
+      { "text": "Python and PostgreSQL", "excerpt": "Strong Python and PostgreSQL skills" },
+      { "text": "AWS and Kubernetes", "excerpt": "Hands-on experience with AWS and Kubernetes" },
+      {
+        "text": "Bachelor's degree in Computer Science or equivalent",
+        "excerpt": "Bachelor's degree in Computer Science or equivalent experience"
+      }
+    ],
+    "desirable": [
+      { "text": "Terraform", "excerpt": "Terraform" },
+      { "text": "Open source contributions", "excerpt": "Contributions to open source projects" }
+    ],
+    "responsibilities": [
+      {
+        "text": "Design and operate Kubernetes-based job infrastructure",
+        "excerpt": "Design and operate Kubernetes-based job infrastructure on AWS"
+      }
+    ],
+    "years_required": [
+      {
+        "term": "software engineering",
+        "years": 5,
+        "professional_only": true,
+        "excerpt": "5+ years of professional software engineering experience"
+      }
+    ]
+  },
+  "forbidden_output_markers": ["Bachelor of Computer Engineering at Federal University"],
+  "notes": "Output locale en-US. Institution 'Universidade Federal do Planalto Austral' and course 'Bacharelado em Engenharia de Computação' keep their original names (an English gloss in parentheses is acceptable; replacing them is not)."
+}

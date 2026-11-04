@@ -1,0 +1,361 @@
+# Fixture 100% sintetica (nenhum dado real). Ver packages/test-fixtures/README.md.
+# Cenario: transicao de setor (educacao -> dados), competencias transferiveis, poucas palavras-chave exatas.
+# SQL/Python so em curso e projeto (nunca professional_experience); Excel e estatistica vieram do trabalho docente.
+schema_version: '2.1.0'
+locale: pt-BR
+profile:
+  identity:
+    full_name: Helena Barroso Cordeiro
+    preferred_name: Helena
+    country_of_residence: BR
+    region: MG
+    city: Uberlândia
+    timezone: America/Sao_Paulo
+
+  contact_points:
+    - id: CP-001
+      kind: email
+      subtype: professional
+      value: helena.cordeiro@example.invalid
+      visibility: public
+      include_by_default: true
+    - id: CP-002
+      kind: link
+      subtype: portfolio
+      label: Notebooks de análise
+      value: https://notebooks.example.test/helena-cordeiro
+      visibility: public
+      include_by_default: true
+
+  positioning:
+    current_profession: Professora em transição para análise de dados
+    current_job_title: Professora de Matemática
+    current_seniority: junior
+    professional_headline: Professora de Matemática com 9 anos de experiência em transição para análise de dados
+
+  statements:
+    - id: STM-001
+      kind: career_narrative
+      text: Depois de 9 anos ensinando matemática e analisando o desempenho de turmas em planilhas, decidi transformar esse hábito em profissão.
+      meta: { status: confirmed, visibility: public, resume_use: allowed, source: user_declared }
+    - id: STM-002
+      kind: differentiator
+      text: Sei explicar números para quem não é da área, hábito criado em sala de aula.
+      meta: { status: needs_review, visibility: public, resume_use: allowed, source: user_declared }
+
+  competency_examples:
+    - id: CEX-001
+      competency: Comunicação de resultados para públicos não técnicos
+      situation: Reuniões de conselho de classe exigiam explicar o desempenho de turmas para pais e coordenação.
+      action: Criou resumos visuais com gráficos simples e uma linguagem sem jargão.
+      outcome_or_learning: Reuniões mais curtas e decisões de reforço escolar tomadas na própria reunião.
+      related_skill_ids: [SKL-003, SKL-006]
+      meta: { status: confirmed, visibility: public, resume_use: allowed, source: user_declared }
+
+  experiences:
+    - id: EXP-001
+      organization_name: Colégio Horizonte Aberto
+      industry: Educação básica
+      location: { city: Uberlândia, region: MG, country: BR }
+      official_title: Professora de Matemática
+      employment_type: employee
+      start_date: '2016-02'
+      end_date: '2025-12'
+      work_mode: onsite
+      operational_scope: Turmas de ensino médio, entre 30 e 40 estudantes cada, três a cinco turmas por ano.
+      transferable_skills:
+        [planejamento, análise de dados de desempenho, comunicação, gestão de prazos]
+      meta:
+        status: confirmed
+        visibility: public
+        resume_use: allowed
+        source: user_declared
+        evidence_ids: [EVD-001]
+        field_states: { products_services_users: not_applicable, department: not_applicable }
+      items:
+        - id: EXP-001-I1
+          kind: responsibility
+          text: Planejamento e aplicação de aulas e avaliações de matemática e estatística básica.
+          meta:
+            { status: confirmed, visibility: public, resume_use: allowed, source: user_declared }
+        - id: EXP-001-I2
+          kind: delivery
+          text: Planilha de acompanhamento do desempenho por turma, com gráficos e alertas para queda de notas.
+          personal_contribution: Concepção, fórmulas e manutenção durante cinco anos.
+          meta:
+            {
+              status: confirmed,
+              visibility: public,
+              resume_use: allowed,
+              source: user_declared,
+              evidence_ids: [EVD-001],
+            }
+        - id: EXP-001-I3
+          kind: achievement
+          text: Redução do índice de reprovação nas turmas de primeiro ano.
+          metric:
+            name: Índice de reprovação
+            value: null
+            method: null
+          meta:
+            {
+              status: needs_review,
+              visibility: public,
+              resume_use: allowed,
+              source: user_declared,
+              field_states: { metric: needs_confirmation },
+            }
+
+    - id: EXP-002
+      organization_name: Colégio Horizonte Aberto
+      organization_group: ORG-HORIZONTE
+      official_title: Coordenadora Pedagógica de Matemática
+      employment_type: employee
+      start_date: '2021-02'
+      end_date: '2025-12'
+      work_mode: onsite
+      meta:
+        {
+          status: confirmed,
+          visibility: public,
+          resume_use: allowed,
+          source: user_declared,
+          private_notes: Nota privada da candidata. CANARY-career-changer-teacher-to-data-private_note,
+        }
+      items:
+        - id: EXP-002-I1
+          kind: responsibility
+          text: Coordenação de uma equipe de 6 professores e padronização das avaliações bimestrais.
+          meta:
+            { status: confirmed, visibility: public, resume_use: allowed, source: user_declared }
+
+  projects:
+    - id: PRJ-001
+      name: Painel de evasão em escolas públicas (projeto final do bootcamp)
+      category: academic
+      team_based: true
+      status: completed
+      start_date: '2026-05'
+      end_date: '2026-07'
+      related_education_id: EDU-002
+      role: Analista de dados em dupla
+      problem: Identificar fatores associados à evasão a partir de dados abertos de censo escolar.
+      personal_contribution: Limpeza e análise exploratória em Python e consultas SQL; construção de 4 dos 7 gráficos do relatório.
+      contributions_by_others: O colega da dupla construiu o modelo de classificação e a apresentação.
+      repository_url: https://git.example.test/helena-cordeiro/evasao-escolar
+      public_access: public
+      meta:
+        {
+          status: confirmed,
+          visibility: public,
+          resume_use: allowed,
+          source: repository,
+          evidence_ids: [EVD-002],
+        }
+      items:
+        - id: PRJ-001-I1
+          kind: contribution
+          text: Limpeza e padronização de dados do censo escolar com Python (pandas).
+          meta: { status: confirmed, visibility: public, resume_use: allowed, source: repository }
+        - id: PRJ-001-I2
+          kind: contribution
+          text: Consultas SQL para agregar evasão por município e dependência administrativa.
+          meta: { status: confirmed, visibility: public, resume_use: allowed, source: repository }
+    - id: PRJ-002
+      name: Análise de preços de feira livre
+      category: personal
+      team_based: false
+      status: completed
+      start_date: '2026-08'
+      end_date: '2026-09'
+      role: Autora única
+      personal_contribution: Coleta, análise e visualização.
+      public_url: https://notebooks.example.test/helena-cordeiro/feira
+      meta: { status: confirmed, visibility: public, resume_use: allowed, source: user_declared }
+
+  education:
+    - id: EDU-001
+      institution: Universidade Estadual do Triângulo Imaginário
+      course_name: Licenciatura em Matemática
+      degree_type: bachelor
+      field_of_study: Matemática
+      status: completed
+      start_date: '2010-02'
+      completion_date: '2014-12'
+      meta: { status: confirmed, visibility: public, resume_use: allowed, source: certificate }
+    - id: EDU-002
+      institution: Escola de Dados Exemplo
+      course_name: Bootcamp de Análise de Dados
+      degree_type: other
+      field_of_study: Análise de dados
+      status: completed
+      start_date: '2026-02'
+      completion_date: '2026-07'
+      modality: online
+      meta:
+        {
+          status: confirmed,
+          visibility: public,
+          resume_use: allowed,
+          source: certificate,
+          evidence_ids: [EVD-003],
+        }
+
+  courses:
+    - id: CRS-001
+      name: SQL para Análise de Dados
+      provider: Plataforma Aprende Exemplo
+      topics: [SELECT, JOIN, funções de janela]
+      start_date: '2026-01'
+      completion_date: '2026-02'
+      workload_hours: 30
+      status: completed
+      certificate_issued: true
+      meta: { status: confirmed, visibility: public, resume_use: allowed, source: certificate }
+
+  skills:
+    - { id: SKL-001, name: SQL, category: language, self_assessed_level: intermediate }
+    - {
+        id: SKL-002,
+        name: Python,
+        category: language,
+        aliases: [pandas],
+        self_assessed_level: basic,
+      }
+    - {
+        id: SKL-003,
+        name: Excel,
+        category: tool,
+        aliases: [Microsoft Excel],
+        self_assessed_level: advanced,
+      }
+    - { id: SKL-004, name: Power BI, category: tool, self_assessed_level: exposure }
+    - { id: SKL-005, name: Estatística descritiva, category: domain, self_assessed_level: advanced }
+    - { id: SKL-006, name: Comunicação com públicos não técnicos, category: soft_skill }
+
+  skill_usages:
+    - { id: USE-001, skill_id: SKL-001, usage_context: coursework, course_id: CRS-001 }
+    - {
+        id: USE-002,
+        skill_id: SKL-001,
+        usage_context: project_experience,
+        project_id: PRJ-001,
+        facet: database,
+      }
+    - { id: USE-003, skill_id: SKL-002, usage_context: coursework, education_id: EDU-002 }
+    - { id: USE-004, skill_id: SKL-002, usage_context: project_experience, project_id: PRJ-002 }
+    - {
+        id: USE-005,
+        skill_id: SKL-003,
+        usage_context: professional_experience,
+        experience_id: EXP-001,
+      }
+    - { id: USE-006, skill_id: SKL-004, usage_context: conceptual_familiarity }
+    - {
+        id: USE-007,
+        skill_id: SKL-005,
+        usage_context: professional_experience,
+        experience_id: EXP-001,
+      }
+    - {
+        id: USE-008,
+        skill_id: SKL-006,
+        usage_context: professional_experience,
+        experience_id: EXP-002,
+      }
+
+  languages:
+    - {
+        id: LNG-001,
+        language: Português,
+        language_code: pt-BR,
+        overall_level: native,
+        reading: native,
+        writing: native,
+        listening: native,
+        speaking: native,
+      }
+    - {
+        id: LNG-002,
+        language: Inglês,
+        language_code: en,
+        overall_level: B1,
+        reading: B2,
+        writing: A2,
+        listening: B1,
+        speaking: A2,
+      }
+
+  certifications: []
+  awards: []
+  publications: []
+  volunteering: []
+
+  evidence:
+    - id: EVD-001
+      type: document
+      title: Declaração da escola sobre cargos e período
+      url_or_location: Arquivo local (não publicado)
+      evidence_date: '2026-01'
+      is_public: false
+      recruiter_sharing: restricted
+      supports: [EXP-001, EXP-002, EXP-001-I2]
+    - id: EVD-002
+      type: repository
+      title: Repositório do projeto final do bootcamp
+      url_or_location: https://git.example.test/helena-cordeiro/evasao-escolar
+      evidence_date: '2026-07'
+      is_public: true
+      recruiter_sharing: allowed
+      supports: [PRJ-001, PRJ-001-I1, PRJ-001-I2]
+    - id: EVD-003
+      type: certificate
+      title: Certificado do Bootcamp de Análise de Dados
+      url_or_location: https://certificados.example.test/escola-de-dados/hc-0001
+      evidence_date: '2026-07'
+      is_public: true
+      recruiter_sharing: allowed
+      supports: [EDU-002]
+
+  pending_items:
+    - id: PEND-001
+      target: { record_id: EXP-001-I3, field: metric.value }
+      subject: Percentual de redução da reprovação
+      reason: missing
+      current_information: Lembra que caiu, mas não tem o número.
+      safe_statement_for_now: null
+      confirmation_method: Consultar o relatório anual da escola.
+      priority: medium
+      status: open
+
+  availability_preferences:
+    preferred_work_modes: [remote, hybrid]
+    salary_expectation:
+      {
+        amount: null,
+        currency: BRL,
+        period: monthly,
+        notes: CANARY-career-changer-teacher-to-data-salary_notes,
+      }
+
+  career_preferences:
+    priority_job_titles: [Analista de Dados Júnior, Analista de BI Júnior]
+    fields_of_interest: [análise de dados, educação, indicadores sociais]
+    preferred_industries: [educação, setor público]
+    interest_in_adjacent_fields: depends
+    target_seniority_levels: [entry, junior]
+
+  resume_preferences:
+    default_language: pt-BR
+    preferred_length: one_page
+    highlight_record_ids: [PRJ-001, PRJ-002]
+
+  additional_professional_context:
+    methods_processes_frameworks: [avaliação por competências]
+
+  usage_rules: { restrictions: [] }
+
+  review:
+    profile_created_date: '2026-08-20'
+    last_reviewed_date: '2026-10-01'
+    reviewed_by: self

@@ -1,0 +1,12 @@
+# Edge case sintetico: data em texto livre, URL e e-mail invalidos. REJEITADO (PartialDate, URL e e-mail validados).
+schema_version: '2.1.0'
+profile:
+  contact_points:
+    - { id: CP-001, kind: email, value: x }
+    - { id: CP-002, kind: link, value: 'not a url' }
+  experiences:
+    - id: EXP-001
+      organization_name: Empresa Fictícia Gama
+      official_title: Assistente
+      start_date: last summer
+      end_date: '2021-13'

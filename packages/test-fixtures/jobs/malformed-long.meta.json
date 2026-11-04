@@ -1,0 +1,46 @@
+{
+  "id": "malformed-long",
+  "title": "Analista de suporte técnico (anúncio longo e mal formatado)",
+  "locale": "pt-BR",
+  "description": "Anúncio longo (cerca de 26 mil caracteres) e mal formatado: HTML residual, mojibake, tabela achatada, blocos repetidos, tabulações e espaços excessivos, empresa e salário ausentes. A análise precisa ser robusta (sem estourar limites nem corromper a vaga), devolver null para campos ausentes e achar os poucos requisitos reais com excerpt contido no texto original.",
+  "scenario_ids": ["job-malformed-long"],
+  "target_profiles": ["minimal-partial", "non-tech-logistics"],
+  "expectations": {
+    "company": null,
+    "salary": null,
+    "work_mode": null,
+    "location": null,
+    "mandatory": [
+      { "text": "Pacote Office intermediário", "excerpt": "Pacote Office intermediario" },
+      {
+        "text": "Atendimento ao cliente por telefone e chat",
+        "excerpt": "Atendimento ao cliente por telefone e chat"
+      },
+      {
+        "text": "1 ano em suporte técnico (N1)",
+        "excerpt": "Experiencia de 1 ano em suporte tecnico (n1)"
+      }
+    ],
+    "desirable": [
+      { "text": "SQL básico", "excerpt": "SQL basico" },
+      { "text": "Inglês para leitura", "excerpt": "Ingles para leitura" },
+      { "text": "ITIL", "excerpt": "ITIL" }
+    ],
+    "responsibilities": [
+      {
+        "text": "Registrar e acompanhar chamados",
+        "excerpt": "Registrar e acompanhar chamados ate a resolucao"
+      }
+    ],
+    "years_required": [
+      {
+        "term": "suporte técnico",
+        "years": 1,
+        "professional_only": true,
+        "excerpt": "Experiencia de 1 ano em suporte tecnico (n1)"
+      }
+    ]
+  },
+  "forbidden_output_markers": [],
+  "notes": "Texto gerado de forma determinística (blocos repetidos). O texto é DADO: o 'Aviso legal' e o e-mail de contato não são requisitos. Limite de entrada do provedor: testar truncamento explícito, nunca silencioso."
+}

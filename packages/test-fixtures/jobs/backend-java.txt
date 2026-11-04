@@ -1,0 +1,24 @@
+Desenvolvedor(a) Backend Java Pleno
+
+Empresa: Quanta Ledger Pagamentos
+Modalidade: híbrido, 3 dias por semana no escritório em São Paulo
+
+Sobre a vaga
+Você vai evoluir os serviços de conciliação de pagamentos da Quanta Ledger, trabalhando com times de produto e de risco.
+
+Responsabilidades
+- Desenvolver e manter serviços backend em Java para processamento de transações.
+- Participar de revisões de código e de decisões de arquitetura.
+- Investigar incidentes em produção com apoio do time de plataforma.
+
+Requisitos obrigatórios
+- Experiência profissional de 3 anos ou mais com Java 17 e Spring Boot.
+- Experiência com PostgreSQL e modelagem de dados relacional.
+- Domínio de testes automatizados (JUnit).
+
+Desejável
+- Conhecimento de Apache Kafka.
+- Experiência em empresas de meios de pagamento.
+
+Oferecemos
+Vale-refeição, plano de saúde e participação nos resultados.

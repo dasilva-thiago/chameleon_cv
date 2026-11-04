@@ -1,0 +1,392 @@
+# Fixture 100% sintetica (nenhum dado real). Ver packages/test-fixtures/README.md.
+# Cenario: perfil nao-TI (logistica/armazem), metricas com linha de base e metodo, NR e CNH como
+# licencas/certificacoes, restricao de uso sobre nome de cliente.
+schema_version: '2.1.0'
+locale: pt-BR
+profile:
+  identity:
+    full_name: Marcos Vinícius Pereira Soares
+    preferred_name: Marcos
+    country_of_residence: BR
+    region: SP
+    city: Campinas
+    timezone: America/Sao_Paulo
+
+  contact_points:
+    - id: CP-001
+      kind: email
+      subtype: professional
+      value: marcos.soares@example.invalid
+      visibility: public
+      include_by_default: true
+    - id: CP-002
+      kind: phone
+      subtype: mobile
+      value: '+5500900000104'
+      visibility: public
+      include_by_default: true
+
+  positioning:
+    current_profession: Supervisor de logística
+    current_job_title: Supervisor de Armazém
+    current_seniority: senior
+    professional_headline: Supervisor de armazém com 12 anos em expedição, estoque e gestão de equipes de operação
+
+  statements:
+    - id: STM-001
+      kind: short_summary
+      text: Profissional de logística com 12 anos de experiência em centros de distribuição, liderando equipes de até 25 pessoas e melhorando acuracidade de estoque e produtividade de expedição.
+      meta: { status: confirmed, visibility: public, resume_use: allowed, source: user_declared }
+
+  competency_examples: []
+
+  experiences:
+    - id: EXP-001
+      organization_name: Distribuidora Vale Verde Ltda.
+      industry: Distribuição de alimentos
+      location: { city: Campinas, region: SP, country: BR }
+      official_title: Auxiliar de Expedição
+      employment_type: employee
+      start_date: '2014-03'
+      end_date: '2016-08'
+      work_mode: onsite
+      meta: { status: confirmed, visibility: public, resume_use: allowed, source: user_declared }
+      items:
+        - id: EXP-001-I1
+          kind: responsibility
+          text: Separação, conferência e carregamento de pedidos para entregas na região metropolitana.
+          meta:
+            { status: confirmed, visibility: public, resume_use: allowed, source: user_declared }
+
+    - id: EXP-002
+      organization_name: Centro Logístico Planalto S.A.
+      organization_public_name: Centro Logístico Planalto
+      industry: Operador logístico
+      location: { city: Jundiaí, region: SP, country: BR }
+      official_title: Conferente de Estoque
+      employment_type: employee
+      start_date: '2016-09'
+      end_date: '2019-04'
+      work_mode: onsite
+      meta: { status: confirmed, visibility: public, resume_use: allowed, source: user_declared }
+      items:
+        - id: EXP-002-I1
+          kind: responsibility
+          text: Inventário cíclico semanal e tratativa de divergências no sistema WMS.
+          meta:
+            { status: confirmed, visibility: public, resume_use: allowed, source: user_declared }
+        - id: EXP-002-I2
+          kind: achievement
+          text: Aumento da acuracidade de estoque do centro de distribuição de 96,5% para 99,2% em 12 meses.
+          metric:
+            name: Acuracidade de estoque
+            value: '99,2%'
+            baseline: '96,5%'
+            period: '2018'
+            method: Inventário cíclico, itens contados sem divergência dividido pelo total de itens contados.
+          personal_contribution: Rotina de contagem cíclica e análise semanal das divergências.
+          meta:
+            {
+              status: confirmed,
+              visibility: public,
+              resume_use: allowed,
+              source: user_declared,
+              evidence_ids: [EVD-001],
+            }
+
+    - id: EXP-003
+      organization_name: Centro Logístico Planalto S.A.
+      organization_public_name: Centro Logístico Planalto
+      organization_group: ORG-PLANALTO
+      official_title: Líder de Expedição
+      employment_type: employee
+      start_date: '2019-05'
+      end_date: '2022-10'
+      work_mode: onsite
+      operational_scope: Turno da tarde, equipe de 12 pessoas, cerca de 1.800 pedidos por dia.
+      meta: { status: confirmed, visibility: public, resume_use: allowed, source: user_declared }
+      items:
+        - id: EXP-003-I1
+          kind: achievement
+          text: Redução de avarias no carregamento com treinamento da equipe e checklist de carga.
+          metric:
+            name: Avarias por mil volumes
+            value: '1,1'
+            baseline: '2,4'
+            period: '2021'
+            method: Relatório mensal de avarias dividido pelo total de volumes expedidos.
+          meta:
+            {
+              status: confirmed,
+              visibility: public,
+              resume_use: allowed,
+              source: user_declared,
+              evidence_ids: [EVD-001],
+            }
+        - id: EXP-003-I2
+          kind: responsibility
+          text: Escala de pessoal, distribuição de tarefas e acompanhamento de indicadores diários de expedição.
+          meta:
+            { status: confirmed, visibility: public, resume_use: allowed, source: user_declared }
+
+    - id: EXP-004
+      organization_name: Transportes Rota Sul Ltda.
+      industry: Transporte rodoviário de cargas
+      location: { city: Campinas, region: SP, country: BR }
+      official_title: Supervisor de Armazém
+      employment_type: employee
+      start_date: '2022-11'
+      end_date: present
+      work_mode: onsite
+      operational_scope: Armazém de 6.000 m², três turnos, 25 colaboradores sob supervisão direta.
+      team_interfaces: [transporte, comercial, financeiro, clientes]
+      meta: { status: confirmed, visibility: public, resume_use: allowed, source: user_declared }
+      items:
+        - id: EXP-004-I1
+          kind: achievement
+          text: Aumento da produtividade de separação em 18% com reorganização de endereçamento e rotas de picking.
+          metric:
+            name: Linhas separadas por hora por operador
+            value: '+18%'
+            baseline: '62 linhas/hora'
+            period: '2023'
+            method: Média mensal do relatório do WMS, seis meses antes e depois da reorganização.
+          meta:
+            status: needs_review
+            visibility: public
+            resume_use: allowed
+            source: user_declared
+            private_notes: Cliente principal do armazém não pode ser citado. CANARY-non-tech-logistics-private_note
+        - id: EXP-004-I2
+          kind: responsibility
+          text: Gestão de 25 colaboradores em três turnos, com escalas, treinamentos e avaliação de desempenho.
+          meta:
+            { status: confirmed, visibility: public, resume_use: allowed, source: user_declared }
+        - id: EXP-004-I3
+          kind: responsibility
+          text: Atendimento de auditorias de clientes e de segurança do trabalho.
+          meta:
+            { status: confirmed, visibility: public, resume_use: allowed, source: user_declared }
+
+  projects: []
+
+  education:
+    - id: EDU-001
+      institution: Faculdade de Tecnologia do Interior Paulista
+      course_name: Tecnologia em Logística
+      degree_type: associate
+      field_of_study: Logística
+      status: completed
+      start_date: '2017-02'
+      completion_date: '2019-12'
+      meta: { status: confirmed, visibility: public, resume_use: allowed, source: certificate }
+
+  courses:
+    - id: CRS-001
+      name: Gestão de Estoques e Inventários
+      provider: Instituto de Capacitação Logística Exemplo
+      topics: [curva ABC, inventário cíclico, giro de estoque]
+      start_date: '2018-03'
+      completion_date: '2018-05'
+      workload_hours: 40
+      status: completed
+      certificate_issued: true
+      meta: { status: confirmed, visibility: public, resume_use: allowed, source: certificate }
+
+  skills:
+    - {
+        id: SKL-001,
+        name: WMS (sistema de gestão de armazém),
+        category: tool,
+        aliases: [WMS],
+        self_assessed_level: advanced,
+      }
+    - { id: SKL-002, name: Inventário cíclico, category: method, self_assessed_level: advanced }
+    - {
+        id: SKL-003,
+        name: Gestão de equipes de operação,
+        category: soft_skill,
+        self_assessed_level: advanced,
+      }
+    - {
+        id: SKL-004,
+        name: Excel,
+        category: tool,
+        aliases: [Microsoft Excel],
+        self_assessed_level: intermediate,
+      }
+    - { id: SKL-005, name: Operação de empilhadeira, category: tool, self_assessed_level: advanced }
+    - { id: SKL-006, name: Lean Six Sigma, category: method, self_assessed_level: basic }
+    - {
+        id: SKL-007,
+        name: Indicadores de armazenagem (KPIs),
+        category: domain,
+        self_assessed_level: advanced,
+      }
+
+  skill_usages:
+    - {
+        id: USE-001,
+        skill_id: SKL-001,
+        usage_context: professional_experience,
+        experience_id: EXP-002,
+      }
+    - {
+        id: USE-002,
+        skill_id: SKL-001,
+        usage_context: professional_experience,
+        experience_id: EXP-004,
+      }
+    - {
+        id: USE-003,
+        skill_id: SKL-002,
+        usage_context: professional_experience,
+        experience_id: EXP-002,
+      }
+    - { id: USE-004, skill_id: SKL-002, usage_context: coursework, course_id: CRS-001 }
+    - {
+        id: USE-005,
+        skill_id: SKL-003,
+        usage_context: professional_experience,
+        experience_id: EXP-004,
+      }
+    - {
+        id: USE-006,
+        skill_id: SKL-004,
+        usage_context: professional_experience,
+        experience_id: EXP-003,
+      }
+    - { id: USE-007, skill_id: SKL-005, usage_context: certification, certification_id: CRT-001 }
+    - { id: USE-008, skill_id: SKL-006, usage_context: certification, certification_id: CRT-003 }
+    - {
+        id: USE-009,
+        skill_id: SKL-007,
+        usage_context: professional_experience,
+        experience_id: EXP-003,
+      }
+
+  languages:
+    - {
+        id: LNG-001,
+        language: Português,
+        language_code: pt-BR,
+        overall_level: native,
+        reading: native,
+        writing: native,
+        listening: native,
+        speaking: native,
+      }
+    - {
+        id: LNG-002,
+        language: Inglês,
+        language_code: en,
+        overall_level: A2,
+        reading: B1,
+        writing: A1,
+        listening: A2,
+        speaking: A1,
+      }
+
+  certifications:
+    - id: CRT-001
+      name: NR-11 Operador de Empilhadeira
+      issuer: Centro de Treinamento em Segurança Exemplo
+      category: license
+      issue_date: '2023-02'
+      expiration_date: '2026-02'
+      status: renewal_in_progress
+      meta:
+        {
+          status: needs_review,
+          visibility: public,
+          resume_use: requires_approval,
+          source: certificate,
+        }
+    - id: CRT-002
+      name: Carteira Nacional de Habilitação, categoria D
+      issuer: Departamento de Trânsito (fictício)
+      category: license
+      issue_date: '2015-06'
+      expiration_date: null
+      status: valid
+      meta:
+        {
+          status: confirmed,
+          visibility: conditional,
+          resume_use: requires_approval,
+          source: certificate,
+        }
+    - id: CRT-003
+      name: Lean Six Sigma Yellow Belt
+      issuer: Instituto de Qualidade Exemplo
+      category: professional_certification
+      issue_date: '2021-09'
+      expiration_date: null
+      status: no_expiration
+      meta: { status: confirmed, visibility: public, resume_use: allowed, source: certificate }
+  awards:
+    - id: AWD-001
+      name: Destaque Operacional do Ano
+      organization: Centro Logístico Planalto
+      date: '2021'
+      context_and_criteria: Escolhido entre líderes de turno pelo menor índice de avarias.
+      meta: { status: confirmed, visibility: public, resume_use: allowed, source: user_declared }
+  publications: []
+  volunteering: []
+
+  evidence:
+    - id: EVD-001
+      type: document
+      title: Relatórios mensais de indicadores do centro de distribuição
+      url_or_location: Arquivo local (não publicado)
+      evidence_date: '2021-12'
+      is_public: false
+      recruiter_sharing: restricted
+      supports: [EXP-002-I2, EXP-003-I1]
+
+  pending_items:
+    - id: PEND-001
+      target: { record_id: EXP-004-I1, field: metric.value }
+      subject: Ganho de produtividade de separação
+      reason: unclear
+      current_information: O ganho de 18% foi calculado sobre um período curto; falta o relatório completo.
+      known_variants: ['+18%', '+15%']
+      safe_statement_for_now: Aumento da produtividade de separação com reorganização de endereçamento.
+      confirmation_method: Exportar o relatório do WMS dos seis meses.
+      priority: medium
+      status: open
+
+  availability_preferences:
+    preferred_work_modes: [onsite]
+    willing_to_relocate: 'no'
+    salary_expectation:
+      {
+        amount: null,
+        currency: BRL,
+        period: monthly,
+        notes: CANARY-non-tech-logistics-salary_notes,
+      }
+
+  career_preferences:
+    priority_job_titles: [Coordenador de Logística, Supervisor de Operações Logísticas]
+    fields_of_interest: [armazenagem, distribuição, melhoria contínua]
+    target_seniority_levels: [senior, lead]
+
+  resume_preferences:
+    default_language: pt-BR
+    preferred_length: two_pages
+
+  additional_professional_context:
+    standards_regulations: [NR-11, NR-12, NR-35]
+    specialized_equipment: [empilhadeira, paleteira elétrica, coletor de dados]
+
+  usage_rules:
+    restrictions:
+      - target: { term: 'Atacadista Pedra Branca CANARY-non-tech-logistics-client_term' }
+        rule: never_include
+        reason: Cliente com cláusula de confidencialidade.
+
+  review:
+    profile_created_date: '2026-05-30'
+    last_reviewed_date: '2026-10-08'
+    reviewed_by: self

@@ -1,0 +1,279 @@
+# Fixture 100% sintetica (nenhum dado real). Ver packages/test-fixtures/README.md.
+# Cenario: pessoa SEM portfolio e SEM links publicos (nenhum contact_point do tipo url,
+# nenhuma evidencia com URL). O curriculo nao pode inventar links nem citar "portfolio".
+schema_version: '2.1.0'
+locale: pt-BR
+profile:
+  identity:
+    full_name: Osvaldo Teixeira Brandão
+    preferred_name: Osvaldo
+    country_of_residence: BR
+    region: BA
+    city: Camaçari
+    timezone: America/Bahia
+
+  contact_points:
+    - id: CP-001
+      kind: email
+      subtype: professional
+      value: osvaldo.brandao@example.invalid
+      visibility: public
+      include_by_default: true
+    - id: CP-002
+      kind: phone
+      subtype: mobile
+      value: '+5500900000105'
+      visibility: public
+      include_by_default: true
+
+  positioning:
+    current_profession: Técnico de manutenção industrial
+    current_job_title: Técnico de Manutenção Elétrica
+    current_seniority: senior
+    professional_headline: Técnico de manutenção elétrica industrial com 24 anos em indústria química e alimentícia
+
+  statements:
+    - id: STM-001
+      kind: short_summary
+      text: Técnico de manutenção elétrica industrial com 24 anos de experiência em manutenção preventiva e corretiva de motores, painéis e acionamentos.
+      meta: { status: confirmed, visibility: public, resume_use: allowed, source: user_declared }
+
+  competency_examples: []
+
+  experiences:
+    - id: EXP-001
+      organization_name: Indústria Química Litoral Norte S.A.
+      industry: Indústria química
+      location: { city: Camaçari, region: BA, country: BR }
+      official_title: Eletricista de Manutenção
+      employment_type: employee
+      start_date: '2002-04'
+      end_date: '2013-11'
+      work_mode: onsite
+      meta: { status: confirmed, visibility: public, resume_use: allowed, source: user_declared }
+      items:
+        - id: EXP-001-I1
+          kind: responsibility
+          text: Manutenção preventiva e corretiva de motores elétricos, painéis de comando e inversores de frequência.
+          meta:
+            { status: confirmed, visibility: public, resume_use: allowed, source: user_declared }
+        - id: EXP-001-I2
+          kind: responsibility
+          text: Atuação em paradas programadas da planta, com serviços em áreas classificadas.
+          meta:
+            { status: confirmed, visibility: public, resume_use: allowed, source: user_declared }
+
+    - id: EXP-002
+      organization_name: Alimentos Costa Dourada Ltda.
+      industry: Indústria de alimentos
+      location: { city: Feira de Santana, region: BA, country: BR }
+      official_title: Técnico de Manutenção Elétrica
+      employment_type: employee
+      start_date: '2013-12'
+      end_date: present
+      work_mode: onsite
+      operational_scope: Fábrica com três linhas de produção contínua e equipe de manutenção de 9 pessoas.
+      meta:
+        status: confirmed
+        visibility: public
+        resume_use: allowed
+        source: user_declared
+        evidence_ids: [EVD-001]
+        private_notes: Nota privada, nao usar no curriculo. CANARY-no-links-no-portfolio-private_note
+      items:
+        - id: EXP-002-I1
+          kind: responsibility
+          text: Programação e atendimento do plano de manutenção preventiva de três linhas de produção.
+          meta:
+            { status: confirmed, visibility: public, resume_use: allowed, source: user_declared }
+        - id: EXP-002-I2
+          kind: achievement
+          text: Redução das paradas não programadas por falha elétrica na linha 2 com termografia e troca preventiva de contatores.
+          metric:
+            name: Paradas não programadas por falha elétrica
+            value: '4 por ano'
+            baseline: '11 por ano'
+            period: '2019'
+            method: Registro de ocorrências da manutenção, comparando 2018 e 2019.
+          meta:
+            {
+              status: confirmed,
+              visibility: public,
+              resume_use: allowed,
+              source: user_declared,
+              evidence_ids: [EVD-001],
+            }
+        - id: EXP-002-I3
+          kind: responsibility
+          text: Treinamento de novos eletricistas em segurança para trabalhos com eletricidade.
+          meta:
+            { status: confirmed, visibility: public, resume_use: allowed, source: user_declared }
+
+  projects: []
+
+  education:
+    - id: EDU-001
+      institution: Escola Técnica Industrial do Recôncavo
+      course_name: Curso Técnico em Eletrotécnica
+      degree_type: technical
+      field_of_study: Eletrotécnica
+      status: completed
+      start_date: '1998-02'
+      completion_date: '2000-12'
+      meta: { status: confirmed, visibility: public, resume_use: allowed, source: certificate }
+
+  courses:
+    - id: CRS-001
+      name: Manutenção de Inversores de Frequência e CLP
+      provider: Centro de Treinamento Industrial Exemplo
+      topics: [inversores, CLP, redes industriais]
+      start_date: '2016-03'
+      completion_date: '2016-06'
+      workload_hours: 80
+      status: completed
+      certificate_issued: true
+      meta: { status: confirmed, visibility: public, resume_use: allowed, source: certificate }
+
+  skills:
+    - {
+        id: SKL-001,
+        name: Manutenção de motores elétricos,
+        category: domain,
+        self_assessed_level: expert,
+      }
+    - { id: SKL-002, name: Inversores de frequência, category: tool, self_assessed_level: advanced }
+    - {
+        id: SKL-003,
+        name: CLP,
+        category: tool,
+        aliases: [controlador lógico programável],
+        self_assessed_level: intermediate,
+      }
+    - { id: SKL-004, name: Termografia, category: method, self_assessed_level: intermediate }
+    - {
+        id: SKL-005,
+        name: Segurança em eletricidade (NR-10),
+        category: domain,
+        self_assessed_level: advanced,
+      }
+
+  skill_usages:
+    - {
+        id: USE-001,
+        skill_id: SKL-001,
+        usage_context: professional_experience,
+        experience_id: EXP-001,
+      }
+    - {
+        id: USE-002,
+        skill_id: SKL-001,
+        usage_context: professional_experience,
+        experience_id: EXP-002,
+      }
+    - {
+        id: USE-003,
+        skill_id: SKL-002,
+        usage_context: professional_experience,
+        experience_id: EXP-001,
+      }
+    - { id: USE-004, skill_id: SKL-002, usage_context: coursework, course_id: CRS-001 }
+    - { id: USE-005, skill_id: SKL-003, usage_context: coursework, course_id: CRS-001 }
+    - {
+        id: USE-006,
+        skill_id: SKL-004,
+        usage_context: professional_experience,
+        experience_id: EXP-002,
+      }
+    - { id: USE-007, skill_id: SKL-005, usage_context: certification, certification_id: CRT-001 }
+
+  languages:
+    - {
+        id: LNG-001,
+        language: Português,
+        language_code: pt-BR,
+        overall_level: native,
+        reading: native,
+        writing: native,
+        listening: native,
+        speaking: native,
+      }
+
+  certifications:
+    - id: CRT-001
+      name: NR-10 Segurança em Instalações e Serviços em Eletricidade
+      issuer: Centro de Treinamento em Segurança Exemplo
+      category: license
+      issue_date: '2024-08'
+      expiration_date: '2026-08'
+      status: expired
+      meta:
+        {
+          status: needs_review,
+          visibility: public,
+          resume_use: requires_approval,
+          source: certificate,
+        }
+  awards: []
+  publications: []
+  volunteering: []
+
+  evidence:
+    - id: EVD-001
+      type: reference
+      title: Carta de referência do supervisor de manutenção (em papel)
+      url_or_location: Documento físico, cópia digitalizada local
+      evidence_date: '2024-05'
+      is_public: false
+      recruiter_sharing: restricted
+      supports: [EXP-002, EXP-002-I2]
+    - id: EVD-002
+      type: certificate
+      title: Certificado do curso de inversores e CLP (papel)
+      url_or_location: Documento físico
+      evidence_date: '2016-06'
+      is_public: false
+      recruiter_sharing: allowed
+      supports: [CRS-001]
+
+  pending_items:
+    - id: PEND-001
+      target: { record_id: CRT-001, field: status }
+      subject: Renovação do NR-10
+      reason: stale
+      current_information: Certificado vencido em 2026-08; reciclagem prevista, sem data confirmada.
+      known_variants: [vencido, renovado]
+      safe_statement_for_now: Formação em NR-10 (reciclagem pendente).
+      confirmation_method: Enviar o novo certificado quando emitido.
+      priority: high
+      status: open
+
+  availability_preferences:
+    preferred_work_modes: [onsite]
+    preferred_workload: Turnos rotativos aceitos
+    salary_expectation:
+      {
+        amount: null,
+        currency: BRL,
+        period: monthly,
+        notes: CANARY-no-links-no-portfolio-salary_notes,
+      }
+
+  career_preferences:
+    priority_job_titles: [Técnico de Manutenção Elétrica, Supervisor de Manutenção]
+    target_seniority_levels: [senior, lead]
+
+  resume_preferences:
+    default_language: pt-BR
+    preferred_length: one_page
+    output_formats: [pdf, docx]
+
+  additional_professional_context:
+    standards_regulations: [NR-10, NR-12]
+    specialized_equipment: [câmera termográfica, megôhmetro, alicate wattímetro]
+
+  usage_rules: { restrictions: [] }
+
+  review:
+    profile_created_date: '2026-09-02'
+    last_reviewed_date: '2026-10-18'
+    reviewed_by: self

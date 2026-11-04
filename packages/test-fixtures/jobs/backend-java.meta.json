@@ -1,0 +1,42 @@
+{
+  "id": "backend-java",
+  "title": "Desenvolvedor(a) Backend Java Pleno",
+  "locale": "pt-BR",
+  "description": "Vaga que exige Java; usada com perfil que só tem JavaScript. Java nunca pode ser declarado (Plano §20; Java é diferente de JavaScript, ADR-0011).",
+  "scenario_ids": ["neg-java-vs-javascript", "same-profile-different-jobs"],
+  "target_profiles": ["student-no-employment", "experienced-promotions-same-employer"],
+  "expectations": {
+    "company": "Quanta Ledger Pagamentos",
+    "salary": null,
+    "work_mode": "hybrid",
+    "location": "São Paulo",
+    "mandatory": [
+      {
+        "text": "Java 17",
+        "excerpt": "Experiência profissional de 3 anos ou mais com Java 17 e Spring Boot"
+      },
+      {
+        "text": "PostgreSQL",
+        "excerpt": "Experiência com PostgreSQL e modelagem de dados relacional"
+      },
+      { "text": "Testes automatizados", "excerpt": "Domínio de testes automatizados (JUnit)" }
+    ],
+    "desirable": [{ "text": "Apache Kafka", "excerpt": "Conhecimento de Apache Kafka" }],
+    "responsibilities": [
+      {
+        "text": "Desenvolver serviços backend em Java",
+        "excerpt": "Desenvolver e manter serviços backend em Java para processamento de transações"
+      }
+    ],
+    "years_required": [
+      {
+        "term": "Java",
+        "years": 3,
+        "professional_only": true,
+        "excerpt": "3 anos ou mais com Java 17"
+      }
+    ]
+  },
+  "forbidden_output_markers": [],
+  "notes": "Esperado para o perfil só com JavaScript: Java = missing (nunca direct); PostgreSQL = partial (coursework) ou direct só se o requisito não exigir vínculo profissional."
+}
