@@ -256,12 +256,25 @@ export async function createWorld(options: WorldOptions = {}): Promise<World> {
   // Uma vaga salva por dono (modelo privado fora do agregado de perfil).
   for (const actor of [a, b, ...others]) {
     const description = `Vaga do mundo de teste ${actor.fixtureId}`;
-    await testDb.db.forOwner(actor.ownerId).jobPosting.create({
+    const descriptionHash = createHash('sha256').update(description).digest('hex');
+    const job = await testDb.db.forOwner(actor.ownerId).jobPosting.create({
       data: {
         ownerId: actor.ownerId,
         description,
-        descriptionHash: createHash('sha256').update(description).digest('hex'),
+        descriptionHash,
         company: `Empresa ${actor.fixtureId}`,
+      },
+    });
+    await testDb.db.forOwner(actor.ownerId).jobAnalysis.create({
+      data: {
+        ownerId: actor.ownerId,
+        jobId: job.id,
+        descriptionHash,
+        profileHash: createHash('sha256').update(`perfil ${actor.fixtureId}`).digest('hex'),
+        engine: 'deterministic',
+        engineVersion: 'test-1',
+        result: { nota: `Analise do mundo de teste ${actor.fixtureId}` },
+        review: {},
       },
     });
   }

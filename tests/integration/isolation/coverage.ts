@@ -22,6 +22,9 @@ export const ROUTE_COVERAGE: CoverageMap = {
   'GET /api/jobs/:jobId': { kind: 'cross-case', caseId: JOBS_CASE },
   'PATCH /api/jobs/:jobId': { kind: 'cross-case', caseId: JOBS_CASE },
   'DELETE /api/jobs/:jobId': { kind: 'cross-case', caseId: JOBS_CASE },
+  'GET /api/jobs/:jobId/analysis': { kind: 'cross-case', caseId: JOBS_CASE },
+  'POST /api/jobs/:jobId/analysis': { kind: 'cross-case', caseId: JOBS_CASE },
+  'PATCH /api/jobs/:jobId/analysis/review': { kind: 'cross-case', caseId: JOBS_CASE },
   'GET /health': {
     kind: 'no-private-data',
     reason: 'Liveness publico: resposta constante { status: "ok" }, sem sessao nem banco.',

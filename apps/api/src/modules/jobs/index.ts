@@ -16,6 +16,7 @@ import {
 import type { ApiModule } from '../../app';
 import { requireAuthContext } from '../../auth/context';
 import { notFound, parseDto, uuidParam } from '../profiles/errors';
+import { registerAnalysisRoutes } from './analysis';
 
 /**
  * Saved job postings (P1): `/api/jobs/**`. Every route is `auth: 'session'` (the registry adds the guard) and
@@ -241,4 +242,6 @@ export const createJobsModule = (): ApiModule => (context) => {
       res.json(response);
     },
   );
+
+  registerAnalysisRoutes(context);
 };

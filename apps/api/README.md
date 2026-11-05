@@ -252,6 +252,24 @@ and field names only. DTOs: `packages/contracts/src/api/jobs.ts`.
 | PATCH  | `/api/jobs/:jobId`            | Change the sent fields (`null` clears); changing `description` recomputes the hash; `status` also archives                                                                                                                                        |
 | DELETE | `/api/jobs/:jobId`            | Delete permanently                                                                                                                                                                                                                                |
 
+### Analysis (P2): `/api/jobs/:jobId/analysis**`
+
+Deterministic and local (`@chameleon/domain` `analyzeJob`; no network, no AI provider): requirements are cut from the
+posting by section (mandatory / desirable / responsibilities), each is matched to profile records and classified
+`direct` (confirmed professional experience), `partial` (confirmed project/study/declared), `transferable` (related
+technology, heuristic), `pending` (exists, not confirmed) or `absent`, with the supporting record ids, cautions and the
+gap. Only confirmed, resume-allowed, non-private facts count as usable evidence. All three routes require the
+`profile_processing` consent (they read the profile) and are cached by (job, text hash, profile hash, engine version).
+
+| Method | Path                               | What                                                                                                                                                                     |
+| ------ | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| GET    | `/api/jobs/:jobId/analysis`        | Latest analysis or `null`; `stale` + `staleBecause` (`job_text`, `profile`) when an input changed                                                                        |
+| POST   | `/api/jobs/:jobId/analysis`        | Analyze. Same inputs -> `200 reused: true` (nothing recomputed); `{force: true}` recomputes. `409 PROFILE_REQUIRED` without a profile. Moves a `saved` job to `analyzed` |
+| PATCH  | `/api/jobs/:jobId/analysis/review` | Owner review of the plan: `excludedRecordIds`, `pinnedRecordIds` (no overlap), notes per requirement id                                                                  |
+
+Tests: `test/job-analysis.int.test.ts`, `packages/domain/test/matching.test.ts`, `tests/matching/matching-fixtures.test.ts`
+(all synthetic job x profile fixtures, including the prompt-injection posting).
+
 Tests: `test/jobs.int.test.ts` (CRUD, validation, search, ownership, anonymous) and the isolation case
 `jobs.api/cross-owner-behaves-like-not-found`.
 

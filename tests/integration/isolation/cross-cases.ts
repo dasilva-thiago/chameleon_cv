@@ -110,6 +110,9 @@ export const CROSS_CASES: Record<string, CrossCase> = {
       'GET /api/jobs/:jobId',
       'PATCH /api/jobs/:jobId',
       'DELETE /api/jobs/:jobId',
+      'GET /api/jobs/:jobId/analysis',
+      'POST /api/jobs/:jobId/analysis',
+      'PATCH /api/jobs/:jobId/analysis/review',
     ],
     async run(ctx) {
       const pair = await ctx.pair('jobs-api');
@@ -126,6 +129,9 @@ export const CROSS_CASES: Record<string, CrossCase> = {
       expect(created.status).toBe(201);
       const victim = (bodyOf(created).job as { id: string }).id;
       expect((await a.get(`/api/jobs/${victim}`)).status).toBe(200);
+      // A has an analysis (and a review) of its own job: positive control for the analysis routes
+      expect((await a.post(`/api/jobs/${victim}/analysis`, {})).status).toBe(201);
+      expect((await a.get(`/api/jobs/${victim}/analysis`)).status).toBe(200);
 
       const before = await stableState(ctx.world, pair.a);
       const beforeB = await stableState(ctx.world, pair.b);
@@ -148,6 +154,17 @@ export const CROSS_CASES: Record<string, CrossCase> = {
         b.patch(`/api/jobs/${id}`, { status: 'archived', notes: 'CANARY-ATTACK-by-B' }),
       );
       await indistinguishable('DELETE job', (id) => b.delete(`/api/jobs/${id}`));
+      await indistinguishable('GET analysis', (id) => b.get(`/api/jobs/${id}/analysis`));
+      await indistinguishable('POST analysis', (id) => b.post(`/api/jobs/${id}/analysis`, {}));
+      await indistinguishable('PATCH review', (id) =>
+        b.patch(`/api/jobs/${id}/analysis/review`, {
+          review: {
+            excludedRecordIds: [],
+            pinnedRecordIds: [],
+            notes: { r1: 'CANARY-ATTACK-by-B' },
+          },
+        }),
+      );
 
       // B cannot claim ownership at creation, and its list/search never shows A's job
       const forged = await b.post('/api/jobs', { description: 'x', ownerId: pair.a.ownerId });
@@ -163,9 +180,9 @@ export const CROSS_CASES: Record<string, CrossCase> = {
       expect(await stableState(ctx.world, pair.a)).toEqual(before);
       // B only wrote its own audit rows/sessions; nothing of B's profile data changed
       expect(await stableState(ctx.world, pair.b)).toEqual(beforeB);
-      // counts alone would not show an edit: A's job is still exactly what A saved
+      // counts alone would not show an edit: A's job is exactly as left by A's own analysis (status moved by A, not by B)
       const still = bodyOf(await a.get(`/api/jobs/${victim}`)).job as Record<string, unknown>;
-      expect(still).toMatchObject({ status: 'saved', notes: CANARY, company: CANARY });
+      expect(still).toMatchObject({ status: 'analyzed', notes: CANARY, company: CANARY });
     },
   },
 

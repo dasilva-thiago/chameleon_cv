@@ -17,7 +17,7 @@ describe('manifesto de rotas (gate de isolamento, ADR-0008 item 5b)', () => {
     expect(profile.every((r) => r.auth === 'session')).toBe(true);
     // The jobs module (P1) is covered by jobs.int.test.ts and the isolation gate.
     const jobs = full.filter((r) => r.path.startsWith('/api/jobs'));
-    expect(jobs).toHaveLength(5);
+    expect(jobs).toHaveLength(8);
     expect(jobs.every((r) => r.auth === 'session')).toBe(true);
     const manifest = full.filter(
       (r) => !r.path.startsWith('/api/profile') && !r.path.startsWith('/api/jobs'),
