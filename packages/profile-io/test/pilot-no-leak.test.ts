@@ -14,7 +14,16 @@
  * As mensagens de falha informam arquivo, linha e CATEGORIA, nunca o valor encontrado.
  */
 import { execFileSync } from 'node:child_process';
-import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
+import {
+  existsSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { isFactKind, listRecords, type ProfileDocument } from '@chameleon/contracts';
@@ -28,18 +37,27 @@ const SKIP_REASON =
   'fixtures-private/pilot.profile.v2.yaml ausente (ADR-0014: o fixture privado nao e versionado)';
 
 /**
- * EXCECOES EXPLICITAS (caminhos exatos, na raiz): especificacoes originais que contem PII real do
- * piloto, conforme docs/decisions/ADR-0014. O usuario decide entre (a) redigir as linhas de contato
- * do Anexo A, (b) manter o repositorio privado ou (c) mover o Anexo A para um arquivo ignorado;
- * quando decidir, remova a entrada daqui. Nenhum outro arquivo (nem diretorio) e isento.
+ * ROOT FILES THAT HOLD REAL PILOT PII (exact paths, repository root). There is no scan exemption any
+ * more: these files are git-ignored and must NEVER be tracked or staged. The scan below fails when
+ * `git ls-files --cached` (tracked + staged) lists any of them; if one is untracked and not ignored it
+ * is enumerated and scanned like every other file (and flagged by the enumeration check). Remove an
+ * entry only if the file is redacted or moved out of the repository (ADR-0014).
  */
-const PII_EXCEPTIONS: readonly { file: string; reason: string }[] = [
+const PRIVATE_ROOT_FILES: readonly { file: string; reason: string }[] = [
   {
     file: 'PLANO_DESENVOLVIMENTO_GERADOR_CURRICULOS_V3.md',
     reason:
-      'Plano V3 original: o Anexo A reproduz os dados de contato reais do piloto (ADR-0014). Alvo da decisao do usuario sobre redacao/repositorio privado.',
+      'Original V3 plan: Annex A reproduces the pilot real contact data (ADR-0014). Kept locally only.',
   },
 ];
+const PRIVATE_ROOT_FILE_NAMES: ReadonlySet<string> = new Set(
+  PRIVATE_ROOT_FILES.map((entry) => entry.file),
+);
+
+/** Entries of `files` (repository-relative, posix) that are private root files. Pure, self-tested. */
+export function findPrivateRootFiles(files: readonly string[]): string[] {
+  return files.map(toPosix).filter((file) => PRIVATE_ROOT_FILE_NAMES.has(file));
+}
 
 // ---------------------------------------------------------------------------------------------
 // Enumeracao dos arquivos versionaveis
@@ -100,6 +118,36 @@ function listWithGit(): string[] | null {
   }
 }
 
+/** `git ls-files --cached` (tracked + staged), or `null` when git/the index is unavailable. */
+function listIndexFiles(): string[] | null {
+  try {
+    const out = execFileSync('git', ['ls-files', '--cached', '-z'], {
+      cwd: ROOT,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+      maxBuffer: 64 * 1024 * 1024,
+    });
+    const files = out.split('\0').filter(Boolean);
+    return files.length > 0 ? files.map(toPosix) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** `true`/`false` from `git check-ignore`, or `null` when git is unavailable. */
+function isGitIgnored(file: string): boolean | null {
+  try {
+    execFileSync('git', ['check-ignore', '-q', '--no-index', file], {
+      cwd: ROOT,
+      stdio: ['ignore', 'ignore', 'ignore'],
+    });
+    return true;
+  } catch (error) {
+    const status = (error as { status?: number }).status;
+    return status === 1 ? false : null;
+  }
+}
+
 /** Alternativa sem git: percorre a arvore replicando as exclusoes do `.gitignore`. */
 function listByWalking(): string[] {
   const out: string[] = [];
@@ -109,7 +157,9 @@ function listByWalking(): string[] {
       if (entry.isDirectory()) {
         if (!WALK_SKIP_DIRS.has(entry.name)) walk(rel);
       } else if (entry.isFile()) {
-        const privateRootFile = !relative && /^(BASE_DE_DADOS_|\.env)/.test(entry.name);
+        const privateRootFile =
+          !relative &&
+          (/^(BASE_DE_DADOS_|\.env)/.test(entry.name) || PRIVATE_ROOT_FILE_NAMES.has(entry.name));
         const exampleEnv = entry.name === '.env.example';
         if (!privateRootFile || exampleEnv) out.push(rel);
       }
@@ -145,7 +195,6 @@ function listVersionableFiles(): { files: string[]; via: 'git' | 'walk' } {
 const GENERIC_DETECTOR_SKIP_PREFIX = 'packages/db/src/generated/';
 
 const PRIVATE_PATH = /^(fixtures-private\/|BASE_DE_DADOS_)/;
-const EXCEPTION_FILES = new Set(PII_EXCEPTIONS.map((entry) => entry.file));
 
 /** Codigo de producao do produto: `apps/<x>/src/**` e `packages/<x>/src/**` (sem testes). */
 const isProductSource = (file: string): boolean =>
@@ -473,27 +522,45 @@ describe('varredura de PII e de nomes exclusivos do piloto nos arquivos versiona
     expect(files.length, `via ${via}`).toBeGreaterThan(50);
     expect(files).toContain('package.json');
     expect(files).toContain('packages/profile-io/test/pilot-no-leak.test.ts');
-    const privateFiles = files.filter((file) => PRIVATE_PATH.test(file));
+    const privateFiles = files.filter(
+      (file) => PRIVATE_PATH.test(file) || PRIVATE_ROOT_FILE_NAMES.has(file),
+    );
     expect(
       privateFiles,
       'arquivo privado do piloto apareceria no versionamento: confira o .gitignore (ADR-0014)',
     ).toEqual([]);
   });
 
-  it('as excecoes sao caminhos exatos na raiz e existem', () => {
-    for (const { file, reason } of PII_EXCEPTIONS) {
-      expect(file, 'excecao deve ser um arquivo na raiz, sem curingas nem diretorios').toMatch(
+  it('private root files are exact root paths with a documented reason', () => {
+    for (const { file, reason } of PRIVATE_ROOT_FILES) {
+      expect(file, 'must be a file at the root, no wildcards or directories').toMatch(
         /^[A-Za-z0-9_.-]+$/,
       );
-      expect(existsSync(join(ROOT, file)), `excecao sem arquivo: ${file}`).toBe(true);
       expect(reason.length).toBeGreaterThan(30);
     }
   });
 
-  it('nenhum arquivo versionado (fora das excecoes) contem PII do piloto', () => {
+  it('no private root file is tracked or staged (git ls-files --cached)', (context) => {
+    const index = listIndexFiles();
+    if (index === null) context.skip();
+    const tracked = findPrivateRootFiles(index!);
+    expect(
+      tracked,
+      'file with real PII is tracked or staged: run `git rm --cached <file>` and keep it in .gitignore (ADR-0014)',
+    ).toEqual([]);
+  });
+
+  it('every private root file is covered by .gitignore', (context) => {
+    for (const { file } of PRIVATE_ROOT_FILES) {
+      const ignored = isGitIgnored(file);
+      if (ignored === null) context.skip();
+      expect(ignored, `${file} is not ignored by .gitignore (ADR-0014)`).toBe(true);
+    }
+  });
+
+  it('nenhum arquivo versionado contem PII do piloto (sem excecoes)', () => {
     const offenders: string[] = [];
     for (const file of files) {
-      if (EXCEPTION_FILES.has(file)) continue;
       const detectors = file.startsWith(GENERIC_DETECTOR_SKIP_PREFIX)
         ? pilot.pii
         : [...pilot.pii, ...GENERIC_DETECTORS];
@@ -520,6 +587,43 @@ describe('varredura de PII e de nomes exclusivos do piloto nos arquivos versiona
 
 // ---------------------------------------------------------------------------------------------
 // O proprio detector precisa funcionar (sem embutir dado real)
+
+describe('tracked private-file check (self-test with synthetic file lists)', () => {
+  const plan = PRIVATE_ROOT_FILES[0]!.file;
+
+  it('flags a private root file that appears in the git index (tracked or staged)', () => {
+    expect(findPrivateRootFiles(['package.json', plan, 'README.md'])).toEqual([plan]);
+  });
+
+  it('is empty when the index has no private root file', () => {
+    expect(findPrivateRootFiles(['package.json', 'docs/' + plan])).toEqual([]);
+    expect(findPrivateRootFiles([])).toEqual([]);
+  });
+
+  it('matches exact root paths only and tolerates Windows separators', () => {
+    expect(findPrivateRootFiles([`${plan}.bak`, `sub/${plan}`])).toEqual([]);
+    expect(findPrivateRootFiles([plan.split('/').join('\\')])).toEqual([plan]);
+  });
+
+  it('would fail the real check for a tracked exception file (end to end on a temp repo)', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'pilot-no-leak-'));
+    try {
+      const git = (...args: string[]): string =>
+        execFileSync('git', args, {
+          cwd: dir,
+          encoding: 'utf8',
+          stdio: ['ignore', 'pipe', 'pipe'],
+        });
+      git('init', '-q');
+      writeFileSync(join(dir, plan), 'synthetic content, no real data\n');
+      git('add', '-f', plan); // staged although it would normally be ignored
+      const staged = git('ls-files', '--cached', '-z').split('\0').filter(Boolean);
+      expect(findPrivateRootFiles(staged)).toEqual([plan]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
 
 describe('detectores da varredura (dados sinteticos montados em tempo de execucao)', () => {
   const synthetic = (): ProfileDocument =>

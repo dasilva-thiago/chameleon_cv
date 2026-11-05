@@ -20,6 +20,7 @@ packages/db/src/generated/
 # PII real do perfil-piloto (ADR-0014): nunca versionar
 BASE_DE_DADOS_CURRICULO_THIAGO.md
 fixtures-private/
+PLANO_DESENVOLVIMENTO_GERADOR_CURRICULOS_V3.md
 
 # Claude Code local
 .claude/settings.local.json
