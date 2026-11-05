@@ -10,6 +10,7 @@ import { ShellFrame } from './ShellFrame';
 const NAV_ITEMS = [
   { to: '/', label: 'Início', end: true },
   { to: '/perfil', label: 'Perfil', end: false },
+  { to: '/vagas', label: 'Vagas', end: false },
   { to: '/conta', label: 'Conta', end: false },
 ] as const;
 

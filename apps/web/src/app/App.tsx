@@ -9,6 +9,9 @@ import { createAppQueryClient } from '../features/auth/session';
 import { AccountPage } from '../features/home/AccountPage';
 import { HomePage } from '../features/home/HomePage';
 import { NotFoundPage } from '../features/home/NotFoundPage';
+import { JobDetailPage } from '../features/jobs/JobDetailPage';
+import { EditJobPage, NewJobPage } from '../features/jobs/JobFormPages';
+import { JobsPage } from '../features/jobs/JobsPage';
 import { EvidencePanel } from '../features/profile/EvidencePanel';
 import { ImportPage } from '../features/profile/ImportPage';
 import { PendingPanel } from '../features/profile/PendingPanel';
@@ -35,6 +38,10 @@ export function AppRoutes() {
           <Route path="evidencias" element={<EvidencePanel />} />
           <Route path=":slug" element={<SectionPage />} />
         </Route>
+        <Route path="/vagas" element={<JobsPage />} />
+        <Route path="/vagas/nova" element={<NewJobPage />} />
+        <Route path="/vagas/:jobId" element={<JobDetailPage />} />
+        <Route path="/vagas/:jobId/editar" element={<EditJobPage />} />
         <Route path="/conta" element={<AccountPage />} />
       </Route>
       <Route element={<PublicLayout />}>

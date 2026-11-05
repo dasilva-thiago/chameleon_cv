@@ -20,8 +20,8 @@ export function HomePage() {
           Perfil profissional
         </h2>
         <p className="text-base text-slate-700">
-          Mantenha sua base de experiências, projetos, formação e habilidades. As áreas de vagas e
-          currículos chegam nas próximas etapas.
+          Mantenha sua base de experiências, projetos, formação e habilidades. A análise de vagas e
+          os currículos chegam nas próximas etapas.
         </p>
         <div className="flex flex-wrap gap-3">
           <Link to="/perfil" className={linkClass}>
@@ -32,6 +32,22 @@ export function HomePage() {
           </Link>
           <Link to="/perfil/pendencias" className={linkClass}>
             Ver pendências
+          </Link>
+        </div>
+      </section>
+      <section aria-labelledby="home-jobs" className="flex flex-col gap-3">
+        <h2 id="home-jobs" className="text-lg font-semibold">
+          Vagas
+        </h2>
+        <p className="text-base text-slate-700">
+          Guarde as vagas de interesse com o texto original e acompanhe a situação de cada uma.
+        </p>
+        <div className="flex flex-wrap gap-3">
+          <Link to="/vagas/nova" className={linkClass}>
+            Adicionar vaga
+          </Link>
+          <Link to="/vagas" className={linkClass}>
+            Ver minhas vagas
           </Link>
         </div>
       </section>

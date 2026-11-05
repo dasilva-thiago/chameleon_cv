@@ -9,10 +9,10 @@ import {
   profileStateResponseSchema,
   type ProfileStateResponse,
 } from '@chameleon/contracts';
-import axe from 'axe-core';
 import { screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { FakeApi, errorResponse, jsonResponse, makeSession } from './helpers/fake-api';
+import { violations } from './helpers/axe';
 import { renderApp } from './helpers/render-app';
 
 const ID = (n: number): string => `0190a8f0-0000-7000-8000-${String(n).padStart(12, '0')}`;
@@ -179,14 +179,6 @@ function loggedIn(state: ProfileStateResponse | Response = emptyState()): FakeAp
   return fake;
 }
 
-async function violations(container: HTMLElement): Promise<string[]> {
-  const result = await axe.run(container, {
-    // jsdom nao calcula layout/cores: regras de contraste dependem do navegador real.
-    rules: { 'color-contrast': { enabled: false }, region: { enabled: false } },
-  });
-  return result.violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.html).join(' | ')}`);
-}
-
 describe('perfil: visao geral e navegacao', () => {
   it('perfil vazio orienta o inicio sem tratar como erro e liga a importacao', async () => {
     loggedIn();
@@ -208,7 +200,7 @@ describe('perfil: visao geral e navegacao', () => {
     const { user } = renderApp('/');
     await screen.findByRole('heading', { level: 1, name: 'Início' });
     const main = screen.getByRole('navigation', { name: 'Principal' });
-    expect(within(main).getAllByRole('link')).toHaveLength(3);
+    expect(within(main).getAllByRole('link')).toHaveLength(4);
     await user.click(screen.getByRole('link', { name: 'Abrir meu perfil' }));
     expect(
       await screen.findByRole('heading', { level: 1, name: 'Perfil profissional' }),
