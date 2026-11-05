@@ -6,6 +6,7 @@ import {
   consentInputSchema,
   invitePreviewRequestSchema,
   loginRequestSchema,
+  signupConsentInputSchema,
 } from '../src/index';
 
 const TOKEN = 'A'.repeat(43);
@@ -27,7 +28,8 @@ describe('DTOs de autenticacao (contracts/api)', () => {
   });
 
   it('aceite de convite: senha de 12 a 128, token de 43 caracteres base64url, e-mail nao e enviado', () => {
-    const ok = { token: TOKEN, password: 'doze-chars-ok' };
+    const consents = [{ purpose: 'profile_processing', granted: true, policyVersion: '2026-11.1' }];
+    const ok = { token: TOKEN, password: 'doze-chars-ok', consents };
     expect(acceptInviteRequestSchema.safeParse(ok).success).toBe(true);
     expect(acceptInviteRequestSchema.safeParse({ ...ok, password: 'curta' }).success).toBe(false);
     expect(acceptInviteRequestSchema.safeParse({ ...ok, token: 'curto' }).success).toBe(false);
@@ -36,6 +38,25 @@ describe('DTOs de autenticacao (contracts/api)', () => {
       acceptInviteRequestSchema.safeParse({ ...ok, displayName: 'Nome\u0000Nulo' }).success,
     ).toBe(false);
     expect(invitePreviewRequestSchema.safeParse({ token: TOKEN }).success).toBe(true);
+  });
+
+  it('aceite de convite exige exatamente um consentimento profile_processing (LGPD)', () => {
+    const base = { token: TOKEN, password: 'doze-chars-ok' };
+    const entry = { purpose: 'profile_processing', granted: true, policyVersion: '2026-11.1' };
+    expect(acceptInviteRequestSchema.safeParse(base).success).toBe(false);
+    expect(acceptInviteRequestSchema.safeParse({ ...base, consents: [] }).success).toBe(false);
+    expect(acceptInviteRequestSchema.safeParse({ ...base, consents: [entry] }).success).toBe(true);
+    expect(acceptInviteRequestSchema.safeParse({ ...base, consents: [entry, entry] }).success).toBe(
+      false,
+    );
+    // ai_processing:* needs the international-transfer notice, never presented at signup.
+    expect(
+      acceptInviteRequestSchema.safeParse({
+        ...base,
+        consents: [{ ...entry, purpose: 'ai_processing:anthropic' }],
+      }).success,
+    ).toBe(false);
+    expect(signupConsentInputSchema.safeParse({ ...entry, extra: 1 }).success).toBe(false);
   });
 
   it('consentimento: finalidades de ADR-0014 e versao de politica restrita', () => {

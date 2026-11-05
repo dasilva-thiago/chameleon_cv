@@ -41,23 +41,39 @@ export const displayNameSchema = z
   // eslint-disable-next-line no-control-regex -- rejeitar caracteres de controle (inclui NUL) e o objetivo
   .regex(/^[^\u0000-\u001f\u007f]+$/);
 
-/** Finalidades aceitas no cadastro (ADR-0014). */
+/** Consent purposes known to the system (ADR-0014). Which ones a given flow accepts is narrower. */
 export const consentPurposeSchema = z
   .string()
   .regex(/^(profile_processing|ai_processing:[a-z0-9][a-z0-9_.-]{0,63})$/);
 
+const policyVersionSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(POLICY_VERSION_MAX_LENGTH)
+  .regex(/^[A-Za-z0-9._-]+$/);
+
 export const consentInputSchema = z.strictObject({
   purpose: consentPurposeSchema,
   granted: z.boolean(),
-  /** Versao do texto da politica exibida ao usuario. */
-  policyVersion: z
-    .string()
-    .trim()
-    .min(1)
-    .max(POLICY_VERSION_MAX_LENGTH)
-    .regex(/^[A-Za-z0-9._-]+$/),
+  /** Version of the policy text shown to the user. The server only accepts versions it publishes. */
+  policyVersion: policyVersionSchema,
 });
 export type ConsentInput = z.infer<typeof consentInputSchema>;
+
+/** The only purpose presented (and therefore the only one recordable) at invite acceptance. */
+export const SIGNUP_CONSENT_PURPOSE = 'profile_processing' as const;
+
+/**
+ * Consent sent at signup. Only `profile_processing` is accepted: `ai_processing:*` requires the
+ * international-transfer notice, which is not shown at this step, so it cannot be asserted here.
+ */
+export const signupConsentInputSchema = z.strictObject({
+  purpose: z.literal(SIGNUP_CONSENT_PURPOSE),
+  granted: z.boolean(),
+  policyVersion: policyVersionSchema,
+});
+export type SignupConsentInput = z.infer<typeof signupConsentInputSchema>;
 
 // --- Usuario e sessao (respostas) ---------------------------------------------------------
 
@@ -106,7 +122,11 @@ export const acceptInviteRequestSchema = z.strictObject({
   token: inviteTokenSchema,
   password: newPasswordSchema,
   displayName: displayNameSchema.optional(),
-  consents: z.array(consentInputSchema).max(MAX_CONSENTS_PER_REQUEST).optional(),
+  /**
+   * Exactly one entry: `profile_processing` granted under a policy version the server publishes
+   * (else 400 CONSENT_REQUIRED / CONSENT_INVALID). Required: an account cannot be created without it.
+   */
+  consents: z.array(signupConsentInputSchema).length(1),
 });
 export type AcceptInviteRequest = z.infer<typeof acceptInviteRequestSchema>;
 
