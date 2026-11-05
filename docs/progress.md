@@ -106,3 +106,12 @@ Nota: o modelo efetivo de cada subagente é o declarado no frontmatter de `.clau
 2. O `ProfileStore` deve ficar vinculado ao dono autenticado (construído a partir de `req.auth`) ou haver regra de lint/teste garantindo que o `ownerId` venha só de `req.auth.ownerId`. Toda rota com `:param` precisa do caso cruzado A/B em `coverage.ts`.
 3. Antes de qualquer deploy acessível a terceiros: contrato de proxy (`TRUST_PROXY` = nº real de hops; proxy sobrescreve X-Forwarded-For), CSP na SPA, role de banco não-superusuário.
 4. S2.3: a rotina de exclusão de conta deve usar `SET LOCAL`/`set_config(..., true)` dentro da transação para a flag `chameleon.allow_purge`.
+
+## Banco remoto na Neon para a API local (2026-11-05)
+
+- A API local passa a usar um Postgres na Neon (projeto e branch `production` ligados em `.neon`, ignorado pelo Git; serviços declarados em `neon.ts`, só Postgres). O `neon deploy` grava `DATABASE_URL` (pooled, usada pelo app) e `DATABASE_URL_UNPOOLED` (direta) no `.env`; o Postgres local ficou em `DATABASE_URL_LOCAL`. `TEST_DATABASE_ADMIN_URL`, testes e E2E continuam locais, e `db:reset` segue recusando host remoto.
+- `packages/db/prisma.config.ts` usa `DATABASE_URL_UNPOOLED` quando existe (migrations não devem passar pelo PgBouncer). As 11 migrations foram aplicadas na Neon (38 tabelas, 69 triggers).
+- Corrigido: `apps/api/dist/main.js` não subia (`Dynamic require of "events"`, com o `pg` no bundle ESM); `tsup.config.ts` ganhou o shim de `require` no banner.
+- Verificado contra a Neon com conta descartável e dados sintéticos (convite, aceite, perfil, vaga, análise, geração, aprovação, DOCX e PDF): 14 de 14 passos. A conta foi removida depois.
+- Limitação encontrada: `purgeAccount` falha com violação de chave estrangeira em contas que têm vagas, análises ou currículos (a rotina é anterior a essas tabelas). Não foi corrigido (rotinas de conta estão fora do escopo pessoal); a limpeza do teste apagou essas linhas antes de chamar a purga.
+- Antes de hospedar frontend e API: revisar autenticação, proxy (`TRUST_PROXY`), cookies, CSP e a role do banco (a `neondb_owner` não é superusuária, o que ajuda).
