@@ -3,6 +3,6 @@
   "compilerOptions": {
     "types": ["node"]
   },
-  "include": ["tests", "e2e", "vitest.config.ts", "playwright.config.ts"],
+  "include": ["tests", "e2e", "vitest.config.ts", "playwright.config.ts", "neon.ts"],
   "exclude": ["node_modules", "**/generated"]
 }
