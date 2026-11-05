@@ -70,7 +70,8 @@ describe('harness de banco por worker (ADR-0002)', () => {
     await testDb.drop();
     expect(await databaseExists(testDb.name)).toBe(false);
     await testDb.drop(); // idempotente
-  });
+    // Cloning the template database competes with the other workers: give it room (it flaked at 30 s under load).
+  }, 120_000);
 
   it('o clone ja nasce vazio e os clones nao compartilham estado', async () => {
     const [a, b] = [await track(), await track()];

@@ -143,6 +143,32 @@ export interface ExportedJobAnalysis {
   createdAt: string;
 }
 
+export interface ExportedResume {
+  id: string;
+  jobId: string;
+  name: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ExportedResumeVersion {
+  id: string;
+  resumeId: string;
+  versionNumber: number;
+  status: string;
+  language: string;
+  content: Json;
+  contentHash: string;
+  issueErrors: number;
+  issueWarnings: number;
+  profileRevisionId: string | null;
+  analysisId: string | null;
+  sourceVersionId: string | null;
+  approvedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface AccountExport {
   format: typeof ACCOUNT_EXPORT_FORMAT;
   version: typeof ACCOUNT_EXPORT_VERSION;
@@ -153,6 +179,8 @@ export interface AccountExport {
   imports: ExportedImportRecord[];
   jobs: ExportedJob[];
   jobAnalyses: ExportedJobAnalysis[];
+  resumes: ExportedResume[];
+  resumeVersions: ExportedResumeVersion[];
   consents: ExportedConsent[];
   auditEvents: ExportedAuditEvent[];
   sessions: ExportedSession[];
@@ -287,6 +315,30 @@ export async function exportAccountData(
     },
     orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
   });
+  const resumes = await scoped.resume.findMany({
+    select: { id: true, jobId: true, name: true, createdAt: true, updatedAt: true },
+    orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+  });
+  const resumeVersions = await scoped.resumeVersion.findMany({
+    select: {
+      id: true,
+      resumeId: true,
+      versionNumber: true,
+      status: true,
+      language: true,
+      content: true,
+      contentHash: true,
+      issueErrors: true,
+      issueWarnings: true,
+      profileRevisionId: true,
+      analysisId: true,
+      sourceVersionId: true,
+      approvedAt: true,
+      createdAt: true,
+      updatedAt: true,
+    },
+    orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+  });
   const consents = await scoped.consentRecord.findMany({
     select: { id: true, purpose: true, granted: true, policyVersion: true, recordedAt: true },
     orderBy: [{ recordedAt: 'asc' }, { id: 'asc' }],
@@ -394,6 +446,30 @@ export async function exportAccountData(
       review: json(row.review),
       reviewedAt: isoOrNull(row.reviewedAt),
       createdAt: iso(row.createdAt),
+    })),
+    resumes: resumes.map((row) => ({
+      id: row.id,
+      jobId: row.jobId,
+      name: row.name,
+      createdAt: iso(row.createdAt),
+      updatedAt: iso(row.updatedAt),
+    })),
+    resumeVersions: resumeVersions.map((row) => ({
+      id: row.id,
+      resumeId: row.resumeId,
+      versionNumber: row.versionNumber,
+      status: row.status,
+      language: row.language,
+      content: json(row.content),
+      contentHash: row.contentHash,
+      issueErrors: row.issueErrors,
+      issueWarnings: row.issueWarnings,
+      profileRevisionId: row.profileRevisionId,
+      analysisId: row.analysisId,
+      sourceVersionId: row.sourceVersionId,
+      approvedAt: isoOrNull(row.approvedAt),
+      createdAt: iso(row.createdAt),
+      updatedAt: iso(row.updatedAt),
     })),
     consents: consents.map((row) => ({
       id: row.id,

@@ -39,6 +39,7 @@ model JobPosting {
 
   owner    User          @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   analyses JobAnalysis[]
+  resumes  Resume[]
 
   @@unique([id, ownerId])
   @@index([ownerId, status, updatedAt])
@@ -63,7 +64,8 @@ model JobAnalysis {
   reviewedAt      DateTime? @db.Timestamptz(3)
   createdAt       DateTime  @default(now()) @db.Timestamptz(3)
 
-  job JobPosting @relation(fields: [jobId, ownerId], references: [id, ownerId], onDelete: Cascade)
+  job            JobPosting      @relation(fields: [jobId, ownerId], references: [id, ownerId], onDelete: Cascade)
+  resumeVersions ResumeVersion[]
 
   @@unique([id, ownerId])
   @@unique([jobId, descriptionHash, profileHash, engineVersion])

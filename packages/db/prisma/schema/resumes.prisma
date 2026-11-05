@@ -1,0 +1,56 @@
+// Curriculos por vaga (P3/P4, docs/REDEFINICAO_PRODUTO_PESSOAL.md §4.4). Dado privado do dono (ownerId, FKs
+// compostas, ownerId imutavel por trigger). `Resume` agrupa as versoes de um curriculo de uma vaga; cada
+// `ResumeVersion` guarda o documento estruturado (cada afirmacao com os ids dos registros que a sustentam),
+// a revisao imutavel do perfil usada na geracao e, quando aprovada, nao muda mais (trigger no banco).
+
+enum ResumeVersionStatus {
+  draft
+  approved
+}
+
+model Resume {
+  id        String   @id @default(uuid(7)) @db.Uuid
+  ownerId   String   @db.Uuid
+  jobId     String   @db.Uuid
+  name      String
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  job      JobPosting      @relation(fields: [jobId, ownerId], references: [id, ownerId], onDelete: Cascade)
+  versions ResumeVersion[]
+
+  @@unique([id, ownerId])
+  @@index([ownerId, jobId, updatedAt])
+}
+
+model ResumeVersion {
+  id                String              @id @default(uuid(7)) @db.Uuid
+  ownerId           String              @db.Uuid
+  resumeId          String              @db.Uuid
+  /// Sequencial por curriculo, a partir de 1.
+  versionNumber     Int
+  status            ResumeVersionStatus @default(draft)
+  language          String
+  /// `resumeContentSchema` (contracts).
+  content           Json
+  /// SHA-256 hex do JSON canonico do conteudo.
+  contentHash       String
+  issueErrors       Int                 @default(0)
+  issueWarnings     Int                 @default(0)
+  /// Revisao imutavel do perfil usada na geracao (base da validacao de proveniencia).
+  profileRevisionId String?             @db.Uuid
+  analysisId        String?             @db.Uuid
+  /// Versao copiada para criar esta (recuperar/duplicar). Sem FK: a origem pode ser apagada com o curriculo.
+  sourceVersionId   String?             @db.Uuid
+  approvedAt        DateTime?           @db.Timestamptz(3)
+  createdAt         DateTime            @default(now()) @db.Timestamptz(3)
+  updatedAt         DateTime            @updatedAt @db.Timestamptz(3)
+
+  resume   Resume           @relation(fields: [resumeId, ownerId], references: [id, ownerId], onDelete: Cascade)
+  revision ProfileRevision? @relation(fields: [profileRevisionId, ownerId], references: [id, ownerId], onDelete: NoAction)
+  analysis JobAnalysis?     @relation(fields: [analysisId, ownerId], references: [id, ownerId], onDelete: NoAction)
+
+  @@unique([id, ownerId])
+  @@unique([resumeId, versionNumber])
+  @@index([ownerId, resumeId, createdAt])
+}

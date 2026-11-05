@@ -128,6 +128,20 @@ export async function seedOwner(
   const job = await testDb.db.forOwner(ownerId).jobPosting.create({
     data: { ownerId, description: jobText, descriptionHash: jobHash },
   });
+  const resume = await testDb.db.forOwner(ownerId).resume.create({
+    data: { ownerId, jobId: job.id, name: 'Currículo de teste' },
+  });
+  const content = { schemaVersion: 1, note: auditCanary };
+  await testDb.db.forOwner(ownerId).resumeVersion.create({
+    data: {
+      ownerId,
+      resumeId: resume.id,
+      versionNumber: 1,
+      language: 'pt-BR',
+      content,
+      contentHash: createHash('sha256').update(JSON.stringify(content)).digest('hex'),
+    },
+  });
   await testDb.db.forOwner(ownerId).jobAnalysis.create({
     data: {
       ownerId,

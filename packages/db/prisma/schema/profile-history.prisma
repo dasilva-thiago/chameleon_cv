@@ -44,7 +44,8 @@ model ProfileRevision {
 
   profile ProfessionalProfile @relation(fields: [profileId, ownerId], references: [id, ownerId], onDelete: Cascade)
 
-  imports ImportRecord[]
+  imports        ImportRecord[]
+  resumeVersions ResumeVersion[]
 
   @@unique([id, ownerId])
   @@unique([profileId, revisionNumber])

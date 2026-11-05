@@ -68,6 +68,8 @@ pnpm db:reset                               # recusa host não local; migrate re
 | `AuditEvent`      | dono   | sem PII em `metadata`                                                                                                                                               |
 | `JobPosting`      | dono   | vaga salva (P1): texto original, `descriptionHash` SHA-256, situação, metadados; CHECKs de tamanho/hash/URL                                                         |
 | `JobAnalysis`     | dono   | análise derivada de uma vaga (P2): `result`/`review` JSON validados pelo contrato; chave de reaproveitamento (vaga, hash do texto, hash do perfil, versão do motor) |
+| `Resume`          | dono   | currículo de uma vaga (nome, datas); cascata da vaga                                                                                                                |
+| `ResumeVersion`   | dono   | versão (rascunho/aprovada): conteúdo JSON com fontes por item, hash, revisão do perfil e análise usadas; aprovada é imutável por trigger                            |
 | `AccountDeletion` | global | registro minimo SEM PII de uma exclusao (id, instante, total agregado de linhas); append-only                                                                       |
 
 ## Agregado de perfil (S1.1b)

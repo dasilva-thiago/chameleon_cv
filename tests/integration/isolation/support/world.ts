@@ -254,7 +254,7 @@ export async function createWorld(options: WorldOptions = {}): Promise<World> {
   });
 
   // Uma vaga salva por dono (modelo privado fora do agregado de perfil).
-  for (const actor of [a, b, ...others]) {
+  for (const [position, actor] of [a, b, ...others].entries()) {
     const description = `Vaga do mundo de teste ${actor.fixtureId}`;
     const descriptionHash = createHash('sha256').update(description).digest('hex');
     const job = await testDb.db.forOwner(actor.ownerId).jobPosting.create({
@@ -265,7 +265,7 @@ export async function createWorld(options: WorldOptions = {}): Promise<World> {
         company: `Empresa ${actor.fixtureId}`,
       },
     });
-    await testDb.db.forOwner(actor.ownerId).jobAnalysis.create({
+    const analysis = await testDb.db.forOwner(actor.ownerId).jobAnalysis.create({
       data: {
         ownerId: actor.ownerId,
         jobId: job.id,
@@ -275,6 +275,23 @@ export async function createWorld(options: WorldOptions = {}): Promise<World> {
         engineVersion: 'test-1',
         result: { nota: `Analise do mundo de teste ${actor.fixtureId}` },
         review: {},
+      },
+    });
+    const resume = await testDb.db.forOwner(actor.ownerId).resume.create({
+      data: { ownerId: actor.ownerId, jobId: job.id, name: `Curriculo ${actor.fixtureId}` },
+    });
+    const content = { schemaVersion: 1, nota: `Versao do mundo de teste ${actor.fixtureId}` };
+    await testDb.db.forOwner(actor.ownerId).resumeVersion.create({
+      data: {
+        ownerId: actor.ownerId,
+        resumeId: resume.id,
+        // distinct per owner so a copied row never trips the (resumeId, versionNumber) unique before the FK
+        versionNumber: position + 1,
+        language: 'pt-BR',
+        content,
+        contentHash: createHash('sha256').update(JSON.stringify(content)).digest('hex'),
+        profileRevisionId: actor.revisionId,
+        analysisId: analysis.id,
       },
     });
   }

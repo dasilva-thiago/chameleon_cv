@@ -20,6 +20,8 @@ export const EXPORT_SECTIONS = [
   'imports',
   'jobs',
   'jobAnalyses',
+  'resumes',
+  'resumeVersions',
 ] as const;
 export type ExportSection = (typeof EXPORT_SECTIONS)[number];
 
@@ -114,6 +116,16 @@ export const ACCOUNT_EXPORT_REGISTRY = {
     status: 'exported',
     section: 'jobAnalyses',
     note: 'Derived analyses of saved jobs (requirements, matches, plan) and the owner review.',
+  },
+  Resume: {
+    status: 'exported',
+    section: 'resumes',
+    note: 'Resume per saved job (name and dates); the content lives in its versions.',
+  },
+  ResumeVersion: {
+    status: 'exported',
+    section: 'resumeVersions',
+    note: 'Resume versions: structured content with per-item sources, status and links to the profile revision and analysis used.',
   },
   AccountDeletion: {
     status: 'excluded',
