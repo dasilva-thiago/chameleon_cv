@@ -9,6 +9,13 @@ import { createAppQueryClient } from '../features/auth/session';
 import { AccountPage } from '../features/home/AccountPage';
 import { HomePage } from '../features/home/HomePage';
 import { NotFoundPage } from '../features/home/NotFoundPage';
+import { EvidencePanel } from '../features/profile/EvidencePanel';
+import { ImportPage } from '../features/profile/ImportPage';
+import { PendingPanel } from '../features/profile/PendingPanel';
+import { ProfileLayout } from '../features/profile/ProfileLayout';
+import { ProfileOverviewPage } from '../features/profile/ProfileOverviewPage';
+import { ReviewPanel } from '../features/profile/ReviewPanel';
+import { SectionPage } from '../features/profile/SectionPage';
 import { ErrorBoundary } from './ErrorBoundary';
 
 export function AppRoutes() {
@@ -20,6 +27,14 @@ export function AppRoutes() {
       </Route>
       <Route element={<RequireAuth />}>
         <Route index element={<HomePage />} />
+        <Route path="/perfil" element={<ProfileLayout />}>
+          <Route index element={<ProfileOverviewPage />} />
+          <Route path="importar" element={<ImportPage />} />
+          <Route path="confirmar" element={<ReviewPanel />} />
+          <Route path="pendencias" element={<PendingPanel />} />
+          <Route path="evidencias" element={<EvidencePanel />} />
+          <Route path=":slug" element={<SectionPage />} />
+        </Route>
         <Route path="/conta" element={<AccountPage />} />
       </Route>
       <Route element={<PublicLayout />}>

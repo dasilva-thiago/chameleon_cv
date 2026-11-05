@@ -7,7 +7,7 @@ export interface ResponseSchema<T> {
   safeParse(data: unknown): { success: true; data: T } | { success: false };
 }
 
-export type HttpMethod = 'GET' | 'POST';
+export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
 export interface RequestOptions<T> {
   body?: unknown;
@@ -43,9 +43,32 @@ function tryParseJson(text: string): unknown {
   }
 }
 
+/** Arquivo recebido de uma rota de download (exportacao). */
+export interface DownloadedFile {
+  blob: Blob;
+  /** Nome sugerido pelo servidor (sanitizado); `undefined` quando o cabecalho esta ausente ou estranho. */
+  filename: string | undefined;
+  contentType: string;
+}
+
 export interface ApiClient {
   get<T>(path: string, options: Omit<RequestOptions<T>, 'body'>): Promise<T>;
   post<T>(path: string, options: RequestOptions<T>): Promise<T>;
+  put<T>(path: string, options: RequestOptions<T>): Promise<T>;
+  patch<T>(path: string, options: RequestOptions<T>): Promise<T>;
+  delete<T>(path: string, options: Omit<RequestOptions<T>, 'body'>): Promise<T>;
+  /** GET autenticado que devolve o corpo como arquivo (nao como JSON). */
+  download(path: string, options?: { signal?: AbortSignal | undefined }): Promise<DownloadedFile>;
+}
+
+/** Aceita apenas nomes simples (letras, digitos, ponto, hifen, sublinhado): o servidor so emite esses. */
+const SAFE_FILENAME = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
+
+export function filenameFromDisposition(header: string | null): string | undefined {
+  if (header === null) return undefined;
+  const match = /filename="?([^";]+)"?/i.exec(header);
+  const candidate = match?.[1]?.trim();
+  return candidate !== undefined && SAFE_FILENAME.test(candidate) ? candidate : undefined;
 }
 
 export function createApiClient(options: ApiClientOptions = {}): ApiClient {
@@ -61,8 +84,9 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
     path: string,
     body: unknown,
     signal: AbortSignal | undefined,
+    accept = 'application/json',
   ): Promise<Response> {
-    const headers = new Headers({ Accept: 'application/json' });
+    const headers = new Headers({ Accept: accept });
     const init: RequestInit = { method, headers, credentials: 'same-origin' };
     if (body !== undefined) {
       headers.set('Content-Type', 'application/json');
@@ -162,8 +186,29 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
     return parsed.data;
   }
 
+  async function download(
+    path: string,
+    { signal }: { signal?: AbortSignal | undefined } = {},
+  ): Promise<DownloadedFile> {
+    const response = await send('GET', path, undefined, signal, '*/*');
+    if (!response.ok) throw await toApiError(response);
+    const blob = await response.blob().catch(() => undefined);
+    if (blob === undefined) {
+      throw new ApiError({ code: 'UNEXPECTED_RESPONSE', status: response.status });
+    }
+    return {
+      blob,
+      filename: filenameFromDisposition(response.headers.get('Content-Disposition')),
+      contentType: response.headers.get('Content-Type') ?? blob.type,
+    };
+  }
+
   return {
     get: (path, opts) => request('GET', path, opts),
     post: (path, opts) => request('POST', path, opts),
+    put: (path, opts) => request('PUT', path, opts),
+    patch: (path, opts) => request('PATCH', path, opts),
+    delete: (path, opts) => request('DELETE', path, opts),
+    download,
   };
 }

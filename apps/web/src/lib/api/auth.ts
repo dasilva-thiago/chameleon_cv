@@ -16,17 +16,8 @@ import {
   type LogoutResponse,
 } from '@chameleon/contracts';
 import { createApiClient, type ApiClient } from './client';
-import { ApiError, isApiError } from './errors';
-
-/** Valida a requisicao com o schema do contrato antes de enviar (falha local = VALIDATION_ERROR). */
-function validated<T>(
-  schema: { safeParse(data: unknown): { success: true; data: T } | { success: false } },
-  input: unknown,
-): T {
-  const result = schema.safeParse(input);
-  if (!result.success) throw new ApiError({ code: 'VALIDATION_ERROR', status: 0 });
-  return result.data;
-}
+import { isApiError } from './errors';
+import { validated } from './validated';
 
 export interface AuthApi {
   /** Sessao atual, ou `null` quando nao autenticado (401). Tambem faz o servidor emitir o CSRF. */

@@ -1,5 +1,5 @@
 import type { AuthUser } from '@chameleon/contracts';
-import { NavLink, Outlet } from 'react-router';
+import { NavLink, Outlet, useMatch } from 'react-router';
 import { useLogout } from '../../features/auth/session';
 import { messageForError } from '../../lib/api';
 import { APP_NAME } from '../../lib/config';
@@ -9,6 +9,7 @@ import { ShellFrame } from './ShellFrame';
 
 const NAV_ITEMS = [
   { to: '/', label: 'Início', end: true },
+  { to: '/perfil', label: 'Perfil', end: false },
   { to: '/conta', label: 'Conta', end: false },
 ] as const;
 
@@ -21,11 +22,15 @@ const linkClass = ({ isActive }: { isActive: boolean }): string =>
 export function AuthenticatedLayout({ user }: { user: AuthUser }) {
   const logout = useLogout();
   const name = user.displayName ?? user.email;
+  const wide = useMatch('/perfil/*') !== null;
 
   return (
     <ShellFrame
+      wide={wide}
       header={
-        <div className="mx-auto flex w-full max-w-3xl flex-wrap items-center justify-between gap-x-6 gap-y-2 px-4 py-3 sm:px-6">
+        <div
+          className={`mx-auto flex w-full ${wide ? 'max-w-6xl' : 'max-w-3xl'} flex-wrap items-center justify-between gap-x-6 gap-y-2 px-4 py-3 sm:px-6`}
+        >
           <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
             <p className="text-lg font-semibold tracking-tight">{APP_NAME}</p>
             <nav aria-label="Principal">

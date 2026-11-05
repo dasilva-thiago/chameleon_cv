@@ -1,6 +1,6 @@
 # Dependências diretas — versão e licença
 
-**Atualizado em:** 2026-11-04 (fatia S0.1). Fase 0 e Fase 1 instaladas; Fase 2 em diante (multer, file-type, Playwright, axe, docx, mammoth etc.) **ainda não**.
+**Atualizado em:** 2026-11-04 (fatia S0.1). Fase 0 e Fase 1 instaladas; `axe-core` (devDependency de `apps/web`, testes de acessibilidade do editor/importação de perfil, 2026-11-05) instalado; multer, file-type, Playwright, docx, mammoth etc. **ainda não**.
 Versões fixadas (exatas) nos `package.json`; licenças conforme o registro npm (`pnpm view <pkg> license`). Todas são permissivas (MIT, ISC, Apache-2.0, BSD).
 
 ## Raiz (`chameleon-cv`, dev)

@@ -52,7 +52,7 @@ describe('acessibilidade basica', () => {
     await screen.findByRole('heading', { level: 1, name: 'Início' });
 
     const nav = screen.getByRole('navigation', { name: 'Principal' });
-    expect(within(nav).getAllByRole('link')).toHaveLength(2);
+    expect(within(nav).getAllByRole('link')).toHaveLength(3);
     for (const control of [...screen.getAllByRole('button'), ...screen.getAllByRole('link')]) {
       expect(accessibleNameOf(control)).not.toBe('');
     }

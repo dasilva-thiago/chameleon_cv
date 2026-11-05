@@ -7,7 +7,16 @@ export const MAIN_ID = 'conteudo';
  * Estrutura comum: link para pular ao conteudo, landmarks (banner e main) e foco no titulo
  * da pagina a cada navegacao interna (leitores de tela anunciam a nova pagina).
  */
-export function ShellFrame({ header, children }: { header: ReactNode; children: ReactNode }) {
+export function ShellFrame({
+  header,
+  children,
+  wide = false,
+}: {
+  header: ReactNode;
+  children: ReactNode;
+  /** Area de conteudo larga (editor do perfil, com navegacao lateral). */
+  wide?: boolean;
+}) {
   const mainRef = useRef<HTMLElement>(null);
   const { pathname } = useLocation();
   const navigationType = useNavigationType();
@@ -43,7 +52,7 @@ export function ShellFrame({ header, children }: { header: ReactNode; children: 
         id={MAIN_ID}
         ref={mainRef}
         tabIndex={-1}
-        className="mx-auto w-full max-w-3xl flex-1 px-4 py-8 focus:outline-none sm:px-6"
+        className={`mx-auto w-full ${wide ? 'max-w-6xl' : 'max-w-3xl'} flex-1 px-4 py-8 focus:outline-none sm:px-6`}
       >
         {children}
       </main>

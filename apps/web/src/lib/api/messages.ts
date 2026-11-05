@@ -23,6 +23,21 @@ const MESSAGES: Record<ApiErrorKind, string> = {
   CONSENT_INVALID: 'O texto da política foi atualizado. Recarregue a página e tente novamente.',
   RATE_LIMITED: 'Muitas tentativas em pouco tempo. Aguarde um pouco e tente novamente.',
   NOT_FOUND: 'O recurso solicitado não foi encontrado.',
+  CONSENT_REQUIRED_FOR_PROFILE:
+    'Sua conta ainda não tem a autorização para tratar os dados do perfil profissional. Fale com a pessoa que administra o serviço.',
+  IMPORT_INVALID:
+    'O arquivo não pôde ser importado. Confira se é um YAML ou JSON no formato do perfil e tente novamente.',
+  IMPORT_PREVIEW_EXPIRED:
+    'A prévia desta importação expirou. Envie o arquivo novamente para gerar uma nova prévia.',
+  IMPORT_NOT_APPLICABLE:
+    'Esta importação não pode mais ser aplicada, pois já foi aplicada ou descartada. Gere uma nova prévia.',
+  ID_CONFLICT:
+    'Alguns identificadores do arquivo já pertencem a outro perfil. Você pode importar gerando identificadores novos.',
+  DUPLICATE_SKILL: 'Já existe uma competência equivalente a esta. Use a que já está cadastrada.',
+  CONCURRENT_MODIFICATION:
+    'O perfil foi alterado por outra ação ao mesmo tempo. Recarregue os dados e tente de novo.',
+  RECORD_IN_USE:
+    'Este item não pode ser excluído porque outros itens dependem dele. Remova o vínculo e tente de novo.',
   INTERNAL_ERROR: 'Ocorreu um erro inesperado. Tente novamente em instantes.',
   NETWORK: 'Não foi possível conectar ao servidor. Verifique sua conexão e tente novamente.',
   TIMEOUT: 'O servidor demorou a responder. Tente novamente.',
