@@ -49,6 +49,8 @@ export const PRIVATE_MODELS = [
 export const GLOBAL_MODELS = {
   User: 'Raiz do dono: User.id e o ownerId dos demais. Acessado pela camada de auth.',
   Invite: 'Convite de cadastro: existe antes de haver usuario/dono (ADR-0009).',
+  AccountDeletion:
+    'Registro minimo e sem PII de conta excluida (ADR-0014): nao pode referenciar o dono que apagou.',
 } as const satisfies Partial<Record<ModelName, string>>;
 
 /**
@@ -59,6 +61,7 @@ export const GLOBAL_MODELS = {
 export const PRIVATE_RELATIONS_OF_GLOBAL = {
   User: ['credentials', 'sessions', 'consentRecords', 'auditEvents', 'profiles'],
   Invite: [],
+  AccountDeletion: [],
 } as const satisfies Record<keyof typeof GLOBAL_MODELS, readonly string[]>;
 
 const PRIVATE_RELATION_KEYS: ReadonlySet<string> = new Set(

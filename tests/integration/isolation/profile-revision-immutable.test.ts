@@ -240,8 +240,8 @@ describe('exclusao de conta (DELETE FROM "User")', () => {
     ).toBe(1);
 
     // 2) Pelo cliente Prisma global (unico caminho da aplicacao hoje): tambem falha.
-    // LIMITACAO a tratar na S2.3: o app so consegue excluir conta via uma rotina em packages/db
-    // que execute `SET LOCAL chameleon.allow_purge = 'on'` na mesma transacao do DELETE.
+    // A aplicacao so exclui conta por `db.purgeAccount` (S2.3a, packages/db/src/account/purge.ts), que
+    // liga a flag de purge dentro da propria transacao; o delete direto continua barrado.
     await expect(testDb.db.global.user.delete({ where: { id: victim.ownerId } })).rejects.toThrow(
       IMMUTABLE,
     );

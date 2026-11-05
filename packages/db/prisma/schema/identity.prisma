@@ -118,3 +118,13 @@ model AuditEvent {
   @@unique([id, ownerId])
   @@index([ownerId, at(sort: Desc)])
 }
+
+/// Registro MINIMO e sem PII de que uma conta foi excluida (ADR-0014). GLOBAL: sem ownerId, sem FK e sem
+/// qualquer referencia ao dono (nem o id do User). Gravado so pela rotina de purge, na mesma transacao da
+/// exclusao. Append-only (trigger `AccountDeletion_append_only`).
+model AccountDeletion {
+  id          String   @id @default(uuid(7)) @db.Uuid
+  deletedAt   DateTime @default(now()) @db.Timestamptz(3)
+  /// Total agregado de linhas removidas (tabelas do dono + convites); nunca por tabela nem por tipo.
+  rowsDeleted Int
+}

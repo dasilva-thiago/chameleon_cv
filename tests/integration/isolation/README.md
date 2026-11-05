@@ -83,6 +83,7 @@ Rota removida? Apague a entrada em `coverage.ts` (o gate aponta a entrada obsole
   installs the `<Table>_owner_immutable` trigger (covered by `packages/db/test/owner-immutable.int.test.ts`). `forOwner`
   remains the first line of defense; `db.unsafeRaw`/raw SQL stay subject to security review.
 - `TRUNCATE` ignora o gatilho de imutabilidade da `ProfileRevision` (é o que `truncateAll()` do harness usa).
-- Exclusão de conta pelo Prisma (`db.global.user.delete`) falha enquanto houver `ProfileRevision`: a S2.3 precisa de uma
-  rotina em `packages/db` que execute `SET LOCAL chameleon.allow_purge = 'on'` na mesma transação do `DELETE`.
+- Exclusão de conta pelo Prisma (`db.global.user.delete`) falha enquanto houver `ProfileRevision`; o caminho oficial é
+  `db.purgeAccount(ownerId)` (S2.3a, `packages/db/src/account/purge.ts`), que liga `chameleon.allow_purge` com
+  `set_config(..., true)` na própria transação. Testes dele: `packages/db/test/account-purge.int.test.ts`.
 - Teste de bundle da web (chaves/segredos no build): já existe em `apps/web/test/bundle.test.ts` (S1.3); não duplicado.

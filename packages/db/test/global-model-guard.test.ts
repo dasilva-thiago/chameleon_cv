@@ -29,6 +29,7 @@ const RELATIONS: RelationFields = new Map<string, ReadonlySet<string>>([
     ]),
   ],
   ['Invite', new Set(['usedBy'])],
+  ['AccountDeletion', new Set()],
 ]);
 const FORBIDDEN = forbiddenGlobalKeys(RELATIONS);
 
@@ -45,6 +46,7 @@ describe('forbiddenGlobalKeys', () => {
       new Map<string, ReadonlySet<string>>([
         ['User', new Set()],
         ['Invite', new Set()],
+        ['AccountDeletion', new Set()],
       ]),
     );
     expect(keys.has('sessions')).toBe(true);

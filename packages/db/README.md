@@ -15,6 +15,7 @@ para testes. Única fronteira onde `@prisma/*` e SQL cru são permitidos (ADR-00
 | `src/private-models.ts`             | Registro central: modelos privados x globais                                                   |
 | `src/mappers/`                      | Mapeamento PURO documento <-> linhas (specs, codec, to/from-rows, plano de diff)               |
 | `src/profile-store/`                | `createProfileStore(db, { snapshot })` (S1.1b)                                                 |
+| `src/account/`                      | `db.purgeAccount`, `exportAccountData`, registro de exportacao (S2.3a)                         |
 | `src/testing/`                      | Harness de teste (`@chameleon/db/testing`)                                                     |
 
 ## Comandos (da raiz)
@@ -57,14 +58,15 @@ pnpm db:reset                               # recusa host não local; migrate re
 
 ## Identidade (S1.1a)
 
-| Modelo          | Escopo | Observações                                                                              |
-| --------------- | ------ | ---------------------------------------------------------------------------------------- |
-| `User`          | global | e-mail `citext` único; `User.id` é o `ownerId` dos demais                                |
-| `Credential`    | dono   | só hash argon2id (CHECK `$argon2id$%`); uma por `(ownerId, kind)`                        |
-| `Session`       | dono   | só `tokenHash` (SHA-256 hex, CHECK de formato); expiração deslizante + absoluta; sem IP  |
-| `Invite`        | global | `tokenHash` único; um convite **em aberto** por e-mail (índice parcial `usedAt IS NULL`) |
-| `ConsentRecord` | dono   | `purpose` (CHECK de formato), `granted`, `policyVersion`, `recordedAt`; append-only      |
-| `AuditEvent`    | dono   | sem PII em `metadata`                                                                    |
+| Modelo            | Escopo | Observações                                                                                   |
+| ----------------- | ------ | --------------------------------------------------------------------------------------------- |
+| `User`            | global | e-mail `citext` único; `User.id` é o `ownerId` dos demais                                     |
+| `Credential`      | dono   | só hash argon2id (CHECK `$argon2id$%`); uma por `(ownerId, kind)`                             |
+| `Session`         | dono   | só `tokenHash` (SHA-256 hex, CHECK de formato); expiração deslizante + absoluta; sem IP       |
+| `Invite`          | global | `tokenHash` único; um convite **em aberto** por e-mail (índice parcial `usedAt IS NULL`)      |
+| `ConsentRecord`   | dono   | `purpose` (CHECK de formato), `granted`, `policyVersion`, `recordedAt`; append-only           |
+| `AuditEvent`      | dono   | sem PII em `metadata`                                                                         |
+| `AccountDeletion` | global | registro minimo SEM PII de uma exclusao (id, instante, total agregado de linhas); append-only |
 
 ## Agregado de perfil (S1.1b)
 
@@ -111,7 +113,9 @@ Decisoes de mapeamento (o que o contrato 2.1.0 pede ao banco):
   `<Tabela>_fact_orphan` (nao apagar so a linha tipada) e `ProfileFact_kind_immutable`.
 - **`ProfileRevision` imutavel:** trigger `ProfileRevision_immutable` (UPDATE/DELETE falham). Excecao:
   `SET LOCAL chameleon.allow_purge = 'on'` em DELETE (exclusao de conta; sem a flag a cascata de
-  `DELETE FROM "User"` tambem falha).
+  `DELETE FROM "User"` tambem falha). Unico chamador: `db.purgeAccount` (secao "Exclusao e exportacao de conta").
+- **`ImportSourceFormat`:** `yaml | json | object | markdown` (migracao `import_source_markdown`; o teste
+  `contract-alignment` confere com `IMPORT_SOURCE_FORMATS` do contrato).
 
 ### ProfileStore
 
@@ -246,6 +250,35 @@ including the review probes: `_count`, deep chains, `invite -> usedBy.update`, r
 | Interactive/batch `$transaction` inherits the extension (tested), including the raw SQL block   | n/a                                                                                                                                                                                                                |
 | `omit`/`select` globais e extensões de resultado não são verificados                            | n/a hoje                                                                                                                                                                                                           |
 | Sem RLS no PostgreSQL                                                                           | Endurecimento planejado na Fase 7 (ADR-0008, item 6)                                                                                                                                                               |
+
+## Exclusao e exportacao de conta (S2.3a, ADR-0014)
+
+```ts
+// Codigo de servidor confiavel (modulo de conta da API). NAO passa por forOwner nem exige unsafeRaw.
+const result = await db.purgeAccount(ownerId); // { purged, deletionId, rowsDeleted, tables }
+const data = await exportAccountData(db, ownerId, { store }); // AccountExport (JSON puro)
+```
+
+- **`db.purgeAccount(ownerId)`** (`src/account/purge.ts`): uma transacao interativa que (1) liga a flag com
+  `set_config('chameleon.allow_purge', 'on', true)` (local a transacao: revertida no COMMIT/ROLLBACK, nunca fica
+  numa conexao do pool), (2) trava a linha de `User`, (3) apaga convites ligados a conta (guardam e-mail),
+  (4) `DELETE FROM "User"` (cascata em todas as tabelas do dono, inclusive `ProfileRevision` imutavel), (5) confere
+  **pelo catalogo** (toda tabela com coluna `"ownerId"`, nao uma lista a mao) que sobraram 0 linhas e, se sobrou
+  alguma, desfaz tudo (`PurgeIncompleteError`), (6) grava um `AccountDeletion` (sem referencia ao dono). Dono
+  inexistente: `{ purged: false }`, nada gravado. `ownerId` precisa ser UUID. Tabela nova com `ownerId` e FK
+  em cascata para `User` (direta ou via perfil) entra no purge sem alterar codigo; sem cascata, o purge falha
+  alto em vez de deixar dado para tras. Nao apaga arquivos do storage nem encerra o cookie: isso e da API.
+- **`exportAccountData(db, ownerId, { store, now? })`** (`src/account/export.ts`): le por `db.forOwner` (e o convite
+  aceito por `db.global`), com `select` explicito (lista de permissao: coluna nova nao sai sem ser classificada).
+  Secoes: `account`, `profiles` (documento canonico via `store.loadProfileDocument`), `revisions` (com snapshot),
+  `imports` (sem conteudo bruto; o arquivo enviado fica no storage), `consents`, `auditEvents`, `sessions`
+  (metadados), `credentials` (so o tipo), `invitations`. Nunca `passwordHash` nem `tokenHash`. As secoes sao lidas
+  em sequencia (nao num unico snapshot).
+- **`ACCOUNT_EXPORT_REGISTRY`** (`src/account/registry.ts`): toda tabela e `exported` (secao + colunas retidas) ou
+  `excluded` (motivo). `Record<Prisma.ModelName, ...>` quebra a compilacao e `account-export-registry.test.ts` /
+  `account-export.int.test.ts` quebram os testes se um model/tabela/coluna ficar sem classificacao.
+- Testes: `test/account-purge.int.test.ts` (dois donos + canarios, flag nao vaza na mesma conexao, atomicidade,
+  tabela futura), `test/account-export.int.test.ts`, `test/account-export-registry.test.ts`.
 
 ## Harness de teste (`@chameleon/db/testing`)
 

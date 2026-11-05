@@ -6,6 +6,7 @@ import {
   relationFieldsOfClient,
   type RelationFields,
 } from './for-owner';
+import { purgeAccountData, type PurgeAccountResult } from './account/purge';
 
 /** Opcao de startup do PostgreSQL aplicada a TODA conexao do app e dos testes. */
 export const SESSION_TIMEZONE_OPTION = '-c timezone=UTC';
@@ -55,6 +56,14 @@ export interface Db {
    * sessao por tokenHash) e em jobs de manutencao (ADR-0008, item 2). Nao use em repositorios.
    */
   readonly unsafeRaw: PrismaClient;
+  /**
+   * Account deletion (ADR-0014): deletes ALL data of `ownerId` (user, credentials, sessions, profile,
+   * immutable revisions, imports, consent, audit) in one transaction that sets `chameleon.allow_purge`
+   * transaction-locally, verifies that nothing remains and records a minimal PII-free
+   * `AccountDeletion` row. Narrow, trusted-server-only entry point: callers need no `unsafeRaw`. The
+   * caller authenticates/authorizes the request and deletes stored files separately.
+   */
+  purgeAccount(ownerId: string): Promise<PurgeAccountResult>;
   $disconnect(): Promise<void>;
 }
 
@@ -66,6 +75,7 @@ export function createDb(options: CreateDbOptions = {}): Db {
     forOwner: (ownerId) => buildOwnerClient(base, ownerId, relations),
     global,
     unsafeRaw: base,
+    purgeAccount: (ownerId) => purgeAccountData(base, ownerId),
     $disconnect: () => base.$disconnect(),
   };
 }

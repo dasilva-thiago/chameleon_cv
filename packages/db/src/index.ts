@@ -8,6 +8,7 @@ export {
   OwnerScopeViolationError,
   UnscopedAccessError,
 } from './errors';
+export * from './account';
 export * from './profile-store';
 export { GLOBAL_MODELS, PRIVATE_MODELS, isPrivateModel } from './private-models';
 export type { GlobalModelName, PrivateModelName } from './private-models';
