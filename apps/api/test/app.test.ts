@@ -1,7 +1,12 @@
 import { createDb, type Db } from '@chameleon/db';
 import request from 'supertest';
 import { afterAll, describe, expect, it } from 'vitest';
-import { buildTestApp, TestClient, testConfig } from './helpers';
+import {
+  buildTestApp,
+  expectSessionRoutesRejectAnonymous,
+  TestClient,
+  testConfig,
+} from './helpers';
 
 // Sem rede: o cliente do Prisma so conecta no primeiro uso. Rotas exercitadas aqui falham antes
 // de qualquer consulta (CSRF, parser, 401 sem cookie, 404).
@@ -27,12 +32,18 @@ describe('createApp', () => {
     expect(response.headers['x-powered-by']).toBeUndefined();
   });
 
-  it('reaproveita X-Request-Id bem formado e substitui um malformado', async () => {
+  it('always generates the correlation id server-side; a client X-Request-Id is never echoed', async () => {
     const app = buildApp();
-    const ok = await request(app).get('/health').set('X-Request-Id', 'abc12345-trace');
-    expect(ok.headers['x-request-id']).toBe('abc12345-trace');
-    const bad = await request(app).get('/health').set('X-Request-Id', 'bad id with spaces!');
-    expect(bad.headers['x-request-id']).not.toBe('bad id with spaces!');
+    for (const sent of ['abc12345-trace', 'bad id with spaces!', 'x'.repeat(500)]) {
+      const response = await request(app).get('/health').set('X-Request-Id', sent);
+      expect(response.headers['x-request-id']).not.toBe(sent);
+      expect(response.headers['x-request-id']).toMatch(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
+      );
+    }
+    const first = await request(app).get('/health');
+    const second = await request(app).get('/health');
+    expect(first.headers['x-request-id']).not.toBe(second.headers['x-request-id']);
   });
 
   it('rota inexistente devolve erro estruturado 404 (dentro e fora de /api)', async () => {
@@ -161,22 +172,9 @@ describe('CSRF (Origin + X-CSRF-Token)', () => {
 });
 
 describe('rotas protegidas sem sessao', () => {
-  it('toda rota `session` do manifesto responde 401 sem cookie', async () => {
-    const app = buildApp();
-    const { getRouteManifest } = await import('../src/http');
-    const protectedRoutes = getRouteManifest(app).filter((route) => route.auth === 'session');
-    expect(protectedRoutes.length).toBeGreaterThan(0);
-    const client = new TestClient(app, testConfig());
-    for (const route of protectedRoutes) {
-      const path = route.path.replace(/:[A-Za-z0-9_]+/g, '00000000-0000-4000-8000-000000000000');
-      const response = await client.request(
-        route.method.toLowerCase() as 'get' | 'post' | 'put' | 'patch' | 'delete',
-        path,
-        route.mutating ? {} : undefined,
-      );
-      expect(response.status, `${route.method} ${route.path}`).toBe(401);
-      expect((response.body as { error: { code: string } }).error.code).toBe('UNAUTHENTICATED');
-    }
+  it('every `session` route in the manifest answers 401 without a cookie', async () => {
+    const checked = await expectSessionRoutesRejectAnonymous(buildApp(), testConfig());
+    expect(checked.length).toBeGreaterThan(0);
   });
 
   it('cookie de sessao malformado -> 401 sem consultar o banco', async () => {

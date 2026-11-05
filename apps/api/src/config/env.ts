@@ -16,6 +16,35 @@ const envSchema = z.object({
   SIGNUP_MODE: z.enum(['invite', 'open', 'closed']).default('invite'),
   /** Numero de proxies confiaveis a frente da API (0 = nenhum; usa o IP do socket). */
   TRUST_PROXY: z.coerce.number().int().min(0).max(10).default(0),
+  /**
+   * Explicit opt-out documenting a DIRECT deployment (no reverse proxy). Required to run
+   * NODE_ENV=production with TRUST_PROXY=0: behind a proxy that setting makes every client share the
+   * proxy address as rate-limit key (shared lockout).
+   */
+  TRUST_PROXY_ACK_DIRECT: z
+    .enum(['true', 'false'])
+    .default('false')
+    .transform((v) => v === 'true'),
+  /**
+   * Policy text versions the server accepts for `profile_processing` consent (comma-separated; the
+   * first is the current one). Must contain the version shown by apps/web (DEFAULT_PROFILE_POLICY_VERSION
+   * or VITE_PROFILE_POLICY_VERSION). Client-supplied versions outside this list are rejected.
+   */
+  PROFILE_POLICY_VERSIONS: z
+    .string()
+    .default('2026-11.1')
+    .transform((value) =>
+      value
+        .split(',')
+        .map((v) => v.trim())
+        .filter((v) => v !== ''),
+    )
+    .pipe(
+      z
+        .array(z.string().regex(/^[A-Za-z0-9._-]{1,64}$/))
+        .min(1)
+        .max(20),
+    ),
   /** Limite do corpo JSON (bytes). Rotas com payload maior definem o proprio parser. */
   JSON_BODY_LIMIT_BYTES: z.coerce
     .number()
@@ -62,6 +91,21 @@ const refinedEnvSchema = envSchema.superRefine((env, ctx) => {
         message: 'http so e aceito para localhost/127.0.0.1/[::1] (desenvolvimento local)',
       });
     }
+  }
+  if (env.NODE_ENV === 'production' && env.TRUST_PROXY === 0 && !env.TRUST_PROXY_ACK_DIRECT) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['TRUST_PROXY'],
+      message:
+        'em producao defina TRUST_PROXY>=1 (numero de proxies confiaveis) ou TRUST_PROXY_ACK_DIRECT=true se a API recebe clientes diretamente; com 0 atras de um proxy todos os clientes compartilham o limite de taxa',
+    });
+  }
+  if (env.TRUST_PROXY_ACK_DIRECT && env.TRUST_PROXY !== 0) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['TRUST_PROXY_ACK_DIRECT'],
+      message: 'so faz sentido com TRUST_PROXY=0 (implantacao direta, sem proxy)',
+    });
   }
   if (env.SIGNUP_MODE === 'open') {
     ctx.addIssue({

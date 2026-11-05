@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { CrossCaseContext } from './support/context';
 import { assertLogsClean, registerSecret } from './support/logs';
-import { TEST_PASSWORD, type ApiModule } from './support/workspace';
+import { TEST_PASSWORD, TEST_SIGNUP_CONSENTS, type ApiModule } from './support/workspace';
 import { createWorld, type World } from './support/world';
 
 /**
@@ -111,6 +111,7 @@ describe('logs com trafego hostil', () => {
       token: HOSTILE.body,
       password: HOSTILE.password,
       displayName: HOSTILE.body,
+      consents: TEST_SIGNUP_CONSENTS,
     });
     // corpo de perfil com canarios para uma rota que aceita POST (nao deve ser registrado)
     expect((await clientA.post('/api/profiles', profileBody)).status).toBe(201);

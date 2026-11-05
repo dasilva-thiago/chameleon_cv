@@ -1,0 +1,1 @@
+export { hasGrantedConsent } from './consent';

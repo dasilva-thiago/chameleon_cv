@@ -17,7 +17,12 @@ import { DEFAULT_SESSION_POLICY, type SessionPolicy, SessionService } from './se
 
 export interface AuthModuleDeps {
   config: AppConfig;
-  db: Db;
+  /**
+   * Unrestricted database handle (`global` + `unsafeRaw`). This is the ONLY place that receives it:
+   * identity lookups (session by token hash, user by e-mail, invites) happen before an owner is known.
+   * Domain modules get no `Db` at all (ADR-0008 item 2); they use `req.auth.db`.
+   */
+  authDb: Db;
   logger: Logger;
   registry: RouteRegistry;
   now: () => Date;
@@ -34,18 +39,21 @@ export interface AuthModule {
 
 export function createAuthModule(deps: AuthModuleDeps): AuthModule {
   const cookies = cookieSettings(deps.config);
-  const sessions = new SessionService(deps.db, deps.now, {
+  const sessions = new SessionService(deps.authDb, deps.now, {
     ...DEFAULT_SESSION_POLICY,
     ...deps.sessionPolicy,
   });
   const service = new AuthService({
-    db: deps.db,
+    db: deps.authDb,
     sessions,
+    policyVersions: deps.config.PROFILE_POLICY_VERSIONS,
     logger: deps.logger,
     now: deps.now,
     signupMode: deps.config.SIGNUP_MODE,
   });
-  const requireAuth = createRequireAuth({ sessions, db: deps.db, cookies });
+  const requireAuth = createRequireAuth({ sessions, db: deps.authDb, cookies });
+  // From here on `auth: 'session'` routes get `requireAuth` from the registry itself.
+  deps.registry.setSessionGuard(requireAuth);
   const limiters = createAuthRateLimiters({ ...DEFAULT_AUTH_RATE_LIMITS, ...deps.rateLimits });
   // Aquece o hash ficticio para que o primeiro login de e-mail inexistente nao seja mais lento.
   void getDummyHash();

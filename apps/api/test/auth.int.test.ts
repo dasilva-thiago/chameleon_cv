@@ -15,6 +15,7 @@ import {
   createTestAccount,
   DEV_ORIGIN,
   TEST_PASSWORD,
+  TEST_SIGNUP_CONSENTS,
   TestClient,
   testConfig,
   type TestResponse,
@@ -55,7 +56,7 @@ describe('aceite de convite', () => {
       token,
       password: TEST_PASSWORD,
       displayName: 'Pessoa Teste',
-      consents: [{ purpose: 'profile_processing', granted: true, policyVersion: '2026-11-01' }],
+      consents: [{ purpose: 'profile_processing', granted: true, policyVersion: '2026-11.1' }],
     });
     expect(response.status).toBe(201);
     const body = acceptInviteResponseSchema.parse(response.body);
@@ -76,7 +77,7 @@ describe('aceite de convite', () => {
       [body.user.id],
     );
     expect(consents.rows).toEqual([
-      { purpose: 'profile_processing', granted: true, policyVersion: '2026-11-01' },
+      { purpose: 'profile_processing', granted: true, policyVersion: '2026-11.1' },
     ]);
 
     const used = await testDb.sql<{ usedAt: Date | null; usedByUserId: string | null }>(
@@ -104,6 +105,7 @@ describe('aceite de convite', () => {
         await client.post('/api/auth/invites/accept', {
           token: used.token,
           password: TEST_PASSWORD,
+          consents: TEST_SIGNUP_CONSENTS,
         })
       ).status,
     ).toBe(201);
@@ -117,6 +119,7 @@ describe('aceite de convite', () => {
       const accept = await other.post('/api/auth/invites/accept', {
         token,
         password: TEST_PASSWORD,
+        consents: TEST_SIGNUP_CONSENTS,
       });
       for (const response of [preview, accept]) {
         expect(response.status).toBe(400);
@@ -137,7 +140,11 @@ describe('aceite de convite', () => {
     const results = await Promise.all(
       Array.from({ length: 4 }, () => {
         const client = new TestClient(setup().app, testConfig());
-        return client.post('/api/auth/invites/accept', { token, password: TEST_PASSWORD });
+        return client.post('/api/auth/invites/accept', {
+          token,
+          password: TEST_PASSWORD,
+          consents: TEST_SIGNUP_CONSENTS,
+        });
       }),
     );
     expect(results.filter((r) => r.status === 201)).toHaveLength(1);
@@ -149,13 +156,25 @@ describe('aceite de convite', () => {
   it('senha fraca -> 400 sem consumir o convite; senha curta -> VALIDATION_ERROR', async () => {
     const { client } = setup();
     const { token } = await createInvite(testDb.db, { email: 'fraca@example.test' });
-    const weak = await client.post('/api/auth/invites/accept', { token, password: 'password1234' });
+    const weak = await client.post('/api/auth/invites/accept', {
+      token,
+      password: 'password1234',
+      consents: TEST_SIGNUP_CONSENTS,
+    });
     expect(weak.status).toBe(400);
     expect(errorOf(weak).code).toBe('WEAK_PASSWORD');
-    const short = await client.post('/api/auth/invites/accept', { token, password: 'curta' });
+    const short = await client.post('/api/auth/invites/accept', {
+      token,
+      password: 'curta',
+      consents: TEST_SIGNUP_CONSENTS,
+    });
     expect(short.status).toBe(400);
     expect(errorOf(short).code).toBe('VALIDATION_ERROR');
-    const ok = await client.post('/api/auth/invites/accept', { token, password: TEST_PASSWORD });
+    const ok = await client.post('/api/auth/invites/accept', {
+      token,
+      password: TEST_PASSWORD,
+      consents: TEST_SIGNUP_CONSENTS,
+    });
     expect(ok.status).toBe(201);
   });
 
@@ -171,6 +190,7 @@ describe('aceite de convite', () => {
     const response = await client.post('/api/auth/invites/accept', {
       token: 'B'.repeat(43),
       password: TEST_PASSWORD,
+      consents: TEST_SIGNUP_CONSENTS,
     });
     expect(response.status).toBe(400);
     expect(errorOf(response).code).toBe('INVITE_INVALID');
@@ -183,6 +203,7 @@ describe('aceite de convite', () => {
     const accept = await client.post('/api/auth/invites/accept', {
       token,
       password: TEST_PASSWORD,
+      consents: TEST_SIGNUP_CONSENTS,
     });
     expect(accept.status).toBe(403);
     expect(errorOf(accept).code).toBe('SIGNUP_CLOSED');
@@ -247,6 +268,7 @@ describe('cookies e armazenamento de segredos', () => {
     const accept = await client.post('/api/auth/invites/accept', {
       token: inviteToken,
       password: TEST_PASSWORD,
+      consents: TEST_SIGNUP_CONSENTS,
     });
     expect(accept.status).toBe(201);
     const sessionToken = client.sessionToken;

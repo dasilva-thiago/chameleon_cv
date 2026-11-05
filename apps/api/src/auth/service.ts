@@ -1,8 +1,10 @@
 import { randomUUID } from 'node:crypto';
-import type {
-  AcceptInviteRequest,
-  AuthSessionResponse,
-  InvitePreviewResponse,
+import {
+  type AcceptInviteRequest,
+  type AuthSessionResponse,
+  type InvitePreviewResponse,
+  SIGNUP_CONSENT_PURPOSE,
+  type SignupConsentInput,
 } from '@chameleon/contracts';
 import type { Db, Session, User } from '@chameleon/db';
 import type { Logger } from 'pino';
@@ -22,6 +24,18 @@ const invalidCredentials = (): HttpError =>
   new HttpError(401, 'INVALID_CREDENTIALS', 'E-mail ou senha incorretos.');
 const invalidInvite = (): HttpError =>
   new HttpError(400, 'INVITE_INVALID', 'Convite invalido ou expirado.');
+const consentRequired = (): HttpError =>
+  new HttpError(
+    400,
+    'CONSENT_REQUIRED',
+    'O consentimento para o tratamento dos dados do perfil e necessario para criar a conta.',
+  );
+const consentInvalid = (): HttpError =>
+  new HttpError(
+    400,
+    'CONSENT_INVALID',
+    'Versao da politica desconhecida ou desatualizada. Recarregue a pagina e tente novamente.',
+  );
 
 export interface AuthServiceDeps {
   db: Db;
@@ -29,6 +43,8 @@ export interface AuthServiceDeps {
   logger: Logger;
   now: () => Date;
   signupMode: 'invite' | 'open' | 'closed';
+  /** Policy text versions the server accepts for `profile_processing` consent (config). */
+  policyVersions: readonly string[];
 }
 
 export interface IssuedSession {
@@ -71,11 +87,14 @@ export class AuthService {
   }): Promise<IssuedSession> {
     const { db, sessions } = this.deps;
     const user = await db.global.user.findUnique({ where: { email: input.email } });
+    // Same DB work on every path (user lookup + one scoped credential lookup): an unknown e-mail
+    // queries a random owner id instead of skipping the query, so latency does not reveal whether
+    // the account exists or is active.
+    const credential = await db
+      .forOwner(user?.id ?? randomUUID())
+      .credential.findFirst({ where: { kind: 'password' } });
     const usable = user !== null && user.status === 'active' && user.deletedAt === null;
-    const credential = usable
-      ? await db.forOwner(user.id).credential.findFirst({ where: { kind: 'password' } })
-      : null;
-    const hash = credential?.passwordHash ?? (await getDummyHash());
+    const hash = usable && credential ? credential.passwordHash : await getDummyHash();
     const valid = await verifyPassword(hash, input.password);
     if (!usable || !credential || !valid) {
       this.deps.logger.warn({ event: 'auth.login.failed' }, 'login failed');
@@ -120,6 +139,7 @@ export class AuthService {
     if (violation) {
       throw new HttpError(400, 'WEAK_PASSWORD', PASSWORD_VIOLATION_MESSAGES[violation]);
     }
+    const consent = this.assertProfileConsent(input.consents);
     const passwordHash = await hashPassword(input.password);
 
     const ownerId = randomUUID();
@@ -139,17 +159,17 @@ export class AuthService {
         await tx.credential.create({
           data: { ownerId, kind: 'password', passwordHash },
         });
-        if (input.consents && input.consents.length > 0) {
-          await tx.consentRecord.createMany({
-            data: input.consents.map((consent) => ({
-              ownerId,
-              purpose: consent.purpose,
-              granted: consent.granted,
-              policyVersion: consent.policyVersion,
-              recordedAt: now,
-            })),
-          });
-        }
+        // Server-side record of what was presented and accepted (validated above): the purpose and
+        // granted flag are fixed by the server, only a known policy version is taken from the client.
+        await tx.consentRecord.create({
+          data: {
+            ownerId,
+            purpose: SIGNUP_CONSENT_PURPOSE,
+            granted: true,
+            policyVersion: consent.policyVersion,
+            recordedAt: now,
+          },
+        });
         return created;
       });
     } catch (error) {
@@ -174,6 +194,20 @@ export class AuthService {
     const revoked = await this.deps.sessions.revokeAll(ownerId);
     await this.audit(ownerId, 'auth.logout_all', null, correlationId, { revoked });
     return revoked;
+  }
+
+  /**
+   * `profile_processing` must be granted, under a policy version the server publishes (LGPD:
+   * consent is verified server-side, never inferred from the client's say-so). The DTO already
+   * limits the purpose to `profile_processing`; re-checked here so a schema change cannot silently
+   * open the door to purposes whose notice was not shown at this step.
+   */
+  private assertProfileConsent(consents: readonly SignupConsentInput[]): SignupConsentInput {
+    const consent = consents.find((c) => c.purpose === SIGNUP_CONSENT_PURPOSE);
+    if (consents.length !== 1 || !consent) throw consentInvalid();
+    if (!consent.granted) throw consentRequired();
+    if (!this.deps.policyVersions.includes(consent.policyVersion)) throw consentInvalid();
+    return consent;
   }
 
   private assertSignupOpen(): void {

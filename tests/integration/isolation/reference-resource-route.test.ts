@@ -3,13 +3,7 @@ import { CrossCaseContext } from './support/context';
 import { evaluateGate, routeKey, type CoverageMap } from './support/gate';
 import { expectNoLeaks, forbiddenFor } from './support/leaks';
 import { assertLogsClean } from './support/logs';
-import {
-  buildProfileSnapshot,
-  createProfileStore,
-  getRouteManifest,
-  requireAuthContext,
-  type ApiModule,
-} from './support/workspace';
+import { getRouteManifest, requireAuthContext, type ApiModule } from './support/workspace';
 import { ROUTE_COVERAGE } from './coverage';
 import { CROSS_CASES } from './cross-cases';
 import { createWorld, type World } from './support/world';
@@ -21,14 +15,13 @@ import { createWorld, type World } from './support/world';
  * (manifesto -> cobertura -> caso -> rastreio de rotas atingidas -> varredura) funciona de ponta a
  * ponta com uma rota de recurso. O app real nao e alterado.
  */
-const probeModule: ApiModule = ({ routes, requireAuth, db }) => {
-  const store = createProfileStore(db, { snapshot: buildProfileSnapshot });
-  routes.get('/probe/profile', { auth: 'session' }, requireAuth, async (req, res) => {
+const probeModule: ApiModule = ({ routes, profileStore: store }) => {
+  routes.get('/probe/profile', { auth: 'session' }, async (req, res) => {
     const auth = requireAuthContext(req);
     const loaded = await store.loadProfileDocument(auth.ownerId);
     res.json(loaded?.document ?? null);
   });
-  routes.get('/probe/revisions/:revisionId', { auth: 'session' }, requireAuth, async (req, res) => {
+  routes.get('/probe/revisions/:revisionId', { auth: 'session' }, async (req, res) => {
     const auth = requireAuthContext(req);
     const revision = await store.getRevision(auth.ownerId, String(req.params.revisionId));
     if (!revision) {

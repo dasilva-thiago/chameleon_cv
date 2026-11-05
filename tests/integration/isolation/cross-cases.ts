@@ -5,6 +5,7 @@ import { expectNoLeaks, forbiddenFor, type Forbidden } from './support/leaks';
 import {
   type AuthSessionResponse,
   type TestClient,
+  TEST_SIGNUP_CONSENTS,
   createInvite,
   generateToken,
   hashToken,
@@ -369,7 +370,13 @@ export const CROSS_CASES: Record<string, CrossCase> = {
       const users = () => db.global.user.count();
       const accepted = ctx.anonymous();
       expect(
-        (await accepted.post('/api/auth/invites/accept', { token: fresh.token, password })).status,
+        (
+          await accepted.post('/api/auth/invites/accept', {
+            token: fresh.token,
+            password,
+            consents: TEST_SIGNUP_CONSENTS,
+          })
+        ).status,
       ).toBe(201);
       const totalUsers = await users();
 
@@ -394,7 +401,9 @@ export const CROSS_CASES: Record<string, CrossCase> = {
       const accepts: unknown[] = [];
       for (const [name, token] of dead) {
         const preview = await ctx.anonymous().post('/api/auth/invites/preview', { token });
-        const accept = await ctx.anonymous().post('/api/auth/invites/accept', { token, password });
+        const accept = await ctx
+          .anonymous()
+          .post('/api/auth/invites/accept', { token, password, consents: TEST_SIGNUP_CONSENTS });
         for (const response of [preview, accept]) {
           expect(response.status, name).toBe(400);
           expect((bodyOf(response).error as Body).code, name).toBe('INVITE_INVALID');
@@ -414,6 +423,7 @@ export const CROSS_CASES: Record<string, CrossCase> = {
         token: another.token,
         password,
         email: world.a.email,
+        consents: TEST_SIGNUP_CONSENTS,
       });
       expect(injected.status).toBe(400);
       expect(await users()).toBe(totalUsers);
@@ -433,6 +443,7 @@ export const CROSS_CASES: Record<string, CrossCase> = {
       const attempt = await ctx.anonymous().post('/api/auth/invites/accept', {
         token: takeover.token,
         password: 'senha-do-invasor-valida-9988',
+        consents: TEST_SIGNUP_CONSENTS,
       });
       ctx.observe(world.b, attempt);
       expect(attempt.status).toBe(400);

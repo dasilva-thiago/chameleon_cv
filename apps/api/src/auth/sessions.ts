@@ -35,9 +35,10 @@ export function sanitizeUserAgent(value: string | undefined): string | null {
 }
 
 /**
- * Sessoes no servidor. Unico lugar (junto de `AuthService`) que usa `db.unsafeRaw`: o lookup por
- * `tokenHash` acontece ANTES de se conhecer o dono (ADR-0008, item 2; db/README "escape hatch").
- * Toda escrita posterior e feita por `db.forOwner(ownerId)`.
+ * Server-side sessions. The only code that uses `db.unsafeRaw` (and `db.global.user` to load the
+ * session owner): the lookup by `tokenHash` happens BEFORE the owner is known (ADR-0008, item 2;
+ * db/README "escape hatch"). `AuthService` uses only `db.global` and `db.forOwner`. Every later write
+ * goes through `db.forOwner(ownerId)`.
  */
 export class SessionService {
   constructor(

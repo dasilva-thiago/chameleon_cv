@@ -1,8 +1,9 @@
 import { createDb } from '@chameleon/db';
-import express from 'express';
+import express, { type RequestHandler } from 'express';
+import request from 'supertest';
 import { afterAll, describe, expect, it } from 'vitest';
-import { getRouteManifest } from '../src/http';
-import { buildTestApp, testConfig } from './helpers';
+import { RouteRegistry, getRouteManifest } from '../src/http';
+import { buildTestApp, expectSessionRoutesRejectAnonymous, testConfig } from './helpers';
 
 const db = createDb({ connectionString: testConfig().DATABASE_URL });
 afterAll(async () => db.$disconnect());
@@ -83,5 +84,102 @@ describe('manifesto de rotas (gate de isolamento, ADR-0008 item 5b)', () => {
     const rogue = getRouteManifest(app).find((r) => r.path.endsWith('/x/:id'));
     expect(rogue?.path).toContain('<?>');
     expect(rogue?.auth).toBe('unclassified');
+  });
+
+  it('auth: "session" is structural: a session route registered WITHOUT requireAuth still answers 401', async () => {
+    const { app, config } = buildTestApp(db, {
+      modules: [
+        ({ routes }) => {
+          // Deliberately no requireAuth: the registry must attach it.
+          routes.get('/vault/:id', { auth: 'session' }, (req, res) => {
+            res.json({ leaked: req.auth?.ownerId ?? 'no-auth-context' });
+          });
+          routes.post('/vault', { auth: 'session' }, (_req, res) => {
+            res.json({});
+          });
+        },
+      ],
+    });
+    const checked = await expectSessionRoutesRejectAnonymous(app, config);
+    expect(checked).toEqual(
+      expect.arrayContaining(['GET /api/vault/:id', 'POST /api/vault', 'GET /api/auth/me']),
+    );
+  });
+
+  it('an explicit requireAuth on a session route is deduplicated (the guard runs once)', async () => {
+    let guardRuns = 0;
+    const registry = new RouteRegistry();
+    const router = express.Router();
+    const guard: RequestHandler = (_req, _res, next) => {
+      guardRuns += 1;
+      next();
+    };
+    registry.setSessionGuard(guard);
+    registry.group(router, '/api').get('/x', { auth: 'session' }, guard, (_req, res) => {
+      res.json({});
+    });
+    const app = express();
+    app.use(router);
+    await request(app).get('/x');
+    expect(guardRuns).toBe(1);
+  });
+
+  it('public routes never see req.auth, even if something upstream set it', async () => {
+    const seen: unknown[] = [];
+    const { app } = buildTestApp(db, {
+      modules: [
+        ({ router, routes }) => {
+          router.use((req, _res, next) => {
+            req.auth = { ownerId: 'planted' } as never;
+            next();
+          });
+          routes.get('/open', { auth: 'public' }, (req, res) => {
+            seen.push(req.auth);
+            res.json({});
+          });
+        },
+      ],
+    });
+    expect((await request(app).get('/api/open')).status).toBe(200);
+    expect(seen).toEqual([undefined]);
+  });
+
+  it('registering a public route with the session guard, or a session route before the guard exists, throws', () => {
+    const guard: RequestHandler = (_req, _res, next) => {
+      next();
+    };
+    const early = new RouteRegistry();
+    expect(() =>
+      early.group(express.Router(), '/api').get('/x', { auth: 'session' }, (_req, res) => {
+        res.json({});
+      }),
+    ).toThrow(/before the session guard/);
+
+    const registry = new RouteRegistry();
+    registry.setSessionGuard(guard);
+    expect(() =>
+      registry.group(express.Router(), '/api').get('/x', { auth: 'public' }, guard),
+    ).toThrow(/must not use the session guard/);
+    expect(() => registry.setSessionGuard(guard)).toThrow(/already set/);
+  });
+
+  it('domain modules receive no unrestricted database handle in their context', () => {
+    let context: Record<string, unknown> = {};
+    buildTestApp(db, {
+      modules: [
+        (ctx) => {
+          context = { ...ctx };
+        },
+      ],
+    });
+    expect(Object.keys(context).sort()).toEqual([
+      'config',
+      'logger',
+      'profileStore',
+      'requireAuth',
+      'router',
+      'routes',
+    ]);
+    expect(context).not.toHaveProperty('db');
   });
 });

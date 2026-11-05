@@ -44,6 +44,7 @@ export type { ProfileId } from '../../../../packages/test-fixtures/src';
 export {
   LogCapture,
   TEST_PASSWORD,
+  TEST_SIGNUP_CONSENTS,
   TestClient,
   buildTestApp,
   createTestAccount,

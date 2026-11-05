@@ -1,4 +1,5 @@
-import type { Db } from '@chameleon/db';
+import { type Db, type ProfileStore, createProfileStore } from '@chameleon/db';
+import { buildProfileSnapshot } from '@chameleon/domain';
 import express, { type Express, type RequestHandler, type Router } from 'express';
 import helmet from 'helmet';
 import type { Logger } from 'pino';
@@ -23,9 +24,17 @@ export interface ApiModuleContext {
   router: Router;
   /** Declara rotas em `/api` registrando-as no manifesto (`getRouteManifest`). */
   routes: RouteGroup;
-  /** Exigir em TODA rota privada; injeta `req.auth` (ownerId e `db.forOwner`). */
+  /**
+   * The session guard. Routes declared with `auth: 'session'` get it from the registry
+   * automatically; passing it explicitly is accepted (and deduplicated) but no longer required.
+   */
   requireAuth: RequestHandler;
-  db: Db;
+  /**
+   * Profile persistence, built by the composition root. Modules NEVER receive the unrestricted
+   * `Db` (`global`/`unsafeRaw`; ADR-0008 item 2): they use this store or `req.auth.db`, the client
+   * scoped to the authenticated owner.
+   */
+  profileStore: ProfileStore;
   logger: Logger;
   config: AppConfig;
 }
@@ -81,7 +90,7 @@ export function createApp(deps: AppDeps): Express {
 
   const auth: AuthModule = createAuthModule({
     config,
-    db,
+    authDb: db,
     logger,
     registry,
     now,
@@ -97,8 +106,9 @@ export function createApp(deps: AppDeps): Express {
   const routes = registry.group(api, '/api');
   routes.get('/health', { auth: 'public', description: 'Liveness.' }, health);
   registry.mount(api, '/auth', auth.router);
+  const profileStore = createProfileStore(db, { snapshot: buildProfileSnapshot });
   for (const mount of deps.modules ?? []) {
-    mount({ router: api, routes, requireAuth: auth.requireAuth, db, logger, config });
+    mount({ router: api, routes, requireAuth: auth.requireAuth, profileStore, logger, config });
   }
   registry.mount(app, '/api', api);
 

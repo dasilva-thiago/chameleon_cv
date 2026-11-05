@@ -78,6 +78,8 @@ export function buildTestApp(
       loginPerIpEmail: huge,
       loginPerIp: huge,
       invitePerIp: huge,
+      // Off by default so flows that fail several logins on one e-mail do not sleep.
+      loginAccountDelay: { windowMs: 60_000, freeAttempts: 0, baseDelayMs: 0, maxDelayMs: 0 },
       ...options.rateLimits,
     },
     ...(options.sessionPolicy ? { sessionPolicy: options.sessionPolicy } : {}),

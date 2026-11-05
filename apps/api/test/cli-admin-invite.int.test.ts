@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { createTestDb, type TestDb } from '@chameleon/db/testing';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { runAdminInvite } from '../src/cli/admin-invite';
-import { buildTestApp, TEST_PASSWORD, TestClient } from './helpers';
+import { buildTestApp, TEST_PASSWORD, TEST_SIGNUP_CONSENTS, TestClient } from './helpers';
 
 let testDb: TestDb;
 beforeAll(async () => {
@@ -59,6 +59,7 @@ describe('CLI admin:invite', () => {
     const response = await new TestClient(app, config).post('/api/auth/invites/accept', {
       token,
       password: TEST_PASSWORD,
+      consents: TEST_SIGNUP_CONSENTS,
     });
     expect(response.status).toBe(201);
   });
@@ -78,6 +79,7 @@ describe('CLI admin:invite', () => {
     const old = await new TestClient(app, config).post('/api/auth/invites/accept', {
       token: firstToken,
       password: TEST_PASSWORD,
+      consents: TEST_SIGNUP_CONSENTS,
     });
     expect(old.status).toBe(400);
 

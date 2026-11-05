@@ -29,9 +29,47 @@ const restrictImports = (...extraPatterns) => ({
   'no-restricted-imports': ['error', { patterns: [PRISMA_PATTERN, ...extraPatterns] }],
 });
 
-/** `$queryRaw` & cia. so existem dentro de packages/db. */
-const RAW_SQL_SELECTOR =
-  'MemberExpression[property.name=/^\\$(queryRaw|executeRaw|queryRawUnsafe|executeRawUnsafe)$/]';
+/**
+ * Restricted database access (ADR-0008 items 2 and 3). Raw SQL members (`$queryRaw*`,
+ * `$executeRaw*`, `$queryRawTyped`, `$runCommandRaw`) are reachable only from packages/db and the
+ * auth module (apps/api/src/auth/**); the unrestricted handles `unsafeRaw` and `.global` only from
+ * the same places in production code. The selectors cover plain member access, computed access with
+ * a string/template literal, optional chaining, destructuring (also with a computed or quoted key)
+ * and, best effort, dynamic keys on db-like objects (`db[k]`). The structural defense is that domain
+ * modules are never handed a `Db` (see apps/api/src/app.ts); this rule is the second line.
+ * Proven by apps/api/test/eslint-restricted-access.test.ts.
+ */
+const RAW_NAMES = '^\\$(queryRaw|executeRaw|runCommandRaw)\\w*$';
+const ACCESS_NAMES = '^(unsafeRaw|global)$';
+const DB_LIKE_OBJECT = '^(db|prisma|tx|client|unsafeRaw|.*Db|.*Client|.*Prisma)$';
+
+const restrictedNameSelectors = (names, message) => [
+  { selector: `MemberExpression[computed=false][property.name=/${names}/]`, message },
+  { selector: `MemberExpression[computed=true][property.value=/${names}/]`, message },
+  {
+    selector: `MemberExpression[computed=true][property.type='TemplateLiteral'][property.quasis.0.value.cooked=/${names}/]`,
+    message,
+  },
+  { selector: `ObjectPattern > Property[key.name=/${names}/]`, message },
+  { selector: `ObjectPattern > Property[key.value=/${names}/]`, message },
+];
+
+const RAW_SQL_SELECTORS = restrictedNameSelectors(
+  RAW_NAMES,
+  'Raw SQL ($queryRaw*/$executeRaw*/$runCommandRaw) is only allowed in packages/db and apps/api/src/auth.',
+);
+
+const UNRESTRICTED_DB_SELECTORS = [
+  ...restrictedNameSelectors(
+    ACCESS_NAMES,
+    'db.global / db.unsafeRaw bypass owner scoping: only packages/db and apps/api/src/auth may use them. Use req.auth.db (db.forOwner).',
+  ),
+  {
+    selector: `MemberExpression[computed=true][property.type='Identifier']:matches([object.name=/${DB_LIKE_OBJECT}/i], [object.property.name=/${DB_LIKE_OBJECT}/i])`,
+    message:
+      'Dynamic property access on a database client can reach global/unsafeRaw/$queryRaw: use an explicit model delegate.',
+  },
+];
 
 export default tseslint.config(
   {
@@ -72,15 +110,24 @@ export default tseslint.config(
   {
     files: SOURCE_FILES,
     ignores: ['packages/db/**'],
+    rules: restrictImports(),
+  },
+  // Raw SQL: only packages/db and the auth module.
+  {
+    files: SOURCE_FILES,
+    ignores: ['packages/db/**', 'apps/api/src/auth/**'],
+    rules: { 'no-restricted-syntax': ['error', ...RAW_SQL_SELECTORS] },
+  },
+  // Unrestricted handles (db.global / db.unsafeRaw) in production code: same allowlist. Test files
+  // may inspect the database with the unrestricted client on purpose.
+  {
+    files: [
+      'apps/*/src/**/*.{ts,tsx,js,jsx,mjs,cjs}',
+      'packages/*/src/**/*.{ts,tsx,js,jsx,mjs,cjs}',
+    ],
+    ignores: ['packages/db/**', 'apps/api/src/auth/**'],
     rules: {
-      ...restrictImports(),
-      'no-restricted-syntax': [
-        'error',
-        {
-          selector: RAW_SQL_SELECTOR,
-          message: 'SQL cru ($queryRaw/$executeRaw) so e permitido dentro de packages/db.',
-        },
-      ],
+      'no-restricted-syntax': ['error', ...RAW_SQL_SELECTORS, ...UNRESTRICTED_DB_SELECTORS],
     },
   },
 

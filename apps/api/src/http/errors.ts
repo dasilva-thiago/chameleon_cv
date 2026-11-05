@@ -30,10 +30,17 @@ export class HttpError extends Error {
 
 const REQUEST_ID_PATTERN = /^[A-Za-z0-9._-]{8,64}$/;
 
-/** Atribui `req.correlationId` (aceita X-Request-Id bem formado) e o devolve no cabecalho da resposta. */
+/**
+ * Assigns `req.correlationId`, ALWAYS generated server-side (it is written to logs and to
+ * `AuditEvent.correlationId`, so a client must not be able to choose it), and returns it in the
+ * `X-Request-Id` response header. An inbound `X-Request-Id` is kept apart as `req.clientRequestId`
+ * (charset/length limited) and only ever appears in logs, for client-side tracing.
+ */
 export const requestId: RequestHandler = (req, res, next) => {
   const incoming = req.header('x-request-id');
-  const id = incoming !== undefined && REQUEST_ID_PATTERN.test(incoming) ? incoming : randomUUID();
+  req.clientRequestId =
+    incoming !== undefined && REQUEST_ID_PATTERN.test(incoming) ? incoming : undefined;
+  const id = randomUUID();
   req.correlationId = id;
   res.setHeader('X-Request-Id', id);
   next();

@@ -7,6 +7,14 @@ import { TestClient } from './test-client';
 
 export const TEST_PASSWORD = 'correct horse battery staple';
 
+/** Policy version the test config accepts (config default `PROFILE_POLICY_VERSIONS`). */
+export const TEST_POLICY_VERSION = '2026-11.1';
+
+/** Valid `consents` for `POST /api/auth/invites/accept` (the checkbox ticked at signup). */
+export const TEST_SIGNUP_CONSENTS = [
+  { purpose: 'profile_processing', granted: true, policyVersion: TEST_POLICY_VERSION },
+] as const;
+
 export interface TestAccount {
   ownerId: string;
   email: string;
@@ -28,9 +36,16 @@ export async function createTestAccount(
   const displayName = options.displayName ?? `Conta ${options.email}`;
   const { token } = await createInvite(ctx.db, { email: options.email });
   const client = new TestClient(ctx.app, ctx.config);
-  const response = await client.post('/api/auth/invites/accept', { token, password, displayName });
+  const response = await client.post('/api/auth/invites/accept', {
+    token,
+    password,
+    displayName,
+    consents: TEST_SIGNUP_CONSENTS,
+  });
   if (response.status !== 201) {
-    throw new Error(`createTestAccount: aceite falhou (${response.status})`);
+    throw new Error(
+      `createTestAccount: accept failed (${response.status}) ${JSON.stringify(response.body)}`,
+    );
   }
   const body = response.body as AuthSessionResponse;
   return { ownerId: body.user.id, email: options.email, password, displayName, client };

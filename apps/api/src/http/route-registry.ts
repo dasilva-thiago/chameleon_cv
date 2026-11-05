@@ -12,7 +12,7 @@ export type RouteAuth = 'public' | 'session';
 export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
 export interface RouteMeta {
-  /** `session`: protegida por `requireAuth` (401 sem sessao). */
+  /** `session`: the registry attaches `requireAuth` itself (401 without a session). */
   auth: RouteAuth;
   /** Texto curto para humanos (documentacao do manifesto). */
   description?: string;
@@ -53,13 +53,27 @@ interface RouteLayer {
 export class RouteRegistry {
   private readonly meta = new Map<string, RouteMeta>();
   private readonly mounts = new WeakMap<object, string>();
+  private sessionGuard: RequestHandler | undefined;
+
+  /**
+   * Registers the middleware that resolves the session and sets `req.auth`. Called once by the auth
+   * module BEFORE any `session` route is declared. From then on `auth: 'session'` is structural: the
+   * registry itself puts the guard in front of the route handlers, so a session route cannot be
+   * registered without it (the declared meta is no longer self-asserted).
+   */
+  setSessionGuard(guard: RequestHandler): void {
+    if (this.sessionGuard !== undefined)
+      throw new Error('RouteRegistry: session guard already set.');
+    this.sessionGuard = guard;
+  }
 
   /** Cria uma API de declaracao de rotas em `target` (app ou router) sob `prefix`. */
   group(target: IRouter, prefix: string): RouteGroup {
     const define = (method: Lower): RouteDefiner => {
       return (path, meta, ...handlers) => {
-        this.meta.set(`${method.toUpperCase()} ${joinPaths(prefix, path)}`, meta);
-        target[method](path, ...handlers);
+        const template = joinPaths(prefix, path);
+        this.meta.set(`${method.toUpperCase()} ${template}`, meta);
+        target[method](path, ...this.chain(meta, template, handlers));
       };
     };
     return {
@@ -69,6 +83,33 @@ export class RouteRegistry {
       patch: define('patch'),
       delete: define('delete'),
     };
+  }
+
+  /** Handler chain for a route: template recorder, then the auth policy implied by `meta.auth`. */
+  private chain(meta: RouteMeta, template: string, handlers: RequestHandler[]): RequestHandler[] {
+    const guard = this.sessionGuard;
+    const record: RequestHandler = (_req, res, next) => {
+      res.locals.routeTemplate = template;
+      next();
+    };
+    if (meta.auth === 'session') {
+      if (guard === undefined) {
+        throw new Error(
+          `RouteRegistry: session route ${template} declared before the session guard.`,
+        );
+      }
+      // A module may still pass `requireAuth` explicitly (compat); it must not run twice.
+      return [record, guard, ...handlers.filter((handler) => handler !== guard)];
+    }
+    if (guard !== undefined && handlers.includes(guard)) {
+      throw new Error(`RouteRegistry: public route ${template} must not use the session guard.`);
+    }
+    // Public routes never see an authenticated context, whatever ran before them.
+    const strip: RequestHandler = (req, _res, next) => {
+      delete req.auth;
+      next();
+    };
+    return [record, strip, ...handlers];
   }
 
   /** Monta `router` em `parent` registrando o prefixo (necessario para o manifesto). */

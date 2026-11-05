@@ -1,7 +1,7 @@
 import { createTestDb, type TestDb } from '@chameleon/db/testing';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createInvite } from '../src/auth/invites';
-import { buildTestApp, TestClient } from './helpers';
+import { buildTestApp, createTestAccount, TEST_SIGNUP_CONSENTS, TestClient } from './helpers';
 
 let testDb: TestDb;
 beforeAll(async () => {
@@ -34,7 +34,7 @@ describe('logs nao contem segredos nem dados pessoais (canarios)', () => {
       token: inviteToken,
       password: CANARY.password,
       displayName: CANARY.displayName,
-      consents: [{ purpose: 'profile_processing', granted: true, policyVersion: 'v1' }],
+      consents: TEST_SIGNUP_CONSENTS,
     });
     expect(accepted.status).toBe(201);
     const sessionToken = client.sessionToken ?? '';
@@ -101,5 +101,78 @@ describe('logs nao contem segredos nem dados pessoais (canarios)', () => {
     const failed = logs.lines().find((l) => l.event === 'auth.login.failed');
     expect(failed).toBeDefined();
     expect(JSON.stringify(failed)).not.toContain('canary');
+  });
+});
+
+describe('correlation id and logged path (F8, F9)', () => {
+  it('the correlation id is server-generated: audit rows and logs never take the client X-Request-Id', async () => {
+    const { app, config, logs } = buildTestApp(testDb.db);
+    const account = await createTestAccount(
+      { app, config, db: testDb.db },
+      { email: 'trace@example.test' },
+    );
+    logs.clear();
+    const chosen = 'attacker-chosen-id-1234';
+    const login = await new TestClient(app, config).post(
+      '/api/auth/login',
+      { email: account.email, password: account.password },
+      { headers: { 'X-Request-Id': chosen } },
+    );
+    expect(login.status).toBe(200);
+    const issued = String(login.headers['x-request-id']);
+    expect(issued).not.toBe(chosen);
+
+    const audit = await testDb.sql<{ correlationId: string }>(
+      `SELECT "correlationId" FROM "AuditEvent" WHERE action = 'auth.login' AND "ownerId" = $1`,
+      [account.ownerId],
+    );
+    expect(audit.rows).toEqual([{ correlationId: issued }]);
+
+    const access = logs
+      .lines()
+      .find((line) => (line.req as { path?: string } | undefined)?.path === '/api/auth/login');
+    expect(access).toMatchObject({ reqId: issued, clientRequestId: chosen });
+    // A malformed inbound id is dropped, not logged.
+    logs.clear();
+    await new TestClient(app, config).get('/api/auth/me', {
+      headers: { 'X-Request-Id': 'bad id with <spaces>' },
+    });
+    const dropped = logs.lines().find((line) => line.msg === 'request completed');
+    expect(dropped?.clientRequestId).toBeUndefined();
+    expect(logs.text()).not.toContain('bad id with');
+  });
+
+  it('logs the matched route template, never the raw path, and <unmatched> for unknown routes', async () => {
+    const secretId = '5c1f0a52-6f43-4c0e-9d5a-3b7c8c1e4f77';
+    const { app, config, logs } = buildTestApp(testDb.db, {
+      modules: [
+        ({ routes }) => {
+          routes.get('/things/:thingId', { auth: 'public' }, (_req, res) => {
+            res.json({});
+          });
+        },
+      ],
+    });
+    const client = new TestClient(app, config);
+    await client.get(`/api/things/${secretId}?q=CANARY-QUERY`);
+    await client.get(`/api/unknown/${secretId}/CANARY-PATH`);
+    await client.get(`/api/auth/me`);
+    await client.post('/api/auth/login', { email: 'x@example.test', password: 'whatever long' });
+
+    const paths = logs
+      .lines()
+      .filter((line) => line.msg === 'request completed' || line.msg === 'request failed')
+      .map((line) => (line.req as { path: string }).path);
+    expect(paths).toEqual(
+      expect.arrayContaining([
+        '/api/things/:thingId',
+        '<unmatched>',
+        '/api/auth/me',
+        '/api/auth/login',
+      ]),
+    );
+    expect(logs.text()).not.toContain(secretId);
+    expect(logs.text()).not.toContain('CANARY-PATH');
+    expect(logs.text()).not.toContain('CANARY-QUERY');
   });
 });

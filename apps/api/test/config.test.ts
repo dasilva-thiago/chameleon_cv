@@ -6,6 +6,8 @@ const VALID = {
   APP_ORIGIN: 'http://localhost:5173',
 };
 
+const PROD = { ...VALID, NODE_ENV: 'production', APP_ORIGIN: 'https://cv.example.test' };
+
 describe('loadConfig', () => {
   it('aplica defaults compativeis com .env.example', () => {
     const config = loadConfig(VALID);
@@ -58,9 +60,37 @@ describe('loadConfig', () => {
   it('producao exige https (cookies Secure com prefixo __Host-)', () => {
     expect(() => loadConfig({ ...VALID, NODE_ENV: 'production' })).toThrow(/APP_ORIGIN/);
     expect(
-      loadConfig({ ...VALID, NODE_ENV: 'production', APP_ORIGIN: 'https://cv.example.test' })
-        .APP_ORIGIN,
+      loadConfig({ ...PROD, APP_ORIGIN: 'https://cv.example.test', TRUST_PROXY: '1' }).APP_ORIGIN,
     ).toBe('https://cv.example.test');
+  });
+
+  it('production with TRUST_PROXY=0 is rejected unless TRUST_PROXY_ACK_DIRECT=true documents a direct deployment', () => {
+    expect(() => loadConfig(PROD)).toThrow(/TRUST_PROXY/);
+    expect(() => loadConfig({ ...PROD, TRUST_PROXY: '0' })).toThrow(/TRUST_PROXY/);
+    expect(loadConfig({ ...PROD, TRUST_PROXY: '1' }).TRUST_PROXY).toBe(1);
+    expect(loadConfig({ ...PROD, TRUST_PROXY_ACK_DIRECT: 'true' }).TRUST_PROXY_ACK_DIRECT).toBe(
+      true,
+    );
+    // The opt-out is meaningless (and contradictory) together with a trusted proxy count.
+    expect(() => loadConfig({ ...PROD, TRUST_PROXY: '1', TRUST_PROXY_ACK_DIRECT: 'true' })).toThrow(
+      /TRUST_PROXY_ACK_DIRECT/,
+    );
+    // Development and test keep the default of 0 without any opt-out.
+    expect(loadConfig(VALID).TRUST_PROXY).toBe(0);
+    expect(loadConfig({ ...VALID, NODE_ENV: 'test' }).TRUST_PROXY_ACK_DIRECT).toBe(false);
+  });
+
+  it('PROFILE_POLICY_VERSIONS: defaults to the version shown by the web app; accepts a list; rejects bad values', () => {
+    expect(loadConfig(VALID).PROFILE_POLICY_VERSIONS).toEqual(['2026-11.1']);
+    expect(
+      loadConfig({ ...VALID, PROFILE_POLICY_VERSIONS: ' 2026-11.1 , 2027-01.0 ' })
+        .PROFILE_POLICY_VERSIONS,
+    ).toEqual(['2026-11.1', '2027-01.0']);
+    for (const bad of ['', ' , ', 'has space', 'a;b', 'x'.repeat(65)]) {
+      expect(() => loadConfig({ ...VALID, PROFILE_POLICY_VERSIONS: bad }), bad).toThrow(
+        /PROFILE_POLICY_VERSIONS/,
+      );
+    }
   });
 
   it('http so e aceito em loopback (desenvolvimento)', () => {

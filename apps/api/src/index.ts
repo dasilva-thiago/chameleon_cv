@@ -6,3 +6,4 @@ export { getRouteManifest } from './http';
 export type { RouteManifestEntry } from './http';
 export { requireAuthContext } from './auth';
 export type { AuthContext } from './auth';
+export { hasGrantedConsent } from './consent';

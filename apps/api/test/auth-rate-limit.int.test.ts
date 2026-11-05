@@ -2,7 +2,13 @@ import { apiErrorBodySchema } from '@chameleon/contracts';
 import { createTestDb, type TestDb } from '@chameleon/db/testing';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { createInvite } from '../src/auth/invites';
-import { buildTestApp, createTestAccount, TEST_PASSWORD, TestClient } from './helpers';
+import {
+  buildTestApp,
+  createTestAccount,
+  TEST_PASSWORD,
+  TEST_SIGNUP_CONSENTS,
+  TestClient,
+} from './helpers';
 
 let testDb: TestDb;
 beforeAll(async () => {
@@ -143,6 +149,7 @@ describe('rate limit de convite (ADR-0009: 10 por hora por IP; aqui 3)', () => {
         await client.post('/api/auth/invites/accept', {
           token,
           password: TEST_PASSWORD,
+          consents: TEST_SIGNUP_CONSENTS,
         })
       ).status,
     ).toBe(201);
