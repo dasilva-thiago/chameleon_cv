@@ -8,6 +8,7 @@ import { Button } from '../../components/ui/Button';
 import { LoadingStatus } from '../../components/ui/LoadingStatus';
 import { SelectField } from '../../components/ui/SelectField';
 import { isApiError, messageForError } from '../../lib/api';
+import { AnalysisSection } from './AnalysisSection';
 import { primaryLinkClass } from './JobsPage';
 import { JOB_STATUS_LABELS, JOB_WORK_MODE_LABELS, STATUS_OPTIONS, UNTITLED_JOB } from './labels';
 import { useDeleteJob, useJob, usePatchJob } from './queries';
@@ -169,6 +170,8 @@ function JobView({ job }: { job: JobDetail }) {
           {job.description}
         </pre>
       </section>
+
+      <AnalysisSection jobId={job.id} />
 
       <div>
         <Link to="/vagas" className={secondaryLinkClass}>

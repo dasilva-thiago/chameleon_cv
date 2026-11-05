@@ -68,6 +68,11 @@ function listBody(jobs: JobDetail[], total = jobs.length) {
 function loggedIn(): FakeApi {
   const fake = new FakeApi().install();
   fake.session = makeSession();
+  // the detail page also asks for the (still empty) analysis
+  fake.on(
+    `GET /api/jobs/${JOB_ID}/analysis`,
+    jsonResponse(200, { analysis: null, stale: false, staleBecause: [] }),
+  );
   return fake;
 }
 

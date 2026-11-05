@@ -1,15 +1,22 @@
 import {
+  analysisStateResponseSchema,
   createJobRequestSchema,
   deleteJobResponseSchema,
   jobResponseSchema,
   listJobsResponseSchema,
+  patchAnalysisReviewRequestSchema,
   patchJobRequestSchema,
+  runAnalysisRequestSchema,
+  runAnalysisResponseSchema,
+  type AnalysisReview,
+  type AnalysisStateResponse,
   type CreateJobRequest,
   type DeleteJobResponse,
   type JobResponse,
   type ListJobsQuery,
   type ListJobsResponse,
   type PatchJobRequest,
+  type RunAnalysisResponse,
 } from '@chameleon/contracts';
 import { createApiClient, type ApiClient } from './client';
 import { validated } from './validated';
@@ -28,6 +35,9 @@ export interface JobsApi {
   create(input: CreateJobRequest): Promise<JobResponse>;
   patch(id: string, input: PatchJobRequest): Promise<JobResponse>;
   remove(id: string): Promise<DeleteJobResponse>;
+  getAnalysis(id: string, signal?: AbortSignal): Promise<AnalysisStateResponse>;
+  runAnalysis(id: string, force?: boolean): Promise<RunAnalysisResponse>;
+  saveReview(id: string, review: AnalysisReview): Promise<AnalysisStateResponse>;
 }
 
 export function createJobsApi(client: ApiClient): JobsApi {
@@ -50,6 +60,22 @@ export function createJobsApi(client: ApiClient): JobsApi {
       return client.patch(`${BASE}/${idPath(id)}`, { body, schema: jobResponseSchema });
     },
     remove: (id) => client.delete(`${BASE}/${idPath(id)}`, { schema: deleteJobResponseSchema }),
+    getAnalysis: (id, signal) =>
+      client.get(`${BASE}/${idPath(id)}/analysis`, { schema: analysisStateResponseSchema, signal }),
+    runAnalysis(id, force = false) {
+      const body = validated(runAnalysisRequestSchema, { force });
+      return client.post(`${BASE}/${idPath(id)}/analysis`, {
+        body,
+        schema: runAnalysisResponseSchema,
+      });
+    },
+    saveReview(id, review) {
+      const body = validated(patchAnalysisReviewRequestSchema, { review });
+      return client.patch(`${BASE}/${idPath(id)}/analysis/review`, {
+        body,
+        schema: analysisStateResponseSchema,
+      });
+    },
   };
 }
 

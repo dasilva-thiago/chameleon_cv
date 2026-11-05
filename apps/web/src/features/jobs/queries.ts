@@ -1,4 +1,9 @@
-import type { CreateJobRequest, ListJobsQuery, PatchJobRequest } from '@chameleon/contracts';
+import type {
+  AnalysisReview,
+  CreateJobRequest,
+  ListJobsQuery,
+  PatchJobRequest,
+} from '@chameleon/contracts';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { jobsApi } from '../../lib/api';
 
@@ -39,3 +44,20 @@ export const usePatchJob = () =>
   );
 
 export const useDeleteJob = () => useJobMutation((id: string) => jobsApi.remove(id));
+
+export function useAnalysis(jobId: string) {
+  return useQuery({
+    queryKey: [...JOBS_KEY, 'analysis', jobId],
+    queryFn: ({ signal }) => jobsApi.getAnalysis(jobId, signal),
+  });
+}
+
+export const useRunAnalysis = () =>
+  useJobMutation((vars: { id: string; force?: boolean }) =>
+    jobsApi.runAnalysis(vars.id, vars.force ?? false),
+  );
+
+export const useSaveReview = () =>
+  useJobMutation((vars: { id: string; review: AnalysisReview }) =>
+    jobsApi.saveReview(vars.id, vars.review),
+  );

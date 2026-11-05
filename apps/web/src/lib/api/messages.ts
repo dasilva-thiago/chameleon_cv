@@ -38,6 +38,7 @@ const MESSAGES: Record<ApiErrorKind, string> = {
     'O perfil foi alterado por outra ação ao mesmo tempo. Recarregue os dados e tente de novo.',
   RECORD_IN_USE:
     'Este item não pode ser excluído porque outros itens dependem dele. Remova o vínculo e tente de novo.',
+  PROFILE_REQUIRED: 'Cadastre ou importe o seu perfil profissional antes de analisar uma vaga.',
   INTERNAL_ERROR: 'Ocorreu um erro inesperado. Tente novamente em instantes.',
   NETWORK: 'Não foi possível conectar ao servidor. Verifique sua conexão e tente novamente.',
   TIMEOUT: 'O servidor demorou a responder. Tente novamente.',
