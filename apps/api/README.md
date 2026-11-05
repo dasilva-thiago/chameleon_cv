@@ -270,6 +270,37 @@ gap. Only confirmed, resume-allowed, non-private facts count as usable evidence.
 Tests: `test/job-analysis.int.test.ts`, `packages/domain/test/matching.test.ts`, `tests/matching/matching-fixtures.test.ts`
 (all synthetic job x profile fixtures, including the prompt-injection posting).
 
+### Resumes (P3/P4): `/api/jobs/:jobId/resumes` and `/api/resumes/**`
+
+Generation is deterministic and local (`generateResume`, `@chameleon/domain`): every line is copied verbatim from a
+confirmed, resume-allowed, non-private profile fact and carries that fact's id (`sourceIds`); the job analysis (plan +
+owner review) only decides what shows first, what is hidden and what is forced. Nothing is paraphrased or invented; what
+does not fit is left out and reported in `notes`. Generating freezes the profile in an immutable `pre_generation`
+revision. A version is `draft` (editable) or `approved` (immutable in the API and by a database trigger); editing an
+approved version, or recovering an old one, means copying it into a NEW draft. All routes need the `profile_processing`
+consent.
+
+| Method               | Path                                                                 | What                                                                                                                                                          |
+| -------------------- | -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| POST                 | `/api/jobs/:jobId/resumes`                                           | Generate resume + version 1 (draft). Runs/reuses the job analysis; `409 PROFILE_REQUIRED` without a profile. Returns `notes`                                  |
+| GET                  | `/api/jobs/:jobId/resumes`                                           | Resumes of the job with their versions (newest first, no content)                                                                                             |
+| GET / PATCH / DELETE | `/api/resumes/:resumeId`                                             | Read / rename / delete (all versions)                                                                                                                         |
+| GET                  | `/api/resumes/:resumeId/versions/:versionId`                         | Content + factuality issues (drafts: against the current profile; approved: against the frozen revision)                                                      |
+| PUT                  | `/api/resumes/:resumeId/versions/:versionId`                         | Replace a DRAFT's content. Edited text is re-marked `edited`, new bullets `added` (a client cannot claim `generated`). `409 VERSION_APPROVED` on approved     |
+| POST                 | `/api/resumes/:resumeId/versions/:versionId/approve`                 | Approve: every item needs confirmed sources in the CURRENT profile (`409 RESUME_INVALID` + details); warnings (terms/numbers not in the sources) do not block |
+| POST                 | `/api/resumes/:resumeId/versions`                                    | New draft copied from `fromVersionId`                                                                                                                         |
+| GET                  | `/api/resumes/:resumeId/versions/:versionId/export?format=docx\|pdf` | Download an APPROVED version (`409 VERSION_NOT_APPROVED`); one export at a time; `503 EXPORT_UNAVAILABLE` if no browser for the PDF                           |
+
+Export (`@chameleon/documents`): one `RenderModel` feeds the DOCX (`docx`: native styles, one column, real bullet list and
+hyperlinks, no tables/images) and the PDF (escaped HTML printed by Chromium through `playwright-core`, JavaScript and
+network disabled). `PDF_BROWSER=chrome` and `PDF_BROWSER_PATH=<binary>` choose the browser; by default the Playwright
+Chromium, then Chrome, then Edge. File name: `<Name>_<Title>_<Company>_<YYYYMMDD>.<ext>` (ASCII). Files are not stored: they
+are rendered again from the approved content (its hash is verified first), and the audit event records format, version and
+hash only.
+
+Tests: `test/resumes.int.test.ts`, `packages/domain/test/resume.test.ts`, `packages/documents/test/documents.test.ts`,
+`packages/db/test/resume-version.int.test.ts`, isolation case `resumes.api/cross-owner-behaves-like-not-found`.
+
 Tests: `test/jobs.int.test.ts` (CRUD, validation, search, ownership, anonymous) and the isolation case
 `jobs.api/cross-owner-behaves-like-not-found`.
 

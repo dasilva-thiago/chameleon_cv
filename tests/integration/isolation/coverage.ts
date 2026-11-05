@@ -15,6 +15,8 @@ const PROFILE_CASE = 'profile.api/cross-owner-behaves-like-not-found';
 
 /** P1: one A x B case covers the whole jobs module (see cross-cases.ts). */
 const JOBS_CASE = 'jobs.api/cross-owner-behaves-like-not-found';
+/** P3/P4: one A x B case covers the resumes routes (see cross-cases.ts). */
+const RESUMES_CASE = 'resumes.api/cross-owner-behaves-like-not-found';
 
 export const ROUTE_COVERAGE: CoverageMap = {
   'GET /api/jobs': { kind: 'cross-case', caseId: JOBS_CASE },
@@ -22,6 +24,22 @@ export const ROUTE_COVERAGE: CoverageMap = {
   'GET /api/jobs/:jobId': { kind: 'cross-case', caseId: JOBS_CASE },
   'PATCH /api/jobs/:jobId': { kind: 'cross-case', caseId: JOBS_CASE },
   'DELETE /api/jobs/:jobId': { kind: 'cross-case', caseId: JOBS_CASE },
+  'POST /api/jobs/:jobId/resumes': { kind: 'cross-case', caseId: RESUMES_CASE },
+  'GET /api/jobs/:jobId/resumes': { kind: 'cross-case', caseId: RESUMES_CASE },
+  'GET /api/resumes/:resumeId': { kind: 'cross-case', caseId: RESUMES_CASE },
+  'PATCH /api/resumes/:resumeId': { kind: 'cross-case', caseId: RESUMES_CASE },
+  'DELETE /api/resumes/:resumeId': { kind: 'cross-case', caseId: RESUMES_CASE },
+  'GET /api/resumes/:resumeId/versions/:versionId': { kind: 'cross-case', caseId: RESUMES_CASE },
+  'PUT /api/resumes/:resumeId/versions/:versionId': { kind: 'cross-case', caseId: RESUMES_CASE },
+  'POST /api/resumes/:resumeId/versions/:versionId/approve': {
+    kind: 'cross-case',
+    caseId: RESUMES_CASE,
+  },
+  'GET /api/resumes/:resumeId/versions/:versionId/export': {
+    kind: 'cross-case',
+    caseId: RESUMES_CASE,
+  },
+  'POST /api/resumes/:resumeId/versions': { kind: 'cross-case', caseId: RESUMES_CASE },
   'GET /api/jobs/:jobId/analysis': { kind: 'cross-case', caseId: JOBS_CASE },
   'POST /api/jobs/:jobId/analysis': { kind: 'cross-case', caseId: JOBS_CASE },
   'PATCH /api/jobs/:jobId/analysis/review': { kind: 'cross-case', caseId: JOBS_CASE },

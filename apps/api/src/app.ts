@@ -18,6 +18,7 @@ import {
 } from './http';
 import { createHttpLogger } from './logging';
 import { createJobsModule } from './modules/jobs';
+import { createResumesModule } from './modules/resumes';
 import {
   type ProfilesModuleOptions,
   createProfilesModule,
@@ -130,6 +131,7 @@ export function createApp(deps: AppDeps): Express {
   };
   createProfilesModule({ now, ...deps.profiles })(moduleContext);
   createJobsModule()(moduleContext);
+  createResumesModule()(moduleContext);
   for (const mount of deps.modules ?? []) mount(moduleContext);
   registry.mount(app, '/api', api);
 

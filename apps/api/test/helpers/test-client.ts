@@ -15,6 +15,19 @@ export interface RequestOptions {
   /** `false` nao envia nenhum cookie (simula cliente sem sessao). */
   cookies?: boolean;
   headers?: Record<string, string>;
+  /** Le o corpo como `Buffer` (downloads DOCX/PDF). */
+  binary?: boolean;
+}
+
+function binaryParser(
+  res: NodeJS.ReadableStream,
+  callback: (error: Error | null, body: Buffer) => void,
+): void {
+  const chunks: Buffer[] = [];
+  res.on('data', (chunk: Buffer) => chunks.push(chunk));
+  res.on('end', () => {
+    callback(null, Buffer.concat(chunks));
+  });
 }
 
 /**
@@ -79,6 +92,7 @@ export class TestClient {
       if (csrf !== null && csrf !== undefined) req = req.set('X-CSRF-Token', csrf);
     }
     for (const [name, value] of Object.entries(options.headers ?? {})) req = req.set(name, value);
+    if (options.binary === true) req = req.buffer(true).parse(binaryParser as never);
     const response = await (body === undefined ? req : req.send(body as object));
     this.capture(response);
     return response;

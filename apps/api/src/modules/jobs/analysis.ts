@@ -4,19 +4,19 @@ import {
   analysisReviewSchema,
   patchAnalysisReviewRequestSchema,
   runAnalysisRequestSchema,
-  type AnalysisResult,
   type AnalysisReview,
   type AnalysisStateResponse,
   type JobAnalysis,
   type RunAnalysisResponse,
 } from '@chameleon/contracts';
-import { MATCHER_VERSION, analyzeJob, hashProfileDocument } from '@chameleon/domain';
+import { hashProfileDocument } from '@chameleon/domain';
 import type { Request } from 'express';
 import type { ApiModuleContext } from '../../app';
 import { requireAuthContext, type AuthContext } from '../../auth/context';
 import { HttpError } from '../../http/errors';
 import { notFound, parseDto, uuidParam } from '../profiles/errors';
 import { requireProfileConsent } from '../profiles/gate';
+import { analyzeOrReuse } from './analysis-core';
 import { bindProfileStore } from '../profiles/scope';
 
 interface AnalysisRow {
@@ -136,46 +136,21 @@ export function registerAnalysisRoutes(context: ApiModuleContext): void {
           'Cadastre ou importe o perfil profissional antes de analisar uma vaga.',
         );
       }
-      const key = {
-        jobId: job.id,
-        descriptionHash: job.descriptionHash,
+      const { row, reused, created } = await analyzeOrReuse(
+        auth,
+        req,
+        job,
+        document,
         profileHash,
-        engineVersion: MATCHER_VERSION,
-      };
-      const existing = await auth.db.jobAnalysis.findFirst({ where: key });
-      if (existing && !body.force) {
-        const response: RunAnalysisResponse = {
-          ...stateOf(existing, job, profileHash),
-          reused: true,
-        };
+        body.force,
+      );
+      if (reused) {
+        const response: RunAnalysisResponse = { ...stateOf(row, job, profileHash), reused: true };
         res.json(response);
         return;
       }
-
-      const result: AnalysisResult = analysisResultSchema.parse(
-        analyzeJob(job.description, document),
-      );
-      const row = existing
-        ? await auth.db.jobAnalysis.update({ where: { id: existing.id }, data: { result } })
-        : await auth.db.jobAnalysis.create({
-            data: {
-              ownerId: auth.ownerId,
-              ...key,
-              engine: result.engine,
-              result,
-              review: EMPTY_REVIEW,
-            },
-          });
-      if (job.status === 'saved') {
-        await auth.db.jobPosting.update({ where: { id: job.id }, data: { status: 'analyzed' } });
-      }
-      await audit(auth, req, 'job.analyze', row.id, {
-        engineVersion: MATCHER_VERSION,
-        requirements: result.summary.requirements,
-        forced: body.force,
-      });
       const response: RunAnalysisResponse = { ...stateOf(row, job, profileHash), reused: false };
-      res.status(existing ? 200 : 201).json(response);
+      res.status(created ? 201 : 200).json(response);
     },
   );
 

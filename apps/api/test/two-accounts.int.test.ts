@@ -95,7 +95,10 @@ describe('requireAuth injeta ownerId e db.forOwner (duas contas)', () => {
     // the profile (S2.1a) and jobs (P1) modules are covered by the isolation gate; this test is about the probe module
     const withParam = getRouteManifest(app).filter(
       (r) =>
-        r.hasResourceParam && !r.path.startsWith('/api/profile') && !r.path.startsWith('/api/jobs'),
+        r.hasResourceParam &&
+        !r.path.startsWith('/api/profile') &&
+        !r.path.startsWith('/api/jobs') &&
+        !r.path.startsWith('/api/resumes'),
     );
     expect(withParam.map((r) => `${r.method} ${r.path}`)).toEqual(['GET /api/probe/:sessionId']);
     expect(withParam[0]).toMatchObject({ auth: 'session', resourceParams: ['sessionId'] });

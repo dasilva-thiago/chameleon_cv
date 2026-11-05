@@ -100,6 +100,94 @@ const activeSessions = async (world: World, ownerId: string): Promise<number> =>
   world.testDb.db.forOwner(ownerId).session.count({ where: { revokedAt: null } });
 
 export const CROSS_CASES: Record<string, CrossCase> = {
+  'resumes.api/cross-owner-behaves-like-not-found': {
+    description:
+      'P3/P4: B com os ids da vaga, do curriculo e da versao de A recebe o MESMO status e corpo que para ids ' +
+      'inexistentes ou malformados em toda rota de curriculos (listar, ler, renomear, editar, aprovar, copiar, ' +
+      'exportar, excluir); nada em A muda.',
+    routes: [
+      'POST /api/jobs/:jobId/resumes',
+      'GET /api/jobs/:jobId/resumes',
+      'GET /api/resumes/:resumeId',
+      'PATCH /api/resumes/:resumeId',
+      'DELETE /api/resumes/:resumeId',
+      'GET /api/resumes/:resumeId/versions/:versionId',
+      'PUT /api/resumes/:resumeId/versions/:versionId',
+      'POST /api/resumes/:resumeId/versions/:versionId/approve',
+      'GET /api/resumes/:resumeId/versions/:versionId/export',
+      'POST /api/resumes/:resumeId/versions',
+    ],
+    async run(ctx) {
+      const pair = await ctx.pair('resumes-api');
+      const a = ctx.http(pair.a.client);
+      const b = ctx.http(pair.b.client);
+      const GHOST = '00000000-0000-4000-8000-000000000000';
+      const CANARY = 'CANARY-RESUME-OF-A-5d1e2';
+
+      const job = bodyOf(
+        await a.post('/api/jobs', { description: `Vaga ${CANARY}`, company: CANARY }),
+      );
+      const jobId = (job.job as { id: string }).id;
+      const created = await a.post(`/api/jobs/${jobId}/resumes`, {});
+      expect(created.status, JSON.stringify(created.body).slice(0, 200)).toBe(201);
+      const resumeId = (bodyOf(created).resume as { id: string }).id;
+      const versionId = (bodyOf(created).version as { id: string; content: unknown }).id;
+      const content = (bodyOf(created).version as { content: unknown }).content;
+      // positive controls: the owner reads and lists its own
+      expect((await a.get(`/api/resumes/${resumeId}`)).status).toBe(200);
+      expect((await a.get(`/api/jobs/${jobId}/resumes`)).status).toBe(200);
+      expect((await a.get(`/api/resumes/${resumeId}/versions/${versionId}`)).status).toBe(200);
+      const copied = await a.post(`/api/resumes/${resumeId}/versions`, {
+        fromVersionId: versionId,
+      });
+      expect(copied.status).toBe(201);
+
+      const before = await stableState(ctx.world, pair.a);
+      const beforeB = await stableState(ctx.world, pair.b);
+
+      /** The victim ids in a URL, a missing id and garbage must be indistinguishable for B. */
+      async function indistinguishable(
+        label: string,
+        request: (ids: { job: string; resume: string; version: string }) => Promise<TestResponse>,
+      ): Promise<void> {
+        const crossed = await request({ job: jobId, resume: resumeId, version: versionId });
+        const ghost = await request({ job: GHOST, resume: GHOST, version: GHOST });
+        const garbage = await request({ job: 'x', resume: 'x', version: 'x' });
+        for (const response of [crossed, ghost, garbage]) ctx.observe(pair.b, response);
+        expect(crossed.status, label).toBe(404);
+        expect(errorShape(crossed), label).toEqual(errorShape(ghost));
+        expect(errorShape(garbage), label).toEqual(errorShape(ghost));
+        expect(crossed.headers['content-length'], label).toBe(ghost.headers['content-length']);
+      }
+      const versionPath = (i: { resume: string; version: string }): string =>
+        `/api/resumes/${i.resume}/versions/${i.version}`;
+      await indistinguishable('POST resume', (i) => b.post(`/api/jobs/${i.job}/resumes`, {}));
+      await indistinguishable('GET resumes of job', (i) => b.get(`/api/jobs/${i.job}/resumes`));
+      await indistinguishable('GET resume', (i) => b.get(`/api/resumes/${i.resume}`));
+      await indistinguishable('PATCH resume', (i) =>
+        b.patch(`/api/resumes/${i.resume}`, { name: 'CANARY-ATTACK-by-B' }),
+      );
+      await indistinguishable('GET version', (i) => b.get(versionPath(i)));
+      await indistinguishable('PUT version', (i) => b.put(versionPath(i), { content }));
+      await indistinguishable('approve', (i) => b.post(`${versionPath(i)}/approve`, {}));
+      await indistinguishable('export docx', (i) => b.get(`${versionPath(i)}/export?format=docx`));
+      await indistinguishable('export pdf', (i) => b.get(`${versionPath(i)}/export?format=pdf`));
+      await indistinguishable('copy version', (i) =>
+        b.post(`/api/resumes/${i.resume}/versions`, { fromVersionId: i.version }),
+      );
+      await indistinguishable('DELETE resume', (i) => b.delete(`/api/resumes/${i.resume}`));
+
+      expect(await stableState(ctx.world, pair.a)).toEqual(before);
+      expect(await stableState(ctx.world, pair.b)).toEqual(beforeB);
+      const still = bodyOf(await a.get(`/api/resumes/${resumeId}`)).resume as {
+        name: string;
+        versions: unknown[];
+      };
+      expect(still.name).not.toContain('ATTACK');
+      expect(still.versions).toHaveLength(2);
+    },
+  },
+
   'jobs.api/cross-owner-behaves-like-not-found': {
     description:
       'P1: B com o id de uma vaga de A recebe o MESMO status e corpo que para um id inexistente ou malformado ' +
