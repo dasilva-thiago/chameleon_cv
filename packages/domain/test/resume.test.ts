@@ -210,6 +210,20 @@ describe('generateResume', () => {
     expect(out.notes.join(' ')).toMatch(/resumo foi omitido/i);
   });
 
+  it('a profile with many skills still yields a valid document (skills are capped, not rejected)', () => {
+    const many = profile({
+      skills: Array.from({ length: 40 }, (_, n) => ({
+        id: id(500 + n),
+        name: `Skill ${String(n)}`,
+        meta: confirmed,
+      })),
+      skill_usages: [],
+    });
+    const out = generate(many).content;
+    expect(() => resumeContentSchema.parse(out)).not.toThrow();
+    expect(bulletsOf(out, 'skills')).toHaveLength(20);
+  });
+
   it('an empty profile yields no sections and says why', () => {
     const empty = generate(parseProfileDocument({ schema_version: '2.1.0', profile: {} }));
     expect(empty.content.sections).toEqual([]);

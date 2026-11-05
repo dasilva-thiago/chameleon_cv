@@ -11,7 +11,7 @@ export const RESUME_LIMITS = {
   line: 200,
   period: 60,
   bulletText: 600,
-  bulletsPerEntry: 12,
+  bulletsPerEntry: 24,
   entriesPerSection: 30,
   sections: 10,
   sourcesPerItem: 12,
