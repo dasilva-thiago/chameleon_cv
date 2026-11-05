@@ -100,6 +100,75 @@ const activeSessions = async (world: World, ownerId: string): Promise<number> =>
   world.testDb.db.forOwner(ownerId).session.count({ where: { revokedAt: null } });
 
 export const CROSS_CASES: Record<string, CrossCase> = {
+  'jobs.api/cross-owner-behaves-like-not-found': {
+    description:
+      'P1: B com o id de uma vaga de A recebe o MESMO status e corpo que para um id inexistente ou malformado ' +
+      '(ler, editar, excluir); a listagem e a busca de B nunca trazem a vaga de A e nada em A muda.',
+    routes: [
+      'GET /api/jobs',
+      'POST /api/jobs',
+      'GET /api/jobs/:jobId',
+      'PATCH /api/jobs/:jobId',
+      'DELETE /api/jobs/:jobId',
+    ],
+    async run(ctx) {
+      const pair = await ctx.pair('jobs-api');
+      const a = ctx.http(pair.a.client);
+      const b = ctx.http(pair.b.client);
+      const GHOST = '00000000-0000-4000-8000-000000000000';
+      const CANARY = 'CANARY-JOB-OF-A-7f3c9';
+
+      const created = await a.post('/api/jobs', {
+        description: `Vaga ${CANARY}`,
+        company: CANARY,
+        notes: CANARY,
+      });
+      expect(created.status).toBe(201);
+      const victim = (bodyOf(created).job as { id: string }).id;
+      expect((await a.get(`/api/jobs/${victim}`)).status).toBe(200);
+
+      const before = await stableState(ctx.world, pair.a);
+      const beforeB = await stableState(ctx.world, pair.b);
+
+      async function indistinguishable(
+        label: string,
+        request: (id: string) => Promise<TestResponse>,
+      ): Promise<void> {
+        const crossed = await request(victim);
+        const ghost = await request(GHOST);
+        const garbage = await request('nao-e-um-uuid');
+        for (const response of [crossed, ghost, garbage]) ctx.observe(pair.b, response);
+        expect(crossed.status, label).toBe(404);
+        expect(errorShape(crossed), label).toEqual(errorShape(ghost));
+        expect(errorShape(garbage), label).toEqual(errorShape(ghost));
+        expect(crossed.headers['content-length'], label).toBe(ghost.headers['content-length']);
+      }
+      await indistinguishable('GET job', (id) => b.get(`/api/jobs/${id}`));
+      await indistinguishable('PATCH job', (id) =>
+        b.patch(`/api/jobs/${id}`, { status: 'archived', notes: 'CANARY-ATTACK-by-B' }),
+      );
+      await indistinguishable('DELETE job', (id) => b.delete(`/api/jobs/${id}`));
+
+      // B cannot claim ownership at creation, and its list/search never shows A's job
+      const forged = await b.post('/api/jobs', { description: 'x', ownerId: pair.a.ownerId });
+      ctx.observe(pair.b, forged);
+      expect(forged.status).toBe(400);
+      for (const query of ['', '?status=all', `?status=all&q=${CANARY}`]) {
+        const listed = await b.get(`/api/jobs${query}`);
+        ctx.observe(pair.b, listed);
+        expect(listed.status).toBe(200);
+        expect(JSON.stringify(listed.body)).not.toContain(CANARY);
+      }
+
+      expect(await stableState(ctx.world, pair.a)).toEqual(before);
+      // B only wrote its own audit rows/sessions; nothing of B's profile data changed
+      expect(await stableState(ctx.world, pair.b)).toEqual(beforeB);
+      // counts alone would not show an edit: A's job is still exactly what A saved
+      const still = bodyOf(await a.get(`/api/jobs/${victim}`)).job as Record<string, unknown>;
+      expect(still).toMatchObject({ status: 'saved', notes: CANARY, company: CANARY });
+    },
+  },
+
   // ------------------------------------------------------------------------------------------
   'auth.me/session-never-crosses-owners': {
     description:

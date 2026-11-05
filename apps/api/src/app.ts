@@ -17,6 +17,7 @@ import {
   requestId,
 } from './http';
 import { createHttpLogger } from './logging';
+import { createJobsModule } from './modules/jobs';
 import {
   type ProfilesModuleOptions,
   createProfilesModule,
@@ -128,6 +129,7 @@ export function createApp(deps: AppDeps): Express {
     config,
   };
   createProfilesModule({ now, ...deps.profiles })(moduleContext);
+  createJobsModule()(moduleContext);
   for (const mount of deps.modules ?? []) mount(moduleContext);
   registry.mount(app, '/api', api);
 

@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import {
   PRIVATE_MODELS,
   TEST_PASSWORD,
@@ -252,6 +252,19 @@ export async function createWorld(options: WorldOptions = {}): Promise<World> {
       metadata: { note: 'sem PII' },
     },
   });
+
+  // Uma vaga salva por dono (modelo privado fora do agregado de perfil).
+  for (const actor of [a, b, ...others]) {
+    const description = `Vaga do mundo de teste ${actor.fixtureId}`;
+    await testDb.db.forOwner(actor.ownerId).jobPosting.create({
+      data: {
+        ownerId: actor.ownerId,
+        description,
+        descriptionHash: createHash('sha256').update(description).digest('hex'),
+        company: `Empresa ${actor.fixtureId}`,
+      },
+    });
+  }
 
   const all = [a, b, ...others];
   const bare = {

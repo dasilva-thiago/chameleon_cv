@@ -236,6 +236,25 @@ private fields (it is the owner's own data). File name `chameleon-profile-YYYYMM
 Integration: `test/profiles-consent.int.test.ts`; `tests/integration/profile-api/` (`import-export` for all 13 fixtures through HTTP,
 `records`, `lifecycle`, `hostile`); the A x B case `profile.api/cross-owner-behaves-like-not-found` in `tests/integration/isolation/`.
 
+## Jobs module (P1): `/api/jobs/**`
+
+Saved job postings of the owner. All routes are `auth: 'session'` and use only `req.auth.db` (owner-scoped), so a foreign
+id is indistinguishable from a missing one (404). No profile-consent gate: a posting is not profile data (the consent
+for **external AI processing** will gate the analysis routes, P2). Job text is untrusted data: stored verbatim (hash =
+SHA-256 of the exact text, the cache key of the future analysis), never interpreted, never logged; audit events carry ids
+and field names only. DTOs: `packages/contracts/src/api/jobs.ts`.
+
+| Method | Path                          | What                                                                                                                                                                                                                                              |
+| ------ | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GET    | `/api/jobs?status=&q=&limit=` | List (summaries with an excerpt, no full text). `status`: `active` (default: not closed/archived), `all` or one status. `q` searches title, company, location and text (case-insensitive; `%`/`_` are literal). Always returns `counts` by status |
+| POST   | `/api/jobs`                   | Save. Only `description` (≤ 30,000 chars) is required; blank optional text becomes `null`; `url` must be http(s) without credentials                                                                                                              |
+| GET    | `/api/jobs/:jobId`            | One job with the original text, hash and notes                                                                                                                                                                                                    |
+| PATCH  | `/api/jobs/:jobId`            | Change the sent fields (`null` clears); changing `description` recomputes the hash; `status` also archives                                                                                                                                        |
+| DELETE | `/api/jobs/:jobId`            | Delete permanently                                                                                                                                                                                                                                |
+
+Tests: `test/jobs.int.test.ts` (CRUD, validation, search, ownership, anonymous) and the isolation case
+`jobs.api/cross-owner-behaves-like-not-found`.
+
 ## Como um módulo de domínio entra (S2+)
 
 ```ts

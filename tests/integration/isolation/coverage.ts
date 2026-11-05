@@ -13,7 +13,15 @@ import type { CoverageMap } from './support/gate';
 /** S2.1a: one A x B case covers the whole profile module (see cross-cases.ts). */
 const PROFILE_CASE = 'profile.api/cross-owner-behaves-like-not-found';
 
+/** P1: one A x B case covers the whole jobs module (see cross-cases.ts). */
+const JOBS_CASE = 'jobs.api/cross-owner-behaves-like-not-found';
+
 export const ROUTE_COVERAGE: CoverageMap = {
+  'GET /api/jobs': { kind: 'cross-case', caseId: JOBS_CASE },
+  'POST /api/jobs': { kind: 'cross-case', caseId: JOBS_CASE },
+  'GET /api/jobs/:jobId': { kind: 'cross-case', caseId: JOBS_CASE },
+  'PATCH /api/jobs/:jobId': { kind: 'cross-case', caseId: JOBS_CASE },
+  'DELETE /api/jobs/:jobId': { kind: 'cross-case', caseId: JOBS_CASE },
   'GET /health': {
     kind: 'no-private-data',
     reason: 'Liveness publico: resposta constante { status: "ok" }, sem sessao nem banco.',
