@@ -1,7 +1,9 @@
+import type { ImportWarning, UnmappedEntry } from '@chameleon/contracts';
 import { isAlias, parseDocument, visit } from 'yaml';
 import { DEFAULT_PARSE_LIMITS, FORBIDDEN_KEYS, type ParseLimits } from './limits';
+import { parseProfileMarkdown } from './markdown';
 
-export type ProfileTextFormat = 'yaml' | 'json';
+export type ProfileTextFormat = 'yaml' | 'json' | 'markdown';
 
 export type ParseErrorCode =
   | 'EMPTY'
@@ -19,7 +21,9 @@ export type ParseErrorCode =
   | 'STRING_TOO_LONG'
   | 'KEY_TOO_LONG'
   | 'NON_FINITE_NUMBER'
-  | 'NOT_AN_OBJECT';
+  | 'NOT_AN_OBJECT'
+  /** Markdown without any `<!-- path: ... -->` annotation that matches the contract (free Markdown). */
+  | 'NO_ANNOTATIONS';
 
 export interface ParseError {
   code: ParseErrorCode;
@@ -28,15 +32,75 @@ export interface ParseError {
 }
 
 export type ParseResult =
-  | { ok: true; format: ProfileTextFormat; data: Record<string, unknown> }
+  | {
+      ok: true;
+      format: ProfileTextFormat;
+      data: Record<string, unknown>;
+      /** Markdown only: notices raised while reading the file (paths and line numbers, no content). */
+      warnings?: ImportWarning[];
+      /** Markdown only: content that was recognised as input but not applied. */
+      unmapped?: UnmappedEntry[];
+    }
   | { ok: false; format: ProfileTextFormat; errors: ParseError[] };
 
 const stripBom = (text: string): string => (text.charCodeAt(0) === 0xfeff ? text.slice(1) : text);
 
-/** Detecta o formato pelo primeiro caractere util: `{` => JSON; caso contrario YAML. */
-export function detectTextFormat(text: string): ProfileTextFormat {
-  const first = stripBom(text).trimStart()[0];
-  return first === '{' ? 'json' : 'yaml';
+export interface FormatHint {
+  /** Original file name, when known (only the extension is read). */
+  filename?: string | null;
+  /** Declared MIME type, when known. */
+  contentType?: string | null;
+}
+
+/** `true` when the text contains an HTML comment of the form `<!-- path: ... -->` (linear scan). */
+export function hasPathAnnotation(text: string): boolean {
+  let from = 0;
+  for (;;) {
+    const open = text.indexOf('<!--', from);
+    if (open < 0) return false;
+    let cursor = open + 4;
+    while (cursor < text.length && /\s/.test(text.charAt(cursor))) cursor += 1;
+    if (text.slice(cursor, cursor + 5).toLowerCase() === 'path:') return true;
+    from = open + 4;
+  }
+}
+
+/** A YAML profile starts with `schema_version:` (possibly quoted) among its first lines. */
+function looksLikeYamlProfile(text: string): boolean {
+  let from = 0;
+  for (let seen = 0; seen < 50 && from < text.length;) {
+    let end = text.indexOf('\n', from);
+    if (end < 0) end = text.length;
+    const line = text.slice(from, end).trim();
+    from = end + 1;
+    if (line === '' || line.startsWith('#')) continue;
+    seen += 1;
+    if (/^["']?schema_version["']?\s*:/.test(line)) return true;
+  }
+  return false;
+}
+
+function formatFromHint(hint: FormatHint | undefined): ProfileTextFormat | null {
+  const name = (hint?.filename ?? '').toLowerCase();
+  const type = (hint?.contentType ?? '').toLowerCase();
+  if (/\.(md|markdown|mdown)$/.test(name) || type.startsWith('text/markdown')) return 'markdown';
+  if (name.endsWith('.json') || type.startsWith('application/json')) return 'json';
+  if (/\.ya?ml$/.test(name) || type.includes('yaml')) return 'yaml';
+  return null;
+}
+
+/**
+ * Detects the text format. An explicit extension/MIME hint wins; otherwise: first character `{` =>
+ * JSON; a `<!-- path: ... -->` annotation (and no `schema_version:` key) => annotated Markdown;
+ * anything else => YAML.
+ */
+export function detectTextFormat(text: string, hint?: FormatHint): ProfileTextFormat {
+  const hinted = formatFromHint(hint);
+  if (hinted) return hinted;
+  const clean = stripBom(text);
+  if (clean.trimStart().startsWith('{')) return 'json';
+  if (hasPathAnnotation(clean) && !looksLikeYamlProfile(clean)) return 'markdown';
+  return 'yaml';
 }
 
 const byteLength = (text: string): number => new TextEncoder().encode(text).length;
@@ -265,16 +329,35 @@ function parseYaml(text: string, limits: ParseLimits): ParseResult {
 }
 
 /**
- * Le o texto de um perfil (YAML ou JSON) com protecao contra entradas maliciosas. Nao valida o
- * contrato: apenas devolve dados puros (objetos/arrays/escalares) ou os erros de parse.
+ * Le o texto de um perfil (YAML, JSON ou Markdown anotado) com protecao contra entradas
+ * maliciosas. Nao valida o contrato: apenas devolve dados puros (objetos/arrays/escalares) ou os
+ * erros de parse. Para Markdown devolve tambem os avisos e o conteudo nao mapeado.
  */
 export function parseProfileText(
   text: string,
-  options: { format?: ProfileTextFormat | 'auto'; limits?: Partial<ParseLimits> } = {},
+  options: {
+    format?: ProfileTextFormat | 'auto';
+    hint?: FormatHint;
+    limits?: Partial<ParseLimits>;
+  } = {},
 ): ParseResult {
   const limits: ParseLimits = { ...DEFAULT_PARSE_LIMITS, ...options.limits };
   const format =
-    options.format && options.format !== 'auto' ? options.format : detectTextFormat(text);
+    options.format && options.format !== 'auto'
+      ? options.format
+      : detectTextFormat(text, options.hint);
+  if (format === 'markdown') {
+    const result = parseProfileMarkdown(text, { limits });
+    return result.ok
+      ? {
+          ok: true,
+          format: 'markdown',
+          data: result.data,
+          warnings: result.warnings,
+          unmapped: result.unmapped,
+        }
+      : { ok: false, format: 'markdown', errors: result.errors };
+  }
   if (byteLength(text) > limits.maxBytes) {
     return {
       ok: false,

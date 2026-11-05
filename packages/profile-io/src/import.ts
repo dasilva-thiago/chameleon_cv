@@ -10,15 +10,20 @@ import { assignIds } from './ids';
 import type { ParseLimits } from './limits';
 import { migrateLegacyToCurrent, migratePreviousToCurrent } from './migrate';
 import { normalizeProfileData } from './normalize';
-import { parseProfileText, type ProfileTextFormat } from './parse';
+import { parseProfileText, type FormatHint, type ProfileTextFormat } from './parse';
 import { buildImportPreview, type ImportPreview } from './preview';
 import { ReportBuilder } from './report';
 import { validateProfile, type ValidationMode } from './validate';
 import { detectSchemaVersion } from './version';
 
 export interface LoadOptions {
-  /** Formato do texto; `auto` (padrao) detecta pelo primeiro caractere. Ignorado para objetos. */
+  /**
+   * Formato do texto; `auto` (padrao) detecta (`{` = JSON; anotacao `<!-- path: ... -->` = Markdown;
+   * senao YAML). Ignorado para objetos.
+   */
   format?: ProfileTextFormat | 'auto';
+  /** Nome/tipo do arquivo, quando conhecidos: a extensao `.md` seleciona o Markdown anotado. */
+  hint?: FormatHint;
   /** `strict` (padrao) rejeita chaves desconhecidas; `lenient` as preserva em `report.unmapped`. */
   mode?: ValidationMode;
   limits?: Partial<ParseLimits>;
@@ -44,6 +49,9 @@ export interface ImportResult extends LoadResult {
   /** Documento pronto para aplicar: needs_review, UUIDs e `meta` padrao. */
   preview: ImportPreview | null;
 }
+
+/** Annotated Markdown is recorded as its own `source_format` (the `parse_markdown` step is kept too). */
+const MARKDOWN_REPORT_SOURCE_FORMAT: ImportReport['source_format'] = 'markdown';
 
 interface Pipeline {
   report: ReportBuilder;
@@ -94,20 +102,37 @@ export function loadProfile(
 
   let data: unknown = input;
   if (typeof input === 'string') {
-    const parsed = parseProfileText(input, { format: options.format, limits: options.limits });
-    pipeline.sourceFormat = parsed.format;
+    const parsed = parseProfileText(input, {
+      format: options.format,
+      hint: options.hint,
+      limits: options.limits,
+    });
+    pipeline.sourceFormat =
+      parsed.format === 'markdown' ? MARKDOWN_REPORT_SOURCE_FORMAT : parsed.format;
     if (!parsed.ok) {
       for (const error of parsed.errors) report.error('', error.code, error.message);
       return fail();
     }
     data = parsed.data;
-    report.step(
-      'parse',
-      null,
-      'object',
-      `Leitura de ${parsed.format.toUpperCase()} com limites de seguranca.`,
-      1,
-    );
+    if (parsed.format === 'markdown') {
+      report.warnings.push(...(parsed.warnings ?? []));
+      report.unmapped.push(...(parsed.unmapped ?? []));
+      report.step(
+        'parse_markdown',
+        null,
+        'object',
+        'Leitura do Markdown anotado (ancoras <!-- path: ... -->) com limites de seguranca.',
+        1,
+      );
+    } else {
+      report.step(
+        'parse',
+        null,
+        'object',
+        `Leitura de ${parsed.format.toUpperCase()} com limites de seguranca.`,
+        1,
+      );
+    }
   }
 
   const detection = detectSchemaVersion(data);

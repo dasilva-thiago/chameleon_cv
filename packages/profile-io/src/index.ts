@@ -13,12 +13,20 @@ export {
 // Parse seguro e serializacao
 export {
   detectTextFormat,
+  hasPathAnnotation,
   parseProfileText,
+  type FormatHint,
   type ParseError,
   type ParseErrorCode,
   type ParseResult,
   type ProfileTextFormat,
 } from './parse';
+export {
+  parseProfileMarkdown,
+  type MarkdownParseOptions,
+  type MarkdownParseResult,
+  type MarkdownParseStats,
+} from './markdown';
 export { serializeProfile } from './serialize';
 export { DEFAULT_PARSE_LIMITS, FORBIDDEN_KEYS, type ParseLimits } from './limits';
 

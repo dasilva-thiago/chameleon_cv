@@ -11,7 +11,7 @@ const QUOTE_LIKE = /^\d{4}(-\d{2}(-\d{2})?)?$|^\d+\.\d+\.\d+$/;
  */
 export function serializeProfile(
   document: ProfileDocument,
-  format: ProfileTextFormat = 'yaml',
+  format: Exclude<ProfileTextFormat, 'markdown'> = 'yaml',
 ): string {
   const canonical = canonicalizeProfileDocument(document);
   if (format === 'json') return `${JSON.stringify(canonical, null, 2)}\n`;

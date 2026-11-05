@@ -13,6 +13,10 @@ Mantidos à mão e **testados** contra o contrato Zod (ADR-0003):
   `meta.source_excerpt` e `field_states`, que o importador/sistema preenchem ou o MD expressa com
   marcadores como `(não se aplica)`).
 
+O import do `.md` preenchido é feito por `parseProfileMarkdown` (`packages/profile-io`, ADR-0013 fase 2b;
+teste: `packages/profile-io/test/markdown*.test.ts`): o parser confia apenas nas anotações
+`<!-- path: ... -->`, então não as apague nem as altere. O `.md` não preenchido gera zero registros.
+
 Os arquivos `MODELO_UNIVERSAL_PERFIL_PROFISSIONAL.{md,yaml}` e `PERFIL_PROFISSIONAL_SCHEMA.json` da
 raiz são a especificação histórica **1.0.0** (cópias em
 `packages/contracts/fixtures/legacy/v1.0.0/`).

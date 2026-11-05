@@ -18,6 +18,7 @@ import {
   FACT_SOURCE_VALUES,
   FACT_STATUS_VALUES,
   FIELD_STATE_VALUES,
+  IMPORT_SOURCE_FORMATS,
   LANGUAGE_LEVEL_VALUES,
   metaSchema,
   PARTICIPATION_TYPE_VALUES,
@@ -88,6 +89,7 @@ const ENUMS: Record<string, readonly string[]> = {
   EvidenceType: EVIDENCE_TYPE_VALUES,
   RecruiterSharing: RECRUITER_SHARING_VALUES,
   RestrictionRule: RESTRICTION_RULE_VALUES,
+  ImportSourceFormat: IMPORT_SOURCE_FORMATS,
 };
 
 const MIGRATIONS = join(dirname(fileURLToPath(import.meta.url)), '..', 'prisma', 'migrations');

@@ -34,6 +34,7 @@ export const IMPORT_WARNING_CODES = [
   'SKILL_MERGED',
   // estrutura
   'FIELD_MERGED',
+  'DUPLICATE_FIELD_IGNORED',
   'IS_CURRENT_CONFLICT',
   'RECORD_RELOCATED',
   'REFERENCE_UNRESOLVED',
@@ -83,8 +84,16 @@ export const importErrorSchema = z.strictObject({
 });
 export type ImportError = z.infer<typeof importErrorSchema>;
 
+/**
+ * Formato de origem registrado no relatorio e no `ImportRecord.sourceFormat` (enum Prisma
+ * `ImportSourceFormat`; um teste do banco confere a igualdade). `markdown` = template Markdown anotado
+ * (ADR-0013); `object` = objeto ja parseado passado pelo chamador.
+ */
+export const IMPORT_SOURCE_FORMATS = ['yaml', 'json', 'object', 'markdown'] as const;
+export type ImportSourceFormat = (typeof IMPORT_SOURCE_FORMATS)[number];
+
 export const importReportSchema = z.strictObject({
-  source_format: z.enum(['yaml', 'json', 'object']),
+  source_format: z.enum(IMPORT_SOURCE_FORMATS),
   source_schema_version: z.string().nullable(),
   target_schema_version: z.string(),
   mode: z.enum(['strict', 'lenient']),

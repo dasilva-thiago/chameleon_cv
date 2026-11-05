@@ -7,7 +7,7 @@ API (`apps/api`).
 ## Pipeline de importação (ADR-0004)
 
 ```text
-parse (YAML|JSON) → detectar schema_version → migrar (1.0.0 → 2.1.0, 2.0.0 → 2.1.0) → normalizar → validar (Zod)
+parse (YAML|JSON|Markdown anotado) → detectar schema_version → migrar (1.0.0 → 2.1.0, 2.0.0 → 2.1.0) → normalizar → validar (Zod)
   → forma canônica → defaults de governança (needs_review) → ids (UUID v7) → pré-visualização
 ```
 
@@ -15,6 +15,9 @@ parse (YAML|JSON) → detectar schema_version → migrar (1.0.0 → 2.1.0, 2.0.0
   governança nem ids definitivos. Devolve `{ ok, report, document }`.
 - `importProfile(input, { existing, existingIdMap, generateId, mode, … })` — pipeline completo.
   Devolve `{ ok, report, document, preview }`. **Nada é persistido.**
+- Formatos de entrada: YAML, JSON e o **Markdown anotado** do template v2 (secao abaixo).
+  `loadProfile`/`importProfile` aceitam `format: 'auto' | 'yaml' | 'json' | 'markdown'` e
+  `hint: { filename, contentType }` (a extensao `.md` seleciona o Markdown).
 - `serializeProfile(document, 'yaml' | 'json')` — forma canônica (chaves na ordem do contrato,
   sem chaves nulas, datas e versões entre aspas, LF). Round-trip estável.
 
@@ -77,8 +80,72 @@ YAML: esquema _core_ 1.2 (sem `!!binary`, `!!set`, timestamps ou tags customizad
 duplicadas. Chaves `__proto__`, `constructor` e `prototype` são recusadas em qualquer nível. Números
 não finitos (`.inf`, `.nan`) são recusados. A raiz precisa ser um mapa/objeto.
 
+## Annotated Markdown import (S2.4, ADR-0013 phase 2b)
+
+`parseProfileMarkdown(text, { limits })` reads a FILLED copy of `templates/profile/*.v2.md` and
+returns the same v2.1.0 interchange object that YAML/JSON import consumes, plus `warnings`
+(`IMPORT_WARNING_CODES`) and `unmapped`. It never throws and the object then goes through the normal
+pipeline (migrate, normalize, validate, defaults, ids). Detection: `detectTextFormat(text, hint)`
+returns `markdown` for a `.md`/`.markdown` file name or `text/markdown` MIME hint, or when the text
+contains a `<!-- path: ... -->` annotation (and no `schema_version:` YAML key).
+
+**How it reads the form.** A field is a line (a bullet or a bold label) that ends with
+`<!-- path: <contract path> -->`; the answer is the text between the label and the annotation. The
+parser trusts only those anchors. Supported label styles: `**Label:** answer`,
+`**Question? (lista)** answer` and `**Label** (long hint): answer`. Answers may continue on
+following lines that are indented by 2+ spaces.
+
+- **Records.** Repeatable sections hold any number of records. A new record starts at a heading
+  that names a record (`... registro N`), when a field already filled in the open record is
+  annotated again, or when an `id` field appears in a record that already has fields. Child records
+  (experience items, project items, collaborators) also start after any heading. A record appears in
+  the output only when it has content (an `id`, `meta`, or a discriminator such as `kind` alone is
+  not content). Section 8.3 (`skills[].study_plan.*`) is attached to the most recent skill record
+  (`RECORD_RELOCATED`, information).
+- **Absence.** Blank answers, `[Preencher]`, `_`, `-`, `...` and "not provided" texts ("Não
+  informado", "N/A", "Not provided", ...) produce no key: they never become values or negative
+  facts. Placeholders are silent; a sentinel typed by the user raises `EMPTY_STRING_NORMALIZED`
+  (information). An answer that still lists every printed option ("`true` ou `false`", the full
+  enum list) is "nothing chosen"; they are counted in one `EMPTY_STRING_NORMALIZED` notice.
+- **Explicit states.** `(não se aplica)`, `(prefiro não informar)`, `(ainda não avaliei)` and
+  `(confirmar depois)` (accent/case-insensitive, also in English) become `field_states` /
+  `meta.field_states`. `(confirmar depois)` may follow a value (the value is kept). A value typed
+  next to one of the other markers is dropped (`INVALID_VALUE_DROPPED`). Records without
+  `field_states` (contacts, evidence, pending items, restrictions, collaborators) cannot carry a
+  state; the marker is ignored with a warning.
+- **Multi-choice answers.** The English contract value (alone, backticked, or with the template's
+  gloss such as "`allowed` (sim)") or the Portuguese gloss maps to the enum without loss:
+  `sim/parcialmente/não` to `public/partial/not_public`, `sim/com restrição/não` to
+  `allowed/restricted/not_allowed`, `sim/parcialmente (com aprovação)/não` to
+  `allowed/requires_approval/never`, `sim/não/depende` to `yes/no/depends`, and so on. Unknown
+  values raise `INVALID_ENUM_VALUE_DROPPED` and are kept in `unmapped`.
+- **Types.** Booleans accept `true/false/sim/não`; numbers accept `40`, `40,5`, `1.500,50` (a lone
+  separator followed by three digits, such as `1.500`, is ambiguous and rejected); end dates accept
+  `present` (also `atual`); dates keep the precision typed. Lists accept nested bullets (each is an
+  atomic item) or an inline list separated by `;` (if any `;` is present) or `,`. Phone numbers go
+  through the existing normalizer.
+- **Security.** Paths are accepted only from the contract path list and never the importer-owned
+  `meta.status/declared_status/source/source_detail/source_excerpt` or `field_states` paths; other
+  annotations are reported (`UNKNOWN_KEY_UNMAPPED`) and not applied. A path repeated for a singleton
+  field keeps the first value (`DUPLICATE_FIELD_IGNORED`). HTML in values is plain text. Other HTML
+  comments (also multi-line) are removed and the annotations inside them are ignored. Warnings carry
+  paths and line numbers (`markdown:line:N`) and never file content; `unmapped` keeps the dropped
+  value by design. Scanning is linear (no backtracking regexes), reuses `DEFAULT_PARSE_LIMITS`
+  (bytes, nodes, string length per answer/line; depth is bounded by the fixed path list) and caps
+  the report (100 warnings per code, 200 unmapped entries).
+- **Report.** `report.source_format` is `markdown` (contract enum and DB enum `ImportSourceFormat`, S2.3a); the
+  step `parse_markdown` is kept.
+  Unreadable input fails with `EMPTY`, `TOO_LARGE`, `STRING_TOO_LONG`, `TOO_MANY_NODES` or
+  `NO_ANNOTATIONS` (free Markdown without anchors is not supported).
+
+**Limitations.** Free Markdown, tables, fenced code and DOCX/PDF are not read. Lines under a field
+that are not indented are not part of its answer (they are reported). `[]` ("explicitly none") has
+no Markdown form: an empty section is simply absent. Without a record heading or an `id`, two
+consecutive records that never repeat a field are read as one record. A study plan (8.3) cannot
+target a skill other than the most recent one. `[text](url)` links are not unwrapped. A person who
+really wants every option of an inline enum list must not print them backticked in contract order.
+
 ## Fora do escopo desta fatia
 
-- Parser do Markdown anotado (`<!-- path: ... -->`): S2.4 (ADR-0013, fase 2b).
 - Persistência do `ImportRecord`, aplicação do merge/replace e confirmação em lote: API/DB.
 - Importação de DOCX/PDF: pós-MVP.

@@ -850,6 +850,25 @@ describe('importacao: ImportRecord, id_map e reimportacao idempotente', () => {
     expect(await store.getImportIdMap(user.id)).toEqual(idMap);
   });
 
+  it('persists every report source format, including markdown, and reads it back', async () => {
+    for (const source_format of ['yaml', 'json', 'object', 'markdown'] as const) {
+      const user = await makeUser(source_format);
+      const document = fixtureDocument('non-tech-nurse');
+      const result = await store.applyImport(user.id, {
+        document,
+        report: importReport({}, { source_format }),
+      });
+      expect(result.importRecord.sourceFormat).toBe(source_format);
+      const listed = await store.listImportRecords(user.id);
+      expect(listed.map((r) => r.sourceFormat)).toEqual([source_format]);
+      const stored = await testDb.sql<{ sourceFormat: string }>(
+        `SELECT "sourceFormat"::text AS "sourceFormat" FROM "ImportRecord" WHERE "ownerId" = $1`,
+        [user.id],
+      );
+      expect(stored.rows[0]?.sourceFormat).toBe(source_format);
+    }
+  });
+
   it('reimportar o mesmo documento: 0 criados, 0 alterados, revisao reutilizada, novo ImportRecord', async () => {
     const user = await makeUser();
     const document = fixtureDocument('non-tech-nurse');
