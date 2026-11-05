@@ -31,3 +31,6 @@ Thumbs.db
 .idea/
 .vscode/*
 !.vscode/extensions.json
+
+# E2E run state (invite token, database name)
+e2e/.tmp/
