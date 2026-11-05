@@ -33,6 +33,10 @@ Correção feita: `pilot-no-leak.test.ts` falhava porque os novos documentos de 
 
 Concluída. `pnpm check`: 62 arquivos / 1.585 testes; `pnpm test:integration`: 39 arquivos / 716 testes. Novo: `JobPosting` (migração `20261105100000_job_postings`), `packages/contracts/src/api/jobs.ts`, `apps/api/src/modules/jobs`, `apps/web/src/features/jobs`, `apps/api/test/jobs.int.test.ts`, `apps/web/test/jobs-ui.test.tsx`, caso de isolamento `jobs.api/cross-owner-behaves-like-not-found`. Achado corrigido durante o teste: `contains` do Prisma não escapa `%`/`_` (busca por "%" casava tudo); a busca agora escapa os curingas. Limite da descrição: 30.000 caracteres (cabe no limite JSON padrão de 100 KiB). Limitações: sem E2E em navegador; o campo de texto do navegador normaliza quebras de linha para LF.
 
+### P2 — análise e correspondência (2026-11-05)
+
+Concluída com motor determinístico (sem IA). Novo: `packages/domain/src/matching`, `packages/contracts/src/api/analysis.ts`, tabela `JobAnalysis` (migração `20261105110000_job_analysis`), rotas `/api/jobs/:id/analysis`, `apps/web/src/features/jobs/AnalysisSection.tsx`, código de erro `PROFILE_REQUIRED`. Testes: unitários do matcher, fixtures sintéticas (todas as vagas × todos os perfis v2, incluindo a vaga com injeção de prompt), integração da API (cache, desatualização, revisão, consentimento, isolamento A×B) e UI com axe. Verificação com o perfil privado local: só contagens por força foram observadas (nenhum conteúdo impresso). Limitações: requisitos sem termo técnico ("boa comunicação") saem como ausentes com aviso de avaliação manual; "transferível" usa uma tabela pequena de famílias de tecnologia (heurística); a extração depende de a vaga ter seções reconhecíveis (senão avisa e usa listas/frases); nível de idioma e anos de experiência por tecnologia não são calculados (viram cautelas).
+
 ## Decisões da redefinição pessoal (2026-11-05)
 
 - Escopo: ferramenta privada de uso pessoal; sem SaaS, multiusuário novo, billing ou plataforma universal. `ownerId`, auth, sessões e testes de isolamento permanecem.
