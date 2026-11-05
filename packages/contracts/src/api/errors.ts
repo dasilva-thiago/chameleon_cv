@@ -29,6 +29,8 @@ export const API_ERROR_CODES = [
   'DUPLICATE_SKILL',
   'CONCURRENT_MODIFICATION',
   'RECORD_IN_USE',
+  // Analise de vagas (P2)
+  'PROFILE_REQUIRED',
   'INTERNAL_ERROR',
 ] as const;
 
