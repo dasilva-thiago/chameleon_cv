@@ -1,7 +1,7 @@
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from './generated/prisma/client';
 import {
-  guardExtension,
+  globalGuardExtension,
   ownerScopeExtension,
   relationFieldsOfClient,
   type RelationFields,
@@ -32,8 +32,8 @@ function createBaseClient(options: CreateDbOptions): PrismaClient {
   return new PrismaClient({ adapter });
 }
 
-function buildGlobalClient(base: PrismaClient) {
-  return base.$extends(guardExtension);
+function buildGlobalClient(base: PrismaClient, relations: RelationFields) {
+  return base.$extends(globalGuardExtension(relations));
 }
 
 function buildOwnerClient(base: PrismaClient, ownerId: string, relations: RelationFields) {
@@ -60,8 +60,8 @@ export interface Db {
 
 export function createDb(options: CreateDbOptions = {}): Db {
   const base = createBaseClient(options);
-  const global = buildGlobalClient(base);
   const relations = relationFieldsOfClient(base); // falha cedo se o modelo de dados nao estiver acessivel
+  const global = buildGlobalClient(base, relations);
   return {
     forOwner: (ownerId) => buildOwnerClient(base, ownerId, relations),
     global,

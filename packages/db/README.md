@@ -39,7 +39,9 @@ pnpm db:reset                               # recusa host não local; migrate re
   (com justificativa). O teste `private-models.test.ts` e o teste de catálogo
   (`identity-schema.int.test.ts`) falham se faltar `@@unique([id, ownerId])`, se uma FK para tabela
   privada não incluir `ownerId`, ou se tabela e registro divergirem. Relações de modelo global para
-  privado entram em `PRIVATE_RELATIONS_OF_GLOBAL`.
+  privado entram em `PRIVATE_RELATIONS_OF_GLOBAL` (the guard also derives the relations of global models
+  from the runtime data model, so a new relation is blocked from day one). A new global model needs a
+  policy in `scopeGlobalModelArgs`; without one `forOwner()` rejects it (fail closed).
 - **`ownerId` imutável (migração `owner_immutable`):** todo UPDATE que mude `"ownerId"` falha (`owner_immutable`,
   SQLSTATE 23000) em **toda** tabela com a coluna, inclusive as de FK só para `User` (`Credential`, `Session`,
   `ConsentRecord`, `AuditEvent`, `ProfessionalProfile`). Sem exceção de purge: a exclusão de conta é DELETE
@@ -193,21 +195,57 @@ movia a linha de B para o dono A (confirmado em `ContactPoint`, `ImportRecord` e
 outro dono (`P2003`). `where`, `select` e `include` com relações (leituras) continuam permitidos. Leituras e
 `delete`/`deleteMany` não carregam `data`.
 
-O cliente `db.global` (e os modelos globais do cliente escopado) também rejeita atravessar relações
-globais -> privadas (`user.findMany({ include: { sessions: true } })`).
+### Global models (`User`, `Invite`) and raw operations (S1.5a)
+
+A global model has no `ownerId`, so it is isolated by **fail-closed rules** in `src/for-owner.ts`. They
+are identical on `db.global` and inside `forOwner()`:
+
+- **No relation in any argument.** `where`, `select`, `include`, `orderBy` and `data`, **at any depth**,
+  must not contain a relation field of a global model (the list is derived from `_runtimeDataModel` plus
+  `PRIVATE_RELATIONS_OF_GLOBAL`): `credentials`, `sessions`, `consentRecords`, `auditEvents`, `profiles`
+  **and also `invitesUsed`/`usedBy`**. The whole `User <-> Invite` cycle is forbidden: a 5+ hop chain
+  (`invite -> usedBy -> invitesUsed -> ...`) used to reach another owner's `sessions`. To read both sides,
+  issue two queries (`invite.findUnique`, then `user.findUnique`).
+- **Relation `_count` is forbidden.** `_count` inside `select`/`include` (any depth) throws: it returned
+  counts of other owners' private rows. The scalar `_count` of `aggregate`/`groupBy` is still allowed.
+- **Depth limit = error.** More than `MAX_GLOBAL_ARGS_DEPTH` (32) nesting levels, or a self-referencing
+  object, throws `OwnerScopeViolationError`. The old limit (16) treated the rest as "no relation" (fail open).
+- **Unknown operations** (`findRaw`, `aggregateRaw`...) on a global model throw.
+- **Nested relation writes** (`user.update({ data: { credentials: { create } } })`,
+  `invite.update({ data: { usedBy: { update } } })`) are a case of the first rule: they throw before any SQL,
+  on `db.global` and on `forOwner()`. Consequence: there is no nested write into `User`/`Invite` anymore;
+  write each table with its own call (inside a `$transaction` when atomicity matters).
+
+Inside `forOwner(ownerId)` the global models are **restricted** (they used to be passed through unscoped):
+
+| Model    | Behavior inside `forOwner(ownerId)`                                                                                                                                                                                                                              |
+| -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `User`   | Scoped to `id = ownerId` (reads, `update*`, `delete*`, `count`...). `create` injects/checks `id = ownerId` (invite acceptance creates the user with the pre-generated `ownerId`). `data.id` in an update throws; `findUnique({ where: { id: other } })` throws.  |
+| `Invite` | Only `update`/`updateMany` whose `where` targets one invite (string `tokenHash` or `id`), `data` limited to `usedAt`/`usedByUserId`, and `usedByUserId` equal to `ownerId`. Reads, `create`, `delete`, `upsert` and other columns throw: use `db.global.invite`. |
+
+Client-level raw operations (`$queryRaw`, `$queryRawUnsafe`, `$executeRaw`, `$executeRawUnsafe`) throw
+`OwnerScopeViolationError` on `db.global` and on `forOwner()` clients, including inside interactive
+`$transaction`s (top-level `$allOperations` hook without a model). `$runCommandRaw` (MongoDB only) and
+`$queryRawTyped` (`typedSql` preview, disabled) are already refused by Prisma itself with this provider and
+configuration. **`db.unsafeRaw` is the only escape hatch** and its use is restricted to
+`apps/api/src/auth` (session lookup by `tokenHash`) and `packages/db` (tests, maintenance); any other use
+fails the security review.
+
+Tests: `test/global-model-guard.test.ts` (pure) and `test/global-model-guard.int.test.ts` (real database,
+including the review probes: `_count`, deep chains, `invite -> usedBy.update`, raw SQL).
 
 ### Lacunas conhecidas (R3) e rede de segurança
 
-| Lacuna                                                                                                                 | Mitigação                                                                                                                                        |
-| ---------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Escrita por relação (`connect`, `create`, `set`...) em `data`                                                          | **Fechada**: `NestedRelationWriteError` na aplicação + trigger `<Tabela>_owner_immutable` no banco (`ownerId` nunca muda por UPDATE). Veja acima |
-| `$queryRaw`/`$executeRaw` não são filtrados (o trigger ainda impede trocar `ownerId`, mas não lê/insere em outro dono) | ESLint proíbe SQL cru fora de `packages/db`; revisão de segurança                                                                                |
-| `db.unsafeRaw` não tem proteção                                                                                        | Só `auth` (lookup de sessão por `tokenHash`) e jobs de manutenção; listar usos na revisão                                                        |
-| `cursor` de paginação aponta para linha de outro dono (vaza apenas a posição, nunca o conteúdo)                        | `where` escopado continua valendo                                                                                                                |
-| Modelos globais (`User`, `Invite`) **não são escopados** (`forOwner(a).user.findMany()` lista todos)                   | Use-os só via `db.global` na camada de auth; relações para privados são bloqueadas                                                               |
-| `$transaction` interativa/em lote herda a extensão (testado), mas SQL cru dentro dela não                              | Idem SQL cru                                                                                                                                     |
-| `omit`/`select` globais e extensões de resultado não são verificados                                                   | n/a hoje                                                                                                                                         |
-| Sem RLS no PostgreSQL                                                                                                  | Endurecimento planejado na Fase 7 (ADR-0008, item 6)                                                                                             |
+| Lacuna                                                                                          | Mitigação                                                                                                                                                                                                          |
+| ----------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Escrita por relação (`connect`, `create`, `set`...) em `data`                                   | **Fechada**: `NestedRelationWriteError` na aplicação + trigger `<Tabela>_owner_immutable` no banco (`ownerId` nunca muda por UPDATE). Veja acima                                                                   |
+| `$queryRaw`/`$executeRaw` (+ `Unsafe`) on `forOwner()` and `global` clients                     | **Closed** (S1.5a): they throw `OwnerScopeViolationError`. `db.unsafeRaw` remains (next row)                                                                                                                       |
+| `db.unsafeRaw` has no protection                                                                | Only escape hatch for raw SQL/unguarded clients; allowed only in `apps/api/src/auth` (session lookup by `tokenHash`) and `packages/db`; list every use in the review                                               |
+| `cursor` de paginação aponta para linha de outro dono (vaza apenas a posição, nunca o conteúdo) | `where` escopado continua valendo                                                                                                                                                                                  |
+| Global models (`User`, `Invite`)                                                                | **Closed** (S1.5a): `User` is restricted to `id = ownerId` in `forOwner()`, `Invite` only accepts the invite-acceptance write; relations, relation `_count` and nested writes are rejected (see the section above) |
+| Interactive/batch `$transaction` inherits the extension (tested), including the raw SQL block   | n/a                                                                                                                                                                                                                |
+| `omit`/`select` globais e extensões de resultado não são verificados                            | n/a hoje                                                                                                                                                                                                           |
+| Sem RLS no PostgreSQL                                                                           | Endurecimento planejado na Fase 7 (ADR-0008, item 6)                                                                                                                                                               |
 
 ## Harness de teste (`@chameleon/db/testing`)
 

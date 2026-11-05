@@ -1,11 +1,16 @@
 import { Prisma } from './generated/prisma/client';
 import { NestedRelationWriteError, OwnerScopeViolationError, UnscopedAccessError } from './errors';
-import { PRIVATE_MODELS, isPrivateModel, isPrivateRelationKey } from './private-models';
+import {
+  GLOBAL_MODELS,
+  PRIVATE_MODELS,
+  PRIVATE_RELATIONS_OF_GLOBAL,
+  isPrivateModel,
+} from './private-models';
 
 /**
  * Extensoes de isolamento (ADR-0008, item 2).
  *
- * - `guardExtension`: aplicada ao cliente SEM escopo. Modelo privado -> lanca UnscopedAccessError.
+ * - `globalGuardExtension`: aplicada ao cliente SEM escopo. Modelo privado -> lanca UnscopedAccessError.
  * - `ownerScopeExtension(ownerId)`: aplicada ao cliente escopado. Injeta `ownerId` em `where`
  *   (leituras, update/delete, count/aggregate/groupBy) e em `data` (create/createMany/upsert) dos
  *   modelos privados; lanca erro ao detectar outro `ownerId` ou tentativa de alterar o `ownerId`.
@@ -17,6 +22,15 @@ import { PRIVATE_MODELS, isPrivateModel, isPrivateRelationKey } from './private-
  * dados do client gerado (nunca escritas a mao). Use os escalares `xId` (formato unchecked): o `ownerId`
  * continua injetado/conferido e a FK composta rejeita pai de outro dono. Defesa em profundidade: o
  * trigger `<Tabela>_owner_immutable` (migracao `owner_immutable`) recusa qualquer UPDATE de `ownerId`.
+ *
+ * GLOBAL models (S1.5a, security review findings F2/F13), all fail CLOSED:
+ * - No argument (`where`/`select`/`include`/`data`/`orderBy`, at any depth) may contain a relation field
+ *   of a global model (derived from the runtime data model) nor `_count` inside `select`/`include`.
+ *   This closes global -> private traversal (and the User <-> Invite cycle) independently of depth;
+ *   exceeding the depth limit THROWS.
+ * - Inside `forOwner(id)`, `User` is restricted to `id = ownerId` and `Invite` only accepts
+ *   `update`/`updateMany` of `usedAt`/`usedByUserId` (invite-acceptance flow).
+ * - Client-level raw operations (`$queryRaw`, ...) throw on both clients.
  *
  * Lacunas conhecidas (R3) -> README. Em resumo: SQL cru nao e filtrado e operacao desconhecida em
  * modelo privado e REJEITADA (fail closed).
@@ -70,6 +84,11 @@ export function relationFieldsOfClient(client: unknown): RelationFields {
       throw new Error(`Modelo privado "${model}" ausente do modelo de dados do Prisma Client.`);
     }
   }
+  for (const model of Object.keys(GLOBAL_MODELS)) {
+    if (!result.has(model)) {
+      throw new Error(`Modelo global "${model}" ausente do modelo de dados do Prisma Client.`);
+    }
+  }
   return result;
 }
 
@@ -90,20 +109,20 @@ const UNIQUE_OPS = new Set(['findUnique', 'findUniqueOrThrow', 'update', 'delete
 const CREATE_OPS = new Set(['create', 'createMany', 'createManyAndReturn']);
 const UPDATE_OPS = new Set(['update', 'updateMany', 'updateManyAndReturn']);
 
-function scopeWhere(where: unknown, ownerId: string, unique: boolean): Json {
+function scopeWhere(where: unknown, ownerId: string, unique: boolean, field = 'ownerId'): Json {
   if (where === undefined || where === null) {
     // Sem `where`: so valido em operacoes nao unicas (o Prisma exige `where` nas unicas).
-    return { ownerId };
+    return { [field]: ownerId };
   }
   if (!isObject(where)) throw new OwnerScopeViolationError('`where` invalido.');
-  const current = where.ownerId;
-  if (current === undefined) return { ...where, ownerId };
+  const current = where[field];
+  if (current === undefined) return { ...where, [field]: ownerId };
   if (current === ownerId) return where;
   if (typeof current === 'string' || unique) {
-    throw new OwnerScopeViolationError('`where.ownerId` difere do ownerId do escopo.');
+    throw new OwnerScopeViolationError(`\`where.${field}\` difere do ownerId do escopo.`);
   }
-  // Filtro composto em ownerId (ex.: { in: [...] }) numa operacao nao unica: intersecao.
-  return { AND: [where, { ownerId }] };
+  // Filtro composto no campo (ex.: { in: [...] }) numa operacao nao unica: intersecao.
+  return { AND: [where, { [field]: ownerId }] };
 }
 
 /**
@@ -194,59 +213,226 @@ export function scopeArgs(
   );
 }
 
-/** Procura (em profundidade) uma chave de relacao que leva a modelo privado. */
-function findPrivateRelationKey(value: unknown, depth = 0): string | undefined {
-  if (depth > 16 || typeof value !== 'object' || value === null) return undefined;
+// ---------------------------------------------------------------------------------------------
+// Global models (User, Invite) and client-level operations (S1.5a, findings F2/F13).
+// ---------------------------------------------------------------------------------------------
+
+/** Maximum nesting depth walked in the arguments of a global-model operation. Exceeding it THROWS. */
+export const MAX_GLOBAL_ARGS_DEPTH = 32;
+
+/** Operations a global model accepts; anything else is rejected (fail closed). */
+const GLOBAL_OPERATIONS = new Set([...WHERE_OPS, ...UNIQUE_OPS, ...CREATE_OPS, 'upsert']);
+
+/**
+ * Relation field names that must never appear in the arguments of a global-model operation. It is the
+ * union of every relation field of every global model (read from the runtime data model, so a new
+ * relation is covered automatically) and of the hand-written, test-checked private relation list.
+ * Global <-> global relations (`Invite.usedBy`, `User.invitesUsed`) are forbidden too: they form a
+ * cycle that could reach private relations through an arbitrarily long chain.
+ */
+export function forbiddenGlobalKeys(relationFields: RelationFields): ReadonlySet<string> {
+  const keys = new Set<string>(Object.values(PRIVATE_RELATIONS_OF_GLOBAL).flat());
+  for (const model of Object.keys(GLOBAL_MODELS)) {
+    const fields = relationFields.get(model);
+    if (!fields) {
+      throw new OwnerScopeViolationError(`Global model "${model}" has no known data model.`);
+    }
+    for (const field of fields) keys.add(field);
+  }
+  return keys;
+}
+
+/**
+ * Walks `value` looking for a forbidden relation key (at any depth, in `where`, `select`, `include`,
+ * `orderBy`, `data`...) or for the relation-count selector `_count` inside a `select`/`include`.
+ * A top-level `_count` of `aggregate`/`groupBy` counts scalar columns and stays allowed. Throws
+ * `OwnerScopeViolationError` when the depth limit is hit instead of assuming the rest is safe.
+ */
+export function findForbiddenGlobalKey(
+  value: unknown,
+  forbidden: ReadonlySet<string>,
+  inSelection = false,
+  depth = 0,
+): string | undefined {
+  if (typeof value !== 'object' || value === null || ArrayBuffer.isView(value)) return undefined;
+  if (depth > MAX_GLOBAL_ARGS_DEPTH) {
+    throw new OwnerScopeViolationError(
+      `Arguments of a global model are nested deeper than ${MAX_GLOBAL_ARGS_DEPTH} levels.`,
+    );
+  }
   if (Array.isArray(value)) {
     for (const item of value) {
-      const found = findPrivateRelationKey(item, depth + 1);
+      const found = findForbiddenGlobalKey(item, forbidden, inSelection, depth + 1);
       if (found) return found;
     }
     return undefined;
   }
   for (const [key, inner] of Object.entries(value)) {
-    if (isPrivateRelationKey(key)) return key;
-    const found = findPrivateRelationKey(inner, depth + 1);
+    if (forbidden.has(key)) return key;
+    if (inSelection && key === '_count') return key;
+    const found = findForbiddenGlobalKey(
+      inner,
+      forbidden,
+      inSelection || key === 'select' || key === 'include',
+      depth + 1,
+    );
     if (found) return found;
   }
   return undefined;
 }
 
-/** Modelo global nao pode ser porta de entrada para linhas privadas (include/select/where/data). */
-function assertNoPrivateRelations(model: string, operation: string, args: unknown): void {
-  const key = findPrivateRelationKey(args);
+/** A global model must not be a doorway to private rows (include/select/where/data/_count). */
+export function assertGlobalModelArgs(
+  model: string,
+  operation: string,
+  args: unknown,
+  forbidden: ReadonlySet<string>,
+): void {
+  if (!GLOBAL_OPERATIONS.has(operation)) {
+    throw new OwnerScopeViolationError(`Operation "${operation}" is not supported on ${model}.`);
+  }
+  const key = findForbiddenGlobalKey(args, forbidden);
   if (key) {
     throw new OwnerScopeViolationError(
-      `${model}.${operation} atravessa a relacao privada "${key}". ` +
-        'Acesse o modelo privado por db.forOwner(ownerId).',
+      `${model}.${operation} traverses the relation "${key}". Global models cannot be used to ` +
+        'reach related rows; query the related model through db.forOwner(ownerId) instead.',
     );
   }
 }
 
-/** Cliente sem escopo: modelos privados lancam. */
-export const guardExtension = Prisma.defineExtension({
-  name: 'chameleon-unscoped-guard',
-  query: {
-    $allModels: {
-      $allOperations({ model, operation, args, query }) {
-        if (isPrivateModel(model)) throw new UnscopedAccessError(model, operation);
-        assertNoPrivateRelations(model, operation, args);
+/** `User` inside `forOwner(ownerId)`: only the owner's own row. */
+function scopeUserArgs(operation: string, rawArgs: unknown, ownerId: string): Json {
+  const args: Json = isObject(rawArgs) ? { ...rawArgs } : {};
+  const scopeCreate = (data: unknown): Json => {
+    if (!isObject(data)) throw new OwnerScopeViolationError('`data` invalido.');
+    if (data.id !== undefined && data.id !== ownerId) {
+      throw new OwnerScopeViolationError('`data.id` of User differs from the scope ownerId.');
+    }
+    return { ...data, id: ownerId };
+  };
+  const checkUpdate = (data: unknown): unknown => {
+    if (isObject(data) && data.id !== undefined) {
+      throw new OwnerScopeViolationError(
+        'User.id is immutable and cannot appear in update `data`.',
+      );
+    }
+    return data;
+  };
+  if (operation === 'upsert') {
+    return {
+      ...args,
+      where: scopeWhere(args.where, ownerId, true, 'id'),
+      create: scopeCreate(args.create),
+      update: checkUpdate(args.update),
+    };
+  }
+  if (CREATE_OPS.has(operation)) {
+    return {
+      ...args,
+      data: Array.isArray(args.data) ? args.data.map(scopeCreate) : scopeCreate(args.data),
+    };
+  }
+  if (WHERE_OPS.has(operation) || UNIQUE_OPS.has(operation)) {
+    const scoped: Json = {
+      ...args,
+      where: scopeWhere(args.where, ownerId, UNIQUE_OPS.has(operation), 'id'),
+    };
+    if (UPDATE_OPS.has(operation)) scoped.data = checkUpdate(args.data);
+    return scoped;
+  }
+  throw new OwnerScopeViolationError(`Operation "${operation}" is not supported on User.`);
+}
+
+/** Invite columns the invite-acceptance flow may write through `forOwner`. */
+const INVITE_OWNER_WRITE_FIELDS: ReadonlySet<string> = new Set(['usedAt', 'usedByUserId']);
+
+/**
+ * `Invite` inside `forOwner(ownerId)`: invites exist before any owner, so they cannot be scoped by
+ * owner. Only the acceptance flow is allowed: `update`/`updateMany` targeting one invite by
+ * `tokenHash` or `id`, writing `usedAt` and/or `usedByUserId` (which must be the scope owner).
+ * Everything else (reads, create, delete, other columns) must use `db.global.invite`.
+ */
+function scopeInviteArgs(operation: string, rawArgs: unknown, ownerId: string): Json {
+  const reject = (reason: string): never => {
+    throw new OwnerScopeViolationError(
+      `Invite.${operation} through forOwner() is not allowed (${reason}). Use db.global.invite.`,
+    );
+  };
+  if (operation !== 'update' && operation !== 'updateMany') return reject('only update/updateMany');
+  const args: Json = isObject(rawArgs) ? { ...rawArgs } : {};
+  const where = args.where;
+  if (!isObject(where) || (typeof where.tokenHash !== 'string' && typeof where.id !== 'string')) {
+    return reject('`where` must target one invite by tokenHash or id');
+  }
+  const data = args.data;
+  if (!isObject(data)) return reject('`data` is invalid');
+  const copy: Json = { ...data };
+  for (const key of Object.keys(copy)) {
+    if (copy[key] !== undefined && !INVITE_OWNER_WRITE_FIELDS.has(key)) {
+      return reject(`column "${key}" is not writable`);
+    }
+  }
+  if (copy.usedByUserId !== undefined && copy.usedByUserId !== ownerId) {
+    return reject('`usedByUserId` must be the scope owner');
+  }
+  return { ...args, data: copy };
+}
+
+/** Policy of a global model inside `forOwner`; unknown global models are rejected (fail closed). */
+export function scopeGlobalModelArgs(
+  model: string,
+  operation: string,
+  args: unknown,
+  ownerId: string,
+): Json {
+  if (model === 'User') return scopeUserArgs(operation, args, ownerId);
+  if (model === 'Invite') return scopeInviteArgs(operation, args, ownerId);
+  throw new OwnerScopeViolationError(`Global model "${model}" has no forOwner() policy.`);
+}
+
+function rejectRawOperation(operation: string): never {
+  throw new OwnerScopeViolationError(
+    `${operation} is not available on scoped or global clients: raw SQL bypasses owner isolation. ` +
+      'Use the typed model API (or db.unsafeRaw, restricted to apps/api/src/auth and packages/db).',
+  );
+}
+
+/**
+ * Unscoped client: private models throw; global models are guarded against relation traversal;
+ * raw operations throw.
+ */
+export function globalGuardExtension(relationFields: RelationFields) {
+  const forbidden = forbiddenGlobalKeys(relationFields);
+  return Prisma.defineExtension({
+    name: 'chameleon-unscoped-guard',
+    query: {
+      $allModels: {
+        $allOperations({ model, operation, args, query }) {
+          if (isPrivateModel(model)) throw new UnscopedAccessError(model, operation);
+          assertGlobalModelArgs(model, operation, args, forbidden);
+          return query(args);
+        },
+      },
+      // Client-level operations (no model): `$queryRaw`, `$executeRaw`, `$queryRawUnsafe`, ...
+      $allOperations({ model, operation, query, args }) {
+        if (model === undefined) rejectRawOperation(operation);
         return query(args);
       },
     },
-  },
-});
+  });
+}
 
 export function ownerScopeExtension(ownerId: string, relationFields: RelationFields) {
   assertOwnerId(ownerId);
+  const forbidden = forbiddenGlobalKeys(relationFields);
   return Prisma.defineExtension({
     name: 'chameleon-for-owner',
     query: {
       $allModels: {
         $allOperations({ model, operation, args, query }) {
           if (!isPrivateModel(model)) {
-            assertNoPrivateRelations(model, operation, args);
-            return query(args);
+            assertGlobalModelArgs(model, operation, args, forbidden);
+            return query(scopeGlobalModelArgs(model, operation, args, ownerId));
           }
           const fields = relationFields.get(model);
           if (!fields) {
@@ -254,6 +440,10 @@ export function ownerScopeExtension(ownerId: string, relationFields: RelationFie
           }
           return query(scopeArgs(operation, args, ownerId, fields));
         },
+      },
+      $allOperations({ model, operation, query, args }) {
+        if (model === undefined) rejectRawOperation(operation);
+        return query(args);
       },
     },
   });

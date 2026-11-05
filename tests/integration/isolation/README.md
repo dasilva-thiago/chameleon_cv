@@ -78,8 +78,10 @@ Rota removida? Apague a entrada em `coverage.ts` (o gate aponta a entrada obsole
   mecanismos (`forbiddenFor`, `readEverythingAs`, `CrossCaseContext`).
 - `ID_CONFLICT` confirma que um UUID existe em algum dono (oráculo de existência de baixa severidade; UUIDs v7 não são
   adivinháveis). Registrado, não corrigido.
-- O banco **não** impede `UPDATE ... SET ownerId` em tabelas cuja única FK é para `User` (Credential, Session,
-  ConsentRecord, AuditEvent, ProfessionalProfile); a defesa é o `forOwner` (testado) e a revisão de `db.unsafeRaw`/SQL cru.
+- The database blocks `UPDATE ... SET ownerId` on **every** table that has the column, including those whose only FK is
+  to `User` (Credential, Session, ConsentRecord, AuditEvent, ProfessionalProfile): the `owner_immutable` migration
+  installs the `<Table>_owner_immutable` trigger (covered by `packages/db/test/owner-immutable.int.test.ts`). `forOwner`
+  remains the first line of defense; `db.unsafeRaw`/raw SQL stay subject to security review.
 - `TRUNCATE` ignora o gatilho de imutabilidade da `ProfileRevision` (é o que `truncateAll()` do harness usa).
 - Exclusão de conta pelo Prisma (`db.global.user.delete`) falha enquanto houver `ProfileRevision`: a S2.3 precisa de uma
   rotina em `packages/db` que execute `SET LOCAL chameleon.allow_purge = 'on'` na mesma transação do `DELETE`.

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { NestedRelationWriteError, OwnerScopeViolationError } from '../src/errors';
 import { relationFieldsOfClient, scopeArgs } from '../src/for-owner';
-import { PRIVATE_MODELS } from '../src/private-models';
+import { GLOBAL_MODELS, PRIVATE_MODELS } from '../src/private-models';
 
 /**
  * Escrita por RELACAO em forOwner (defeito da S1.4): `connect` troca `(profileId, ownerId)` juntos e
@@ -153,7 +153,10 @@ describe('scopeArgs: escrita por relacao e rejeitada (fail closed)', () => {
 describe('relationFieldsOfClient', () => {
   const clientWith = (models: unknown): unknown => ({ _runtimeDataModel: { models } });
   const allPrivate = (extra: Record<string, unknown> = {}): Record<string, unknown> => ({
-    ...Object.fromEntries(PRIVATE_MODELS.map((m) => [m, { fields: [] }])),
+    // Global models must be present too since S1.5a (the global guard derives their relations).
+    ...Object.fromEntries(
+      [...PRIVATE_MODELS, ...Object.keys(GLOBAL_MODELS)].map((m) => [m, { fields: [] }]),
+    ),
     ...extra,
   });
 
@@ -189,5 +192,10 @@ describe('relationFieldsOfClient', () => {
     const missing = allPrivate();
     delete missing.Skill;
     expect(() => relationFieldsOfClient(clientWith(missing))).toThrow(/ausente/);
+    const missingGlobal = allPrivate();
+    delete missingGlobal.Invite;
+    expect(() => relationFieldsOfClient(clientWith(missingGlobal))).toThrow(
+      /Modelo global "Invite" ausente/,
+    );
   });
 });
