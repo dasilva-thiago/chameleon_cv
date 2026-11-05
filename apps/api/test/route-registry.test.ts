@@ -10,7 +10,12 @@ afterAll(async () => db.$disconnect());
 
 describe('manifesto de rotas (gate de isolamento, ADR-0008 item 5b)', () => {
   it('lista as rotas reais com metodo, caminho, auth e parametros de recurso', () => {
-    const manifest = getRouteManifest(buildTestApp(db).app);
+    const full = getRouteManifest(buildTestApp(db).app);
+    // The profile module (S2.1a) has its own manifest checks: profiles-consent.int.test.ts and the isolation gate.
+    const profile = full.filter((r) => r.path.startsWith('/api/profile'));
+    expect(profile).toHaveLength(26);
+    expect(profile.every((r) => r.auth === 'session')).toBe(true);
+    const manifest = full.filter((r) => !r.path.startsWith('/api/profile'));
     const summary = manifest.map((r) => `${r.method} ${r.path} ${r.auth}`);
     expect(summary).toEqual([
       'POST /api/auth/invites/accept public',

@@ -63,6 +63,7 @@ export function buildTestApp(
     rateLimits?: AppDeps['rateLimits'];
     sessionPolicy?: AppDeps['sessionPolicy'];
     modules?: AppDeps['modules'];
+    profiles?: AppDeps['profiles'];
   } = {},
 ): TestApp {
   const config = options.config ?? testConfig();
@@ -84,6 +85,8 @@ export function buildTestApp(
     },
     ...(options.sessionPolicy ? { sessionPolicy: options.sessionPolicy } : {}),
     ...(options.modules ? { modules: options.modules } : {}),
+    // Import-preview quota off by default (like the auth limits); quota tests pass their own.
+    profiles: { previewQuota: { windowMs: 60_000, max: 100_000 }, ...options.profiles },
   });
   return { app, config, logs };
 }

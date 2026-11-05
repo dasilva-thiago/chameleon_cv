@@ -138,6 +138,104 @@ que o anterior tenha expirado ou que se use `--replace`. `--revoke` encerra o co
 convite revogado/substituído é registrado como `usedAt` preenchido **sem** `usedByUserId`. A CLI recusa
 e-mail que já tem conta. Códigos de saída: `0` ok, `1` erro de regra de negócio, `2` uso incorreto.
 
+## Profile module (S2.1a): `/api/profile/**`
+
+Code in `src/modules/profiles/`; DTOs in `packages/contracts/src/api/profile.ts` (strict Zod, reusing the v2.1.0 record
+schemas; no DTO carries an `ownerId` or `profileId`). One primary profile per owner.
+
+**Structural guarantees**
+
+- **Consent gate.** Every route is declared through `profileRoutes()` (`gate.ts`), which puts, in this order, the session guard
+  (registry), `requireProfileConsent` and the owner-bound scope in front of the handlers. A caller whose LATEST
+  `profile_processing` record is not `granted` (absent or withdrawn) gets `403 CONSENT_REQUIRED_FOR_PROFILE` before any body is
+  read. Test: `test/profiles-consent.int.test.ts` sweeps the real manifest.
+- **Owner-bound store.** Handlers never see `ProfileStore`: `scopeOf(res)` returns an `OwnerProfileStore` built per request from
+  `req.auth` (`scope.ts`); the owner is closed over, `profileId` is not accepted. `test/profiles-owner-binding.test.ts` scans the
+  module sources (no `ownerId`, `req.auth` or raw store outside `scope.ts`/`gate.ts`/`index.ts`).
+- **Not-found parity.** Missing, foreign and malformed ids in a URL all answer the same `404 NOT_FOUND` (same body). Records are
+  created by OMITTING the id (the server generates it); ids the stored profile does not know are `400 VALIDATION_ERROR`, so there
+  is no `ID_CONFLICT` existence oracle on edits.
+- **Writes are serialized per owner** (`OwnerLocks`, in-process): every edit is read-modify-write over the whole document
+  (the contract validates references on the full document). Single-instance assumption.
+- **Body limits.** `JSON_BODY_LIMIT_BYTES` (100 KiB) applies everywhere EXCEPT three route patterns that declare their own parser
+  with `UPLOAD_MAX_BYTES` (default 2 MiB): `POST /profile/imports/preview`, `PUT /profile` and `PUT /profile/sections/:section`
+  (`isLargeBodyRoute`, exact method + path; `app.ts` skips the global parser only for them).
+- **Audit trail** (`AuditEvent`, no PII): `profile.save`, `profile.record.*`, `profile.confirm_batch`, `profile.import.*`,
+  `profile.revision.create`, `profile.export`.
+
+**Routes** (all `auth: session` + consent gate; mutations also need Origin + `X-CSRF-Token`)
+
+| Method and path                                               | Request DTO                                       | Response DTO                                            |
+| ------------------------------------------------------------- | ------------------------------------------------- | ------------------------------------------------------- |
+| `GET /api/profile`                                            | -                                                 | `ProfileStateResponse` (`exists:false` when no profile) |
+| `PUT /api/profile`                                            | `SaveProfileRequest` (`onMissing` default `keep`) | `ProfileWriteResponse`                                  |
+| `GET /api/profile/sections/:section`                          | -                                                 | `ProfileSectionResponse`                                |
+| `PUT /api/profile/sections/:section`                          | `SaveSectionRequest`                              | `ProfileWriteResponse`                                  |
+| `POST /api/profile/records`                                   | `CreateRecordRequest`                             | `ProfileRecordWriteResponse` (`201`)                    |
+| `GET /api/profile/records/:recordId`                          | -                                                 | `ProfileRecordResponse`                                 |
+| `PUT /api/profile/records/:recordId`                          | `ReplaceRecordRequest`                            | `ProfileRecordWriteResponse`                            |
+| `DELETE /api/profile/records/:recordId`                       | -                                                 | `DeleteRecordResponse` (`409 RECORD_IN_USE`)            |
+| `PATCH /api/profile/records/:recordId/meta`                   | `PatchRecordMetaRequest`                          | `ProfileRecordWriteResponse`                            |
+| `POST /api/profile/records/:recordId/archive`                 | -                                                 | `ProfileRecordWriteResponse`                            |
+| `POST /api/profile/confirmations`                             | `ConfirmRecordsRequest` (explicit ids, max 500)   | `ConfirmRecordsResponse`                                |
+| `GET /api/profile/evidence`                                   | -                                                 | `EvidenceListResponse`                                  |
+| `GET /api/profile/evidence/:evidenceId/links`                 | -                                                 | `EvidenceLinksResponse`                                 |
+| `POST /api/profile/evidence/:evidenceId/links`                | `LinkEvidenceRequest`                             | `EvidenceLinksResponse`                                 |
+| `DELETE /api/profile/evidence/:evidenceId/links/:recordId`    | -                                                 | `EvidenceLinksResponse` (idempotent)                    |
+| `GET /api/profile/pending?status=open/resolved/dismissed/all` | -                                                 | `PendingListResponse`                                   |
+| `PATCH /api/profile/pending/:pendingId`                       | `PatchPendingRequest`                             | `ProfileRecordResponse`                                 |
+| `POST /api/profile/revisions`                                 | `CreateRevisionRequest`                           | `CreateRevisionResponse` (`201`, `200` if reused)       |
+| `GET /api/profile/revisions?limit=&before=`                   | -                                                 | `ListRevisionsResponse`                                 |
+| `GET /api/profile/revisions/:revisionId`                      | -                                                 | `RevisionDetailResponse` (`verified` = hash recomputed) |
+| `POST /api/profile/imports/preview`                           | `ImportPreviewRequest` or raw `text/yaml` body    | `ImportPreviewResponse` (`201`; `422 IMPORT_INVALID`)   |
+| `GET /api/profile/imports?status=&limit=`                     | -                                                 | `ListImportsResponse`                                   |
+| `GET /api/profile/imports/:importRecordId`                    | -                                                 | `ImportDetailResponse`                                  |
+| `POST /api/profile/imports/:importRecordId/apply`             | `ApplyImportRequest` (`mode` required)            | `ApplyImportResponse`                                   |
+| `POST /api/profile/imports/:importRecordId/discard`           | -                                                 | `DiscardImportResponse`                                 |
+| `GET /api/profile/export?format=yaml/json`                    | -                                                 | the v2.1.0 document (attachment, `no-store`)            |
+
+**Governance rules the API enforces** (ADR-0005): records have no `meta` until someone sets it (the store treats that as the most
+restrictive default); `PATCH .../meta` is the only way to confirm one by one, `POST /confirmations` the only batch way (explicit ids,
+only `needs_review` -> `confirmed`; unknown ids are reported as `not_found`, foreign ones identically); `archived` always means
+`resume_use: never` (filled when missing, `400` when a write says otherwise, on every write path); a file can never confirm
+anything. Per-record edits use `onMissing: archive` over the COMPLETE document (nothing is missing, and link rows removed from
+`supports`/`evidence_ids` are really dropped); whole-document and section saves default to `keep` (explicit `archive`/`delete`
+only). With `keep`, removing an id from `evidence.supports`/`meta.evidence_ids` does NOT unlink (store limitation): use the
+`.../links` routes, or an explicit `onMissing`.
+
+**Import (ADR-0013)**
+
+1. `POST /imports/preview`: JSON `{ text, format?, mode? }` or a raw body (`text/yaml`, `application/yaml`, `application/x-yaml`,
+   `text/plain`; `?mode=`). Text is UNTRUSTED: at most `UPLOAD_MAX_BYTES` bytes of UTF-8 (default 2 MiB; `413 PAYLOAD_TOO_LARGE`;
+   the JSON envelope is accepted up to 2x + 4 KiB for escaping and then checked on the decoded text), content type allowlist (`415`),
+   `profile-io` parse limits (depth 32, 200k nodes, strings 20k, no aliases/anchors/tags/merge keys, no `__proto__`/`constructor`/
+   `prototype` keys), then migration/validation. Errors carry a FIXED text per code (JSON/YAML library messages quote the input and are
+   never forwarded); nothing from the file reaches the logs. A failing file creates no `ImportRecord` (`422 IMPORT_INVALID`). A valid
+   one creates an `ImportRecord` in `preview` (source/target versions, steps, warnings, `idMap`) and returns the `ImportPreview`
+   (counts, per-record `create|update|unchanged` against the CURRENT profile, using `getImportIdMap` + the stored document).
+   Per-owner quota: 30 previews / 10 min (`429` + `Retry-After`). The first preview creates the (empty) profile row the
+   `ImportRecord` hangs from.
+2. The processed document of a preview is kept in memory (30 min, 5 per owner, 100 total) because `ImportRecord` does not persist it.
+   After a restart or the TTL, apply answers `409 IMPORT_PREVIEW_EXPIRED` and the user previews again.
+3. `POST /imports/:id/apply { mode: merge|replace }`: explicit, one-shot. `replace` needs `confirmReplace: true` (it archives facts and
+   removes contacts/evidence/pending/restrictions the file omits). Before applying, a revision of the previous state is created
+   (`previousRevision`). Everything imported is `needs_review` (`archived` stays `archived`, with `resume_use: never`), EXCEPT records
+   the file leaves unchanged against the stored profile: those keep their current `meta` (confirmed/archived decisions survive
+   re-importing your own export; a changed record goes back to review). Ids that belong to another account give
+   `409 ID_CONFLICT` (no hint of whose); `regenerateConflictingIds: true` imports them with new ids.
+4. Re-importing an export is idempotent: `preview.totals.create == 0`, `update == 0`, and applying creates/updates nothing.
+
+**Export.** `GET /export?format=yaml|json` returns the canonical v2.1.0 document with ids (round-trips with import), including
+private fields (it is the owner's own data). File name `chameleon-profile-YYYYMMDD.<ext>`, `Content-Disposition: attachment`,
+`Cache-Control: no-store`, `X-Content-Type-Options: nosniff`. A profile that does not exist yet answers `404`.
+
+**New error codes** (`API_ERROR_CODES`): `CONSENT_REQUIRED_FOR_PROFILE` (403), `IMPORT_INVALID` (422), `IMPORT_PREVIEW_EXPIRED` (409),
+`IMPORT_NOT_APPLICABLE` (409), `ID_CONFLICT` (409), `DUPLICATE_SKILL` (409), `CONCURRENT_MODIFICATION` (409), `RECORD_IN_USE` (409).
+
+**Tests.** Unit: `test/profiles-owner-binding.test.ts`, `test/profiles-units.test.ts`, `packages/contracts/test/api-profile.test.ts`.
+Integration: `test/profiles-consent.int.test.ts`; `tests/integration/profile-api/` (`import-export` for all 13 fixtures through HTTP,
+`records`, `lifecycle`, `hostile`); the A x B case `profile.api/cross-owner-behaves-like-not-found` in `tests/integration/isolation/`.
+
 ## Como um módulo de domínio entra (S2+)
 
 ```ts

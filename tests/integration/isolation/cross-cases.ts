@@ -1,4 +1,5 @@
 import { expect } from 'vitest';
+import { listRecords } from '../../../packages/contracts/src';
 import type { CaseInfo } from './support/gate';
 import type { CrossCaseContext } from './support/context';
 import { expectNoLeaks, forbiddenFor, type Forbidden } from './support/leaks';
@@ -9,9 +10,10 @@ import {
   createInvite,
   generateToken,
   hashToken,
+  PRIVATE_MODELS,
   type TestResponse,
 } from './support/workspace';
-import type { Actor, World } from './support/world';
+import { delegateName, type Actor, type World } from './support/world';
 
 /**
  * Casos cruzados HTTP (ADR-0008 item 5b). Cada caso declara as rotas que exercita (`routes`) e o gate
@@ -70,6 +72,28 @@ async function secretsOf(world: World, viewer: Actor, other: Actor): Promise<For
   );
   for (const row of rowIds.rows) own.push({ label: `id de linha do par`, needle: row.id });
   return [...base, ...own];
+}
+
+/**
+ * Everything an owner's profile surface holds, in an order-independent form (no physical row order, so
+ * autovacuum or HEAP updates between two reads cannot make it flap): the document, revisions, imports and the
+ * row count of every private model.
+ */
+async function stableState(world: World, owner: Actor): Promise<unknown> {
+  const scoped = world.testDb.db.forOwner(owner.ownerId) as unknown as Record<
+    string,
+    { count(): Promise<number> }
+  >;
+  const counts: Record<string, number> = {};
+  for (const model of PRIVATE_MODELS)
+    counts[model] = (await scoped[delegateName(model)]?.count()) ?? -1;
+  return {
+    document: (await world.store.loadProfileDocument(owner.ownerId))?.document,
+    revisions: await world.store.listRevisions(owner.ownerId, { limit: 200 }),
+    imports: await world.store.listImportRecords(owner.ownerId, { limit: 200 }),
+    idMap: await world.store.getImportIdMap(owner.ownerId),
+    counts,
+  };
 }
 
 const activeSessions = async (world: World, ownerId: string): Promise<number> =>
@@ -465,6 +489,298 @@ export const CROSS_CASES: Record<string, CrossCase> = {
         ctx.observedBy(world.b),
         await secretsOf(world, world.b, world.a),
       );
+    },
+  },
+
+  // ------------------------------------------------------------------------------------------
+  'profile.api/cross-owner-behaves-like-not-found': {
+    description:
+      'S2.1a: B com ids de A (registro, evidencia, revisao, importacao em previa e aplicada) recebe o MESMO status e ' +
+      'corpo que para um id inexistente ou malformado; escritas/exclusoes/aplicacao de B sobre ids de A nao mudam ' +
+      'nada em A; listagens, exportacao, confirmacao em lote e importacao de B so tem dados de B.',
+    routes: [
+      'GET /api/profile',
+      'PUT /api/profile',
+      'GET /api/profile/sections/:section',
+      'PUT /api/profile/sections/:section',
+      'POST /api/profile/records',
+      'GET /api/profile/records/:recordId',
+      'PUT /api/profile/records/:recordId',
+      'DELETE /api/profile/records/:recordId',
+      'PATCH /api/profile/records/:recordId/meta',
+      'POST /api/profile/records/:recordId/archive',
+      'POST /api/profile/confirmations',
+      'GET /api/profile/evidence',
+      'GET /api/profile/evidence/:evidenceId/links',
+      'POST /api/profile/evidence/:evidenceId/links',
+      'DELETE /api/profile/evidence/:evidenceId/links/:recordId',
+      'GET /api/profile/pending',
+      'PATCH /api/profile/pending/:pendingId',
+      'POST /api/profile/revisions',
+      'GET /api/profile/revisions',
+      'GET /api/profile/revisions/:revisionId',
+      'POST /api/profile/imports/preview',
+      'GET /api/profile/imports',
+      'GET /api/profile/imports/:importRecordId',
+      'POST /api/profile/imports/:importRecordId/apply',
+      'POST /api/profile/imports/:importRecordId/discard',
+      'GET /api/profile/export',
+    ],
+    async run(ctx) {
+      const { world } = ctx;
+      const pair = await ctx.pair('profile-api');
+      const a = ctx.http(pair.a.client);
+      const b = ctx.http(pair.b.client);
+      const secrets = await secretsOf(world, pair.b, pair.a);
+      const secretsForA = await secretsOf(world, pair.a, pair.b);
+      const GHOST = '00000000-0000-4000-8000-000000000000';
+      const GARBAGE = 'nao-e-um-uuid';
+
+      const recordsOf = async (owner: Actor) => {
+        const loaded = await world.store.loadProfileDocument(owner.ownerId);
+        return listRecords(loaded?.document);
+      };
+      const idOfKind = async (owner: Actor, kind: string): Promise<string> => {
+        const found = (await recordsOf(owner)).find((r) => r.kind === kind);
+        if (found?.id == null) throw new Error(`${owner.fixtureId} has no ${kind}`);
+        return found.id;
+      };
+      const factA = await idOfKind(pair.a, 'skill');
+      const experienceA = await idOfKind(pair.a, 'experience');
+      const evidenceA = await idOfKind(pair.a, 'evidence');
+      const pendingB = await idOfKind(pair.b, 'pending_item');
+      const factB = await idOfKind(pair.b, 'skill');
+      const evidenceB = await idOfKind(pair.b, 'evidence');
+
+      // controle positivo: o dono le o que e dele
+      expect((await a.get(`/api/profile/records/${factA}`)).status).toBe(200);
+      expect((await a.get(`/api/profile/revisions/${pair.a.revisionId}`)).status).toBe(200);
+      expect((await a.get(`/api/profile/imports/${pair.a.appliedImportId}`)).status).toBe(200);
+      expect((await a.get(`/api/profile/evidence/${evidenceA}/links`)).status).toBe(200);
+
+      // A's own export (it writes an audit event for A) happens BEFORE the snapshot of A's state
+      const exportA = await a.get('/api/profile/export?format=yaml');
+      expect(exportA.status).toBe(200);
+
+      const before = await stableState(world, pair.a);
+      const beforeB = await stableState(world, pair.b);
+
+      /** B pede o recurso de A, um inexistente e lixo: tudo igual (status + corpo sem requestId). */
+      async function indistinguishable(
+        label: string,
+        request: (id: string) => Promise<TestResponse>,
+        victimId: string,
+        /** A malformed id in the URL is a 404 too; in a JSON body it is a plain schema error (400). */
+        garbageIsNotFound = true,
+      ): Promise<void> {
+        const crossed = await request(victimId);
+        const ghost = await request(GHOST);
+        const garbage = await request(GARBAGE);
+        for (const response of [crossed, ghost, garbage]) ctx.observe(pair.b, response);
+        expect(crossed.status, label).toBe(404);
+        expect(errorShape(crossed), label).toEqual(errorShape(ghost));
+        if (garbageIsNotFound) expect(errorShape(garbage), label).toEqual(errorShape(ghost));
+        else expect(garbage.status, label).toBe(400);
+        expect(crossed.headers['content-length'], label).toBe(ghost.headers['content-length']);
+      }
+
+      const attack = { record: { name: 'CANARY-ATTACK-by-B' } };
+      await indistinguishable('GET record', (id) => b.get(`/api/profile/records/${id}`), factA);
+      await indistinguishable(
+        'PUT record',
+        (id) => b.put(`/api/profile/records/${id}`, attack),
+        factA,
+      );
+      await indistinguishable(
+        'DELETE record',
+        (id) => b.delete(`/api/profile/records/${id}`),
+        factA,
+      );
+      await indistinguishable(
+        'PATCH meta',
+        (id) => b.patch(`/api/profile/records/${id}/meta`, { status: 'confirmed' }),
+        factA,
+      );
+      await indistinguishable(
+        'archive',
+        (id) => b.post(`/api/profile/records/${id}/archive`, {}),
+        factA,
+      );
+      await indistinguishable(
+        'GET links',
+        (id) => b.get(`/api/profile/evidence/${id}/links`),
+        evidenceA,
+      );
+      await indistinguishable(
+        'POST link (evidence of A)',
+        (id) => b.post(`/api/profile/evidence/${id}/links`, { recordId: factB }),
+        evidenceA,
+      );
+      // B's own evidence pointing at A's record: the target is "not found", exactly like a ghost target
+      await indistinguishable(
+        'POST link (target of A)',
+        (id) => b.post(`/api/profile/evidence/${evidenceB}/links`, { recordId: id }),
+        factA,
+        false,
+      );
+      await indistinguishable(
+        'DELETE link (evidence of A)',
+        (id) => b.delete(`/api/profile/evidence/${id}/links/${factA}`),
+        evidenceA,
+      );
+      // unlinking a foreign record from B's own evidence is an idempotent 200 with B's own links only
+      const unlinkForeign = await b.delete(`/api/profile/evidence/${evidenceB}/links/${factA}`);
+      const unlinkGhost = await b.delete(`/api/profile/evidence/${evidenceB}/links/${GHOST}`);
+      ctx.observe(pair.b, unlinkForeign);
+      expect(unlinkForeign.status).toBe(200);
+      expect(unlinkForeign.body).toEqual(unlinkGhost.body);
+      await indistinguishable(
+        'GET revision',
+        (id) => b.get(`/api/profile/revisions/${id}`),
+        pair.a.revisionId,
+      );
+      await indistinguishable(
+        'GET import (applied)',
+        (id) => b.get(`/api/profile/imports/${id}`),
+        pair.a.appliedImportId,
+      );
+      await indistinguishable(
+        'GET import (preview)',
+        (id) => b.get(`/api/profile/imports/${id}`),
+        pair.a.previewImportId,
+      );
+      await indistinguishable(
+        'apply import (preview of A)',
+        (id) => b.post(`/api/profile/imports/${id}/apply`, { mode: 'merge' }),
+        pair.a.previewImportId,
+      );
+      await indistinguishable(
+        'apply import (applied of A)',
+        (id) => b.post(`/api/profile/imports/${id}/apply`, { mode: 'merge' }),
+        pair.a.appliedImportId,
+      );
+      await indistinguishable(
+        'discard import',
+        (id) => b.post(`/api/profile/imports/${id}/discard`, {}),
+        pair.a.previewImportId,
+      );
+      // the symmetric direction on the pending-item route: A attacks B's pending item
+      const attackPending = (id: string) =>
+        a.patch(`/api/profile/pending/${id}`, { status: 'dismissed' });
+      const crossedPending = await attackPending(pendingB);
+      const ghostPending = await attackPending(GHOST);
+      ctx.observe(pair.a, crossedPending);
+      expect(crossedPending.status).toBe(404);
+      expect(errorShape(crossedPending)).toEqual(errorShape(ghostPending));
+      expect(errorShape(await attackPending(GARBAGE))).toEqual(errorShape(ghostPending));
+
+      // a nested create whose parent belongs to A: "not found", like a ghost parent
+      await indistinguishable(
+        'POST record with foreign parent',
+        (id) =>
+          b.post('/api/profile/records', {
+            kind: 'experience_item',
+            parentId: id,
+            record: { kind: 'achievement', text: 'CANARY-ATTACK-nested' },
+          }),
+        experienceA,
+        false,
+      );
+
+      // batch confirmation with A's ids: every id is "not_found", the same answer as for ghosts
+      const idsOfA = (await recordsOf(pair.a)).slice(0, 8).map((r) => String(r.id));
+      const ghosts = idsOfA.map(
+        (_, i) => `00000000-0000-4000-8000-${String(i + 1).padStart(12, '0')}`,
+      );
+      const confirmCrossed = await b.post('/api/profile/confirmations', { recordIds: idsOfA });
+      const confirmGhost = await b.post('/api/profile/confirmations', { recordIds: ghosts });
+      // not observed: `skipped` echoes the ids B itself sent (and nothing else), which the final sweep would flag
+      expect(confirmCrossed.status).toBe(200);
+      expect(bodyOf(confirmCrossed).confirmed).toEqual([]);
+      const skipped = bodyOf(confirmCrossed).skipped as { reason: string }[];
+      expect(skipped).toHaveLength(idsOfA.length);
+      expect((skipped as unknown as { recordId: string }[]).map((entry) => entry.recordId)).toEqual(
+        idsOfA,
+      );
+      expect(Object.keys(bodyOf(confirmCrossed)).sort()).toEqual([
+        'confirmed',
+        'skipped',
+        'summary',
+      ]);
+      expect(JSON.stringify(bodyOf(confirmCrossed).summary)).not.toContain(pair.a.ownerId);
+      expect(skipped.every((s) => s.reason === 'not_found')).toBe(true);
+      expect((bodyOf(confirmGhost).skipped as unknown[]).length).toBe(skipped.length);
+
+      // A's document as the body of B's whole-document save: A's ids are unknown to B (400, no oracle)
+      const documentOfA = (await world.store.loadProfileDocument(pair.a.ownerId))?.document;
+      const putForeign = await b.put('/api/profile', { document: documentOfA });
+      const putPhantom = await b.put('/api/profile', {
+        document: {
+          schema_version: '2.1.0',
+          profile: { skills: [{ id: '99999999-9999-4999-8999-999999999999', name: 'Fantasma' }] },
+        },
+      });
+      ctx.observe(pair.b, putForeign);
+      expect(putForeign.status).toBe(400);
+      expect(putPhantom.status).toBe(400);
+      expect(bodyOf(putForeign).error).toMatchObject({ code: 'VALIDATION_ERROR' });
+      expect(bodyOf(putPhantom).error).toMatchObject({ code: 'VALIDATION_ERROR' });
+      // the section route cannot adopt A's ids either
+      const sectionForeign = await b.put('/api/profile/sections/skills', {
+        value: (documentOfA?.profile.skills ?? []).slice(0, 2),
+      });
+      ctx.observe(pair.b, sectionForeign);
+      expect(sectionForeign.status).toBe(400);
+
+      // reads without ids return B's own data only
+      for (const path of [
+        '/api/profile',
+        '/api/profile/sections/identity',
+        '/api/profile/evidence',
+        '/api/profile/pending?status=all',
+        '/api/profile/revisions',
+        '/api/profile/imports',
+        '/api/profile/export?format=json',
+        '/api/profile/export?format=yaml',
+      ]) {
+        const response = await b.get(path);
+        ctx.observe(pair.b, response);
+        expect(response.status, path).toBe(200);
+      }
+      const ownProfile = await b.get('/api/profile');
+      expect(JSON.stringify(ownProfile.body)).toContain(pair.b.canaries[0]);
+      const revisionB = await b.post('/api/profile/revisions', {});
+      ctx.observe(pair.b, revisionB);
+      expect([200, 201]).toContain(revisionB.status);
+
+      // B's own writes through the section route only touch B
+      const writeB = await b.put('/api/profile/sections/review', {
+        value: { reviewed_by: 'self' },
+      });
+      ctx.observe(pair.b, writeB);
+      expect(writeB.status).toBe(200);
+
+      // another account's export text previewed by B: the text is B's own input; applying it hits ID_CONFLICT
+      const previewByB = await b.post('/api/profile/imports/preview', { text: exportA.text });
+      expect(previewByB.status).toBe(201);
+      const previewId = (bodyOf(previewByB).importRecord as Body).id as string;
+      const conflict = await b.post(`/api/profile/imports/${previewId}/apply`, { mode: 'merge' });
+      ctx.observe(pair.b, conflict);
+      expect(conflict.status).toBe(409);
+      expect(bodyOf(conflict).error).toMatchObject({ code: 'ID_CONFLICT' });
+      expect((await b.post(`/api/profile/imports/${previewId}/discard`, {})).status).toBe(200);
+
+      // A is byte-for-byte untouched; B changed only what B did to itself
+      expect(await stableState(world, pair.a)).toEqual(before);
+      expect(await stableState(world, pair.b)).not.toEqual(beforeB);
+      const afterB = await world.store.loadProfileDocument(pair.b.ownerId);
+      expect(JSON.stringify(afterB?.document)).not.toContain('CANARY-ATTACK');
+      expect(JSON.stringify(await world.store.loadProfileDocument(pair.a.ownerId))).not.toContain(
+        'CANARY-ATTACK',
+      );
+
+      expectNoLeaks('rotas de perfil como B', ctx.observedBy(pair.b), secrets);
+      expectNoLeaks('rotas de perfil como A (par)', ctx.observedBy(pair.a), secretsForA);
     },
   },
 };

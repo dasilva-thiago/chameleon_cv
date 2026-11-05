@@ -92,7 +92,10 @@ describe('requireAuth injeta ownerId e db.forOwner (duas contas)', () => {
 
   it('o manifesto marca rotas com parametro de recurso para o gate da S1.4', () => {
     const { app } = setup();
-    const withParam = getRouteManifest(app).filter((r) => r.hasResourceParam);
+    // the profile module (S2.1a) is covered by the isolation gate; this test is about the probe module
+    const withParam = getRouteManifest(app).filter(
+      (r) => r.hasResourceParam && !r.path.startsWith('/api/profile'),
+    );
     expect(withParam.map((r) => `${r.method} ${r.path}`)).toEqual(['GET /api/probe/:sessionId']);
     expect(withParam[0]).toMatchObject({ auth: 'session', resourceParams: ['sessionId'] });
   });

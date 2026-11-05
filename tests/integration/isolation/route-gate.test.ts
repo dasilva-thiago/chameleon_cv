@@ -87,10 +87,11 @@ describe('gate de rotas: prova negativa com apps sinteticos (o gate FALHA quando
 
   it('rota nova sem parametro mas com sessao e SEM cobertura -> falha', () => {
     const module: ApiModule = ({ routes, requireAuth }) => {
-      routes.get('/profile', { auth: 'session' }, requireAuth, (_req, res) => res.json({}));
+      // not '/profile': that path is a real route since S2.1a and is covered
+      routes.get('/preferences', { auth: 'session' }, requireAuth, (_req, res) => res.json({}));
     };
     const problems = evaluateGate(manifestOf([module]), ROUTE_COVERAGE, CROSS_CASES);
-    expect(problems.join('\n')).toContain('GET /api/profile: sem cobertura cruzada');
+    expect(problems.join('\n')).toContain('GET /api/preferences: sem cobertura cruzada');
   });
 
   it('rota fora do registro (unclassified) -> falha, mesmo que o caminho esteja em coverage.ts', () => {

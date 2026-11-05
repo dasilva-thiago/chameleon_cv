@@ -42,7 +42,11 @@ describe('catalogo: o schema respeita o desenho de isolamento', () => {
   it('toda tabela com ownerId esta em PRIVATE_MODELS e vice-versa (sem tabela esquecida)', async () => {
     expect([...privateTables].sort()).toEqual([...PRIVATE_MODELS].sort());
     const all = await listTables(world.testDb);
-    expect(all.filter((table) => !privateTables.has(table)).sort()).toEqual(['Invite', 'User']);
+    expect(all.filter((table) => !privateTables.has(table)).sort()).toEqual([
+      'AccountDeletion',
+      'Invite',
+      'User',
+    ]);
   });
 
   it('toda tabela privada tem UNIQUE (id, ownerId)', async () => {

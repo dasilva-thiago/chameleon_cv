@@ -17,6 +17,11 @@ import {
   requestId,
 } from './http';
 import { createHttpLogger } from './logging';
+import {
+  type ProfilesModuleOptions,
+  createProfilesModule,
+  isLargeBodyRoute,
+} from './modules/profiles';
 
 /** O que um modulo de dominio recebe para montar suas rotas em `/api` (profiles, imports, ...). */
 export interface ApiModuleContext {
@@ -53,6 +58,8 @@ export interface AppDeps {
   sessionPolicy?: Partial<SessionPolicy>;
   /** Modulos de dominio adicionais (as fatias seguintes entram aqui; testes tambem). */
   modules?: readonly ApiModule[];
+  /** Limits of the built-in profile module (preview cache, import quota); defaults in production. */
+  profiles?: ProfilesModuleOptions;
 }
 
 /** Evita cache de respostas da API (dados de sessao e de conta). */
@@ -102,14 +109,26 @@ export function createApp(deps: AppDeps): Express {
   api.use(noStore);
   api.use(csrfCookieIssuer(auth.cookies));
   api.use(csrfGuard(config, auth.cookies));
-  api.use(express.json({ limit: config.JSON_BODY_LIMIT_BYTES, strict: true }));
+  // Global JSON limit (JSON_BODY_LIMIT_BYTES). Routes with a larger payload (import preview) declare their own
+  // parser and are skipped here by exact METHOD + path; every other route keeps the global limit.
+  const jsonParser = express.json({ limit: config.JSON_BODY_LIMIT_BYTES, strict: true });
+  api.use((req, res, next) =>
+    isLargeBodyRoute(req.method, req.path) ? next() : jsonParser(req, res, next),
+  );
   const routes = registry.group(api, '/api');
   routes.get('/health', { auth: 'public', description: 'Liveness.' }, health);
   registry.mount(api, '/auth', auth.router);
   const profileStore = createProfileStore(db, { snapshot: buildProfileSnapshot });
-  for (const mount of deps.modules ?? []) {
-    mount({ router: api, routes, requireAuth: auth.requireAuth, profileStore, logger, config });
-  }
+  const moduleContext = {
+    router: api,
+    routes,
+    requireAuth: auth.requireAuth,
+    profileStore,
+    logger,
+    config,
+  };
+  createProfilesModule({ now, ...deps.profiles })(moduleContext);
+  for (const mount of deps.modules ?? []) mount(moduleContext);
   registry.mount(app, '/api', api);
 
   app.use(notFoundHandler);
