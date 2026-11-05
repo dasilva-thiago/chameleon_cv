@@ -22,10 +22,11 @@ Atualizado pelo orquestrador a cada fatia. Só marca como concluído o que foi e
 | S0.2b contrato 2.1.0 (telefone BR, nível de idioma descritivo, field_states aninhado, archived na importação, aviso de reimportação sem ids, preview sem valores privados) | data-model-engineer | Concluída |
 | S1.1a Prisma spike + identidade + harness + forOwner | data-model-engineer | Concluída |
 | **Fase 0 (gate)** | orquestrador | **Verificada pelo orquestrador em 2026-11-04: `pnpm check` exit 0 (36 arquivos, 860 testes unit/web), `pnpm test:integration` 5 arquivos / 90 testes passando, `contracts:check` OK** |
-| S1.1b agregado de perfil no banco | data-model-engineer | Em andamento |
-| S1.2 auth, sessões, CSRF, rate limit, DTOs | backend-implementer | Em andamento |
-| S1.3 shell web + login | frontend-implementer | Aguarda DTOs da S1.2 |
-| S1.4 suíte de isolamento | qa-engineer | Aguarda S1.1b e S1.2 |
+| **Fase 1 (gate de segurança)** | security-reviewer (opus, xhigh) | **PASS em 95ebca5** (reverificação direcionada): F1, F2, F3, F4, F5, F6, F8, F9, F13 FIXED; nenhum achado novo. Diferidos: F7, F10 (CI pinada por SHA), F11 (role de banco não-superusuário), F12 (e-mail de autor dos commits) |
+| S1.1b agregado de perfil no banco | data-model-engineer | Concluída |
+| S1.2 auth, sessões, CSRF, rate limit, DTOs | backend-implementer | Concluída |
+| S1.3 shell web + login | frontend-implementer | Concluída |
+| S1.4 suíte de isolamento | qa-engineer | Concluída (achou o furo de relação em forOwner, corrigido) |
 
 Nota: o modelo efetivo de cada subagente é o declarado no frontmatter de `.claude/agents/*.md`; a execução com esse modelo não é verificável a partir daqui.
 
@@ -48,3 +49,10 @@ Nota: o modelo efetivo de cada subagente é o declarado no frontmatter de `.clau
 4. Revisão visual manual do DOCX (Word/Google Docs/LibreOffice).
 5. Retenção, política de privacidade e textos de consentimento.
 6. Confirmar pendências do piloto (data de início do PROATI, espanhol, estado da migração do portfólio).
+
+## Condições herdadas pela Fase 2 (gate de segurança da Fase 1)
+
+1. Toda rota que processa dados de perfil deve checar `hasGrantedConsent(req.auth.db, req.auth.ownerId, 'profile_processing')`, com teste de que consentimento ausente ou retirado é recusado.
+2. O `ProfileStore` deve ficar vinculado ao dono autenticado (construído a partir de `req.auth`) ou haver regra de lint/teste garantindo que o `ownerId` venha só de `req.auth.ownerId`. Toda rota com `:param` precisa do caso cruzado A/B em `coverage.ts`.
+3. Antes de qualquer deploy acessível a terceiros: contrato de proxy (`TRUST_PROXY` = nº real de hops; proxy sobrescreve X-Forwarded-For), CSP na SPA, role de banco não-superusuário.
+4. S2.3: a rotina de exclusão de conta deve usar `SET LOCAL`/`set_config(..., true)` dentro da transação para a flag `chameleon.allow_purge`.
