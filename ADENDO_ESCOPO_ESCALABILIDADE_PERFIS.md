@@ -1,3 +1,5 @@
+> **SUPERSEDIDO (2026-11-05) para decisões de produto e roadmap.** O Chameleon CV é agora uma ferramenta pessoal e privada; veja `docs/REDEFINICAO_PRODUTO_PESSOAL.md`. Este adendo permanece como referência técnica histórica (modelo de perfil); suas metas de escala, multiusuário e universalidade não autorizam trabalho novo.
+
 # Adendo de produto e arquitetura — modelo universal e escalabilidade
 
 **Versão:** 2.0  

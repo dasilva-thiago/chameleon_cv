@@ -60,3 +60,35 @@ Testes:
 - contexto de IA sem campos privados;
 - logs sem canários;
 - teste "sem vazamento do piloto".
+
+## Amendment (S2.3a) — what account deletion and export cover
+
+Implemented in `packages/db/src/account/` (tests: `packages/db/test/account-*.test.ts`).
+
+**Deletion — `db.purgeAccount(ownerId)`** (trusted server code only; not reachable through `forOwner`):
+- One transaction: `set_config('chameleon.allow_purge','on', true)` (transaction-local, so it cannot persist on a
+  pooled connection), `SELECT ... FOR UPDATE` on the `User` row, delete of the invitations tied to the account,
+  `DELETE FROM "User"` (cascade), then a **catalog-driven check** (every table with an `"ownerId"` column must
+  have 0 rows for the owner, the user and its invitations must be gone). Any leftover rolls everything back
+  (`PurgeIncompleteError`). It is the only path that deletes `ProfileRevision` rows.
+- **Deleted:** the user, credentials, sessions, consent records, audit events, the whole profile aggregate,
+  immutable revisions, import records (incl. `idMap` and `unmapped`), and **invitations** that hold the user's
+  e-mail (the one the user accepted and any invitation addressed to the same e-mail). Consent and audit events
+  are deleted too: they are personal data of the account, and the LGPD request prevails (ADR-0006 item 7).
+- **Retained (no PII):** one `AccountDeletion` row per purge: random id, timestamp and the aggregate number of
+  rows removed. No owner id, e-mail, per-table counts or any other link to the person; append-only (trigger).
+  Application logs (30 days, no personal content) remain governed by the retention table above.
+- **Not covered by the database routine (caller's job, after the commit):** `storage.deletePrefix` for uploaded
+  files, clearing the session cookie and an application log line without PII. Rows created after the purge by
+  a concurrent request of the same owner are impossible: the `User` row is locked and then deleted, so their
+  FK insert fails.
+- Idempotent: an unknown or already purged owner returns `purged: false` and records nothing.
+
+**Export — `exportAccountData(db, ownerId, { store })`**: plain JSON (dates as ISO strings) with the account,
+the canonical profile document(s), revisions with their immutable snapshots, import records (steps, warnings,
+id map, unmapped values, summary; the raw uploaded file is not stored in the table), consent records, audit
+events, session metadata, credential kinds and the invitation the account accepted. Allow-list of columns:
+never `passwordHash`, session or invite `tokenHash`. `ACCOUNT_EXPORT_REGISTRY` classifies every table as
+exported (with its section and withheld columns) or excluded with a reason, and tests fail on an unclassified
+table or column. Generation runs, documents and files (S3.x/S2.x) must be added to the registry when those
+tables exist. The zip packaging and `GET /api/account/export` belong to the API.

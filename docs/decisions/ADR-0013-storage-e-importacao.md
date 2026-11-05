@@ -48,3 +48,34 @@ Testes:
 - reimportação idempotente;
 - importação 1.0.0 com avisos;
 - pré-visualização não persiste nada.
+
+## Amendment (S2.4) — annotated Markdown import, phase 2b delivered
+
+`parseProfileMarkdown` (`packages/profile-io/src/markdown.ts`) now reads a filled
+`templates/profile/*.v2.md` into the v2.1.0 interchange object and feeds the same pipeline as
+YAML/JSON (`detectTextFormat` recognises `.md` hints and `<!-- path: ... -->` annotations;
+`loadProfile`/`importProfile` accept `format: 'markdown'`). Delivered behaviour:
+
+- **Anchors only.** The parser trusts the `<!-- path: ... -->` annotations and nothing else. Paths must
+  belong to the contract path list and must not be importer-owned (`meta.status`, `declared_status`,
+  `source*`, `field_states`); anything else is reported (`UNKNOWN_KEY_UNMAPPED`, kept in
+  `report.unmapped`) and not applied. Free Markdown fails with `NO_ANNOTATIONS`.
+- **Records and absence.** Repeatable sections may hold several records, delimited by "registro N"
+  headings, repeated fields or `id` lines (child records also by headings). Placeholders, blanks and
+  "not provided" texts produce no key, so they never become facts or leak as values; explicit markers
+  (`(não se aplica)`, `(prefiro não informar)`, `(ainda não avaliei)`, `(confirmar depois)`) become
+  `field_states`; yes/no/partial style answers map to the contract enums without loss.
+- **Untrusted input.** Same `ParseLimits` as YAML/JSON, linear scanning, report caps, values kept as
+  inert text, and warnings with paths and line numbers only (never file content).
+- **Open items.** `ImportReport.source_format` and the `ImportSourceFormat` DB enum still lack a
+  `markdown` value, so the report records Markdown as `object` plus the step `parse_markdown`
+  (a contract + migration change owned by the contracts/DB slice). New warning code
+  `DUPLICATE_FIELD_IGNORED`. Details and limitations: `packages/profile-io/README.md`.
+
+## Amendment (S2.3a) — `markdown` source format
+
+`ImportReport.source_format` (`IMPORT_SOURCE_FORMATS` in `@chameleon/contracts`) and the Prisma enum
+`ImportSourceFormat` now both include `markdown` (migration `20261105090000_import_source_markdown`;
+`packages/db/test/contract-alignment.test.ts` keeps the two lists equal). `importProfile`/`loadProfile`
+record annotated Markdown as `markdown` (the `parse_markdown` step stays). This closes the "open item" above.
+Raw uploaded content is still not stored in `ImportRecord`; stored files are a storage-layer concern (S2.x).

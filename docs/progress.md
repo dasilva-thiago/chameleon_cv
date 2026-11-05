@@ -1,5 +1,7 @@
 # Registro de andamento e decisões do orquestrador
 
+> **Direção atual (2026-11-05):** ferramenta pessoal e privada — ver [`REDEFINICAO_PRODUTO_PESSOAL.md`](REDEFINICAO_PRODUTO_PESSOAL.md) e o roadmap P0–P5 em [`implementation-plan.md`](implementation-plan.md). As fatias S0–S1 abaixo são históricas e válidas como base.
+
 Atualizado pelo orquestrador a cada fatia. Só marca como concluído o que foi executado e observado.
 
 ## Estado do ambiente (verificado em 2026-11-04)
@@ -8,7 +10,33 @@ Atualizado pelo orquestrador a cada fatia. Só marca como concluído o que foi e
 - Node 24.14, pnpm 12.16, PostgreSQL 18 (cluster do projeto em `127.0.0.1:54329` via `pnpm db:local:*`; o serviço da 5432 não é usado).
 - Sem Docker, sem LibreOffice/Word: PDF via Chromium do Playwright; DOCX sem verificação visual automática (ADR-0012).
 
-## Fases
+## Estado verificado na retomada (2026-11-05)
+
+Git: `main` em 5598ab3, nenhum outro branch/worktree/stash, nenhum agente ativo; todo o trabalho da Fase 2 está **não commitado** (preservado). `pnpm typecheck` verde em todos os pacotes.
+
+| Fatia | Estado verificado |
+|---|---|
+| S2.1a API de perfil | Pronta. `tests/integration/profile-api`: 4 arquivos, 92 testes verdes (reexecutados). Os 1.318 + 555 testes informados não foram reexecutados |
+| S2.2 editor/importação (web) | **Concluída em P0.1** (2026-11-05): lint corrigido, rotas `/perfil/*`, `ImportPage`, `EvidencePanel`, Home, `axe-core` como devDependency, `apps/web/test/profile-ui.test.tsx`. `pnpm check`: 60 arquivos / 1.565 testes; `pnpm test:integration`: 38 arquivos / 682 testes (uma execução teve 1 falha intermitente em `packages/db/test/harness.int.test.ts`, que passou isolada e em 2 reexecuções completas) |
+| S2.3a (data-model-engineer) | Pronta: Markdown em `profile-io` (parse/serialize/relatório), migrações `import_source_markdown` e `account_deletion`, `packages/db/src/account` (export + purge). Unit verdes; `account-purge`/`account-export` integração: 24 testes verdes |
+| S2.3b rotas de conta / importação MD na API | Não iniciada; rotas de conta reclassificadas como fora do escopo pessoal |
+
+Correção feita: `pilot-no-leak.test.ts` falhava porque os novos documentos de redefinição citavam o nome completo do piloto; trocado por "Thiago" (controle de PII mantido).
+
+### Verificação final da P0 (2026-11-05)
+
+- `pnpm check`: 60 arquivos / 1.565 testes; `pnpm test:integration`: 38 arquivos / 682 testes.
+- Ciclo exportar → reimportar com preview → restaurar, com o perfil privado local (`fixtures-private/`, 266 registros; só contagens foram observadas, nenhum conteúdo foi impresso nem versionado): reimportar o próprio export é idempotente (0 criados, 0 atualizados, 266 sem mudança); apagar um registro e reimportar o export com `merge` recria exatamente 1 registro e o export seguinte fica idêntico ao original; importar o export em **outra** conta falha com `409 ID_CONFLICT` e só aplica com `regenerateConflictingIds` (a UI oferece essa opção). Verificado por um teste temporário descartado, não versionado.
+- Limitações não verificadas: não há testes E2E (sem `e2e/` nem `playwright.config`); o axe roda em jsdom, sem regras de contraste; o editor não foi exercitado em navegador real com o perfil privado; uma execução isolada de `packages/db/test/harness.int.test.ts` falhou uma vez e passou nas três reexecuções (causa não investigada).
+
+## Decisões da redefinição pessoal (2026-11-05)
+
+- Escopo: ferramenta privada de uso pessoal; sem SaaS, multiusuário novo, billing ou plataforma universal. `ownerId`, auth, sessões e testes de isolamento permanecem.
+- `docs/implementation-plan.md` reescrito (P0–P5); plano anterior em `docs/archive/implementation-plan-v3-saas.md`.
+- `ADENDO_ESCOPO_ESCALABILIDADE_PERFIS.md`, `PROMPT_EXECUCAO_AUTONOMA_CLAUDE_CODE.md` e o plano V3 marcados como supersedidos para escopo/roadmap.
+- Purge/exportação de conta: código mantido (pronto e testado), sem rotas nem expansão; manutenção secundária. Nenhuma ADR nova: nenhuma decisão técnica mudou.
+
+## Fases (histórico S0–S1)
 
 | Fatia | Agente (modelo declarado no frontmatter) | Estado |
 |---|---|---|

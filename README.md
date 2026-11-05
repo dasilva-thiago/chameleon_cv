@@ -1,8 +1,8 @@
 # ChameleonCV
 
-A platform that adapts resumes to job postings from a **structured professional profile**, for any field and seniority. The system only uses facts that exist in the profile, and every claim in a generated resume points to the record that supports it.
+A **private, personal tool** (single owner) that keeps one structured professional profile, stores job postings, analyzes each posting against the profile, generates tailored resumes with every claim traced to a profile fact, and exports DOCX/PDF. It is not a SaaS or multi-user product.
 
-> Status: work in progress. Done so far: monorepo scaffold, universal profile contract (v2.1.0) with YAML/JSON import, database layer with per-user isolation, session-based authentication and the web shell with login. Profile editing, job analysis, matching, resume generation and DOCX/PDF export are next. See the roadmap in [`docs/implementation-plan.md`](docs/implementation-plan.md), the architecture in [`docs/architecture.md`](docs/architecture.md) and the progress log in [`docs/progress.md`](docs/progress.md).
+> Status: work in progress. Done: monorepo, profile contract (v2.1.0) with YAML/JSON/Markdown import, database layer with owner scoping, session authentication, the profile API (import preview, export) and the web shell with login. In progress: the profile editor and import UI. Next: saved jobs, job analysis and matching, resume generation and editing, DOCX/PDF export. Product definition: [`docs/REDEFINICAO_PRODUTO_PESSOAL.md`](docs/REDEFINICAO_PRODUTO_PESSOAL.md); roadmap: [`docs/implementation-plan.md`](docs/implementation-plan.md); architecture: [`docs/architecture.md`](docs/architecture.md); progress: [`docs/progress.md`](docs/progress.md).
 
 ## Structure
 
