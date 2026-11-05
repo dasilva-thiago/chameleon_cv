@@ -1,6 +1,6 @@
 # ADR-0012 — Exportação DOCX/PDF sem LibreOffice
 
-**Status:** Aceita (não implementada) · 2026-11-04
+**Status:** Aceita; implementada em 2026-11-05 (P4) com os desvios abaixo · 2026-11-04
 
 ## Contexto
 O plano §4.8 sugere converter DOCX→PDF com LibreOffice headless, "quando suportado pelo ambiente", e exige: DOCX editável, PDF com texto selecionável e links, uma coluna, sem tabelas de layout, preview fiel e inspeção do resultado.
@@ -50,3 +50,7 @@ Verificado em 2026-11-04:
 - Testes de integração geram ambos os formatos para 3 fixtures de tamanhos diferentes.
 - Verificação de páginas ≤ 2 quando o conteúdo permite, texto extraído igual ao do `RenderModel` e links presentes.
 - Um teste com um campo contendo `<script>` mostra o texto literal no PDF.
+
+## Implementação (2026-11-05, P4)
+`packages/documents` tem `render-model.ts` (um `RenderModel` para os dois formatos), `docx.ts` (biblioteca `docx`), `html.ts` + `pdf.ts` (HTML com todo valor escapado e CSP restritiva, impresso por `playwright-core`/Chromium com JavaScript e rede desligados; navegadores tentados em ordem: Chromium do Playwright, Chrome, Edge; `PDF_BROWSER`, `PDF_BROWSER_PATH`). O teste do pacote confere, para DOCX e PDF, que o texto sai na ordem do `RenderModel`, que links reais existem (anotações no PDF, relações no DOCX), que não há tabelas/imagens, que conteúdo hostil (`<script>`, `<img>`) aparece como texto literal e que o PDF tem ≤ 2 páginas no exemplo.
+Desvios do desenho original, registrados e não mascarados: **sem** fonte Arimo embarcada (usa Arial/Arimo/Liberation conforme instalado: quebras de linha podem diferir entre máquinas); **sem** pacote `inspect` em produção nem `DocumentExport` persistido (o arquivo é reproduzível do conteúdo aprovado, cujo hash é verificado a cada exportação; a auditoria guarda formato, versão e hash); a verificação visual do DOCX no Word/LibreOffice continua manual (limitação original mantida). Rota: `GET /api/resumes/:resumeId/versions/:versionId/export?format=docx|pdf` (somente versão aprovada).

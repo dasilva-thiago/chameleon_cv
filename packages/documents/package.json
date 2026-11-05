@@ -11,7 +11,12 @@
   },
   "dependencies": {
     "@chameleon/contracts": "workspace:*",
-    "@chameleon/domain": "workspace:*"
+    "@chameleon/domain": "workspace:*",
+    "docx": "^9.15.2",
+    "playwright-core": "^1.64.1"
   },
-  "devDependencies": {}
+  "devDependencies": {
+    "jszip": "^3.10.2",
+    "unpdf": "^2.1.0"
+  }
 }
