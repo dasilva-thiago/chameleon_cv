@@ -29,6 +29,10 @@ Correção feita: `pilot-no-leak.test.ts` falhava porque os novos documentos de 
 - Ciclo exportar → reimportar com preview → restaurar, com o perfil privado local (`fixtures-private/`, 266 registros; só contagens foram observadas, nenhum conteúdo foi impresso nem versionado): reimportar o próprio export é idempotente (0 criados, 0 atualizados, 266 sem mudança); apagar um registro e reimportar o export com `merge` recria exatamente 1 registro e o export seguinte fica idêntico ao original; importar o export em **outra** conta falha com `409 ID_CONFLICT` e só aplica com `regenerateConflictingIds` (a UI oferece essa opção). Verificado por um teste temporário descartado, não versionado.
 - Limitações não verificadas: não há testes E2E (sem `e2e/` nem `playwright.config`); o axe roda em jsdom, sem regras de contraste; o editor não foi exercitado em navegador real com o perfil privado; uma execução isolada de `packages/db/test/harness.int.test.ts` falhou uma vez e passou nas três reexecuções (causa não investigada).
 
+### P1 — vagas salvas (2026-11-05)
+
+Concluída. `pnpm check`: 62 arquivos / 1.585 testes; `pnpm test:integration`: 39 arquivos / 716 testes. Novo: `JobPosting` (migração `20261105100000_job_postings`), `packages/contracts/src/api/jobs.ts`, `apps/api/src/modules/jobs`, `apps/web/src/features/jobs`, `apps/api/test/jobs.int.test.ts`, `apps/web/test/jobs-ui.test.tsx`, caso de isolamento `jobs.api/cross-owner-behaves-like-not-found`. Achado corrigido durante o teste: `contains` do Prisma não escapa `%`/`_` (busca por "%" casava tudo); a busca agora escapa os curingas. Limite da descrição: 30.000 caracteres (cabe no limite JSON padrão de 100 KiB). Limitações: sem E2E em navegador; o campo de texto do navegador normaliza quebras de linha para LF.
+
 ## Decisões da redefinição pessoal (2026-11-05)
 
 - Escopo: ferramenta privada de uso pessoal; sem SaaS, multiusuário novo, billing ou plataforma universal. `ownerId`, auth, sessões e testes de isolamento permanecem.

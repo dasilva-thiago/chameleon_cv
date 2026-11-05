@@ -30,8 +30,8 @@ Monorepo (`apps/api`, `apps/web`, `packages/*`), contrato de perfil v2.1.0, Pris
 
 **Aceite P0:** Thiago mantém o perfil pela interface, importa com preview e exporta/restaura backup sem tocar no banco. `pnpm check` e `pnpm test:integration` verdes.
 
-## P1 — Vagas salvas
-CRUD de vagas (texto original, empresa/cargo/URL/local/modalidade/data opcionais, status simples), listagem com busca/filtro, detalhe, editar/arquivar/excluir. Módulo `jobs` na API, contratos, tabela com `ownerId`, UI. **Aceite:** vaga colada é salva, localizada, editada e reaberta sem perder o texto.
+## P1 — Vagas salvas (concluída em 2026-11-05)
+CRUD de vagas (texto original, empresa/cargo/URL/local/modalidade/data opcionais, status simples), listagem com busca/filtro, detalhe, editar/arquivar/excluir. Módulo `jobs` na API, contratos, tabela com `ownerId`, UI. **Entregue:** modelo `JobPosting` + migração `job_postings` (CHECKs, trigger de `ownerId` imutável, incluído na exportação de conta), contrato `api/jobs`, módulo `apps/api/src/modules/jobs` (5 rotas), caso de isolamento A×B, UI `/vagas` (painel com busca e filtro, adicionar, detalhe com texto original, editar, mudar situação/arquivar, excluir com confirmação), Home e menu. **Aceite:** vaga colada é salva, localizada, editada e reaberta sem perder o texto (testado: texto idêntico byte a byte pela API; pelo navegador as quebras de linha chegam normalizadas em LF).
 
 ## P2 — Análise e correspondência
 Extração de requisitos (determinística primeiro; IA apenas para semântica), matriz requisito → evidência → força → fonte → lacuna, plano de adaptação revisável, cache por hash (vaga + revisão relevante do perfil + prompt + modelo). Somente fatos selecionados vão ao provedor; sem contatos/privados; consentimento exigido. **Aceite:** a análise mostra o que é comprovado, transferível e ausente, com justificativa.
