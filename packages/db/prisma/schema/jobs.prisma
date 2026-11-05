@@ -1,0 +1,45 @@
+// Vagas salvas (P1, docs/REDEFINICAO_PRODUTO_PESSOAL.md §4.2). Dado privado do dono (ownerId, FK em cascata
+// para User, ownerId imutavel por trigger). O texto original e guardado exatamente como colado; o hash
+// SHA-256 dele e a chave de cache das analises (P2). Nada daqui entra no perfil nem em prompts por padrao.
+
+enum JobStatus {
+  saved
+  analyzed
+  application_prepared
+  application_sent
+  interview
+  closed
+  archived
+}
+
+enum JobWorkMode {
+  remote
+  hybrid
+  onsite
+}
+
+model JobPosting {
+  id              String       @id @default(uuid(7)) @db.Uuid
+  ownerId         String       @db.Uuid
+  title           String?
+  company         String?
+  url             String?
+  location        String?
+  workMode        JobWorkMode?
+  /// Data de publicacao informada pela pessoa (dia civil).
+  postedOn        DateTime?    @db.Date
+  status          JobStatus    @default(saved)
+  /// Texto integral original, sem normalizacao.
+  description     String
+  /// SHA-256 hex do `description` (64 caracteres).
+  descriptionHash String
+  notes           String?
+  createdAt       DateTime     @default(now()) @db.Timestamptz(3)
+  updatedAt       DateTime     @updatedAt @db.Timestamptz(3)
+
+  owner User @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@unique([id, ownerId])
+  @@index([ownerId, status, updatedAt])
+  @@index([ownerId, createdAt])
+}

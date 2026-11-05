@@ -44,6 +44,8 @@ export const PRIVATE_MODELS = [
   'UsageRestriction',
   'ProfileRevision',
   'ImportRecord',
+  // Vagas salvas (P1)
+  'JobPosting',
 ] as const satisfies readonly ModelName[];
 
 export const GLOBAL_MODELS = {
@@ -59,7 +61,7 @@ export const GLOBAL_MODELS = {
  * forOwner e o cliente global as rejeitam. O teste do registro confere esta lista contra o schema.
  */
 export const PRIVATE_RELATIONS_OF_GLOBAL = {
-  User: ['credentials', 'sessions', 'consentRecords', 'auditEvents', 'profiles'],
+  User: ['credentials', 'sessions', 'consentRecords', 'auditEvents', 'profiles', 'jobPostings'],
   Invite: [],
   AccountDeletion: [],
 } as const satisfies Record<keyof typeof GLOBAL_MODELS, readonly string[]>;

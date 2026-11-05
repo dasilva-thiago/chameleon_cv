@@ -29,6 +29,7 @@ model User {
   auditEvents    AuditEvent[]
   invitesUsed    Invite[]
   profiles       ProfessionalProfile[]
+  jobPostings    JobPosting[]
 }
 
 /// Credencial de login. Somente o hash argon2id (string PHC) e armazenado.

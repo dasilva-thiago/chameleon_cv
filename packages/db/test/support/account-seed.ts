@@ -122,6 +122,16 @@ export async function seedOwner(
   const second = saved.revision;
   if (!second || second.reused) throw new Error('second revision was not created');
 
+  // A saved job posting whose text carries the audit canary (it must be exported, and purged, with the account).
+  const jobText = `Job posting text ${auditCanary}`;
+  await testDb.db.forOwner(ownerId).jobPosting.create({
+    data: {
+      ownerId,
+      description: jobText,
+      descriptionHash: createHash('sha256').update(jobText).digest('hex'),
+    },
+  });
+
   return {
     ownerId,
     email,

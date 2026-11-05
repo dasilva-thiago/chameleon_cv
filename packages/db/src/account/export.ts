@@ -114,6 +114,22 @@ export interface ExportedInvitation {
   usedAt: string | null;
 }
 
+export interface ExportedJob {
+  id: string;
+  title: string | null;
+  company: string | null;
+  url: string | null;
+  location: string | null;
+  workMode: string | null;
+  postedOn: string | null;
+  status: string;
+  description: string;
+  descriptionHash: string;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface AccountExport {
   format: typeof ACCOUNT_EXPORT_FORMAT;
   version: typeof ACCOUNT_EXPORT_VERSION;
@@ -122,6 +138,7 @@ export interface AccountExport {
   profiles: ExportedProfile[];
   revisions: ExportedRevision[];
   imports: ExportedImportRecord[];
+  jobs: ExportedJob[];
   consents: ExportedConsent[];
   auditEvents: ExportedAuditEvent[];
   sessions: ExportedSession[];
@@ -223,6 +240,24 @@ export async function exportAccountData(
     },
     orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
   });
+  const jobs = await scoped.jobPosting.findMany({
+    select: {
+      id: true,
+      title: true,
+      company: true,
+      url: true,
+      location: true,
+      workMode: true,
+      postedOn: true,
+      status: true,
+      description: true,
+      descriptionHash: true,
+      notes: true,
+      createdAt: true,
+      updatedAt: true,
+    },
+    orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+  });
   const consents = await scoped.consentRecord.findMany({
     select: { id: true, purpose: true, granted: true, policyVersion: true, recordedAt: true },
     orderBy: [{ recordedAt: 'asc' }, { id: 'asc' }],
@@ -303,6 +338,21 @@ export async function exportAccountData(
       revisionId: row.revisionId,
       createdAt: iso(row.createdAt),
       appliedAt: isoOrNull(row.appliedAt),
+    })),
+    jobs: jobs.map((row) => ({
+      id: row.id,
+      title: row.title,
+      company: row.company,
+      url: row.url,
+      location: row.location,
+      workMode: row.workMode,
+      postedOn: row.postedOn === null ? null : row.postedOn.toISOString().slice(0, 10),
+      status: row.status,
+      description: row.description,
+      descriptionHash: row.descriptionHash,
+      notes: row.notes,
+      createdAt: iso(row.createdAt),
+      updatedAt: iso(row.updatedAt),
     })),
     consents: consents.map((row) => ({
       id: row.id,

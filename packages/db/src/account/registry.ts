@@ -18,6 +18,7 @@ export const EXPORT_SECTIONS = [
   'profiles',
   'revisions',
   'imports',
+  'jobs',
 ] as const;
 export type ExportSection = (typeof EXPORT_SECTIONS)[number];
 
@@ -102,6 +103,11 @@ export const ACCOUNT_EXPORT_REGISTRY = {
     note:
       'Import reports (steps, warnings, id map, unmapped values, summary). The raw uploaded file is not ' +
       'stored in this table; stored files are exported by the storage layer (S2.x).',
+  },
+  JobPosting: {
+    status: 'exported',
+    section: 'jobs',
+    note: 'Saved job postings: original text, metadata, status and notes.',
   },
   AccountDeletion: {
     status: 'excluded',

@@ -149,6 +149,7 @@ describe('exportAccountData: content', () => {
       'profiles',
       'revisions',
       'imports',
+      'jobs',
       'consents',
       'auditEvents',
       'sessions',
@@ -205,6 +206,7 @@ describe('export registry against the live catalog', () => {
     auditEvents: (e: AccountExport) => e.auditEvents,
     revisions: (e: AccountExport) => e.revisions,
     imports: (e: AccountExport) => e.imports,
+    jobs: (e: AccountExport) => e.jobs,
   } as const;
 
   it('table columns = exported fields + withheld columns + ownerId (a new column must be classified)', async () => {
