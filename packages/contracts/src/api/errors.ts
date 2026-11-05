@@ -31,6 +31,11 @@ export const API_ERROR_CODES = [
   'RECORD_IN_USE',
   // Analise de vagas (P2)
   'PROFILE_REQUIRED',
+  // Currículos (P3/P4)
+  'VERSION_APPROVED',
+  'VERSION_NOT_APPROVED',
+  'RESUME_INVALID',
+  'EXPORT_UNAVAILABLE',
   'INTERNAL_ERROR',
 ] as const;
 

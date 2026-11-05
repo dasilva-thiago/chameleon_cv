@@ -5,3 +5,5 @@ export * from './normalization';
 export * from './snapshot';
 
 export * from './matching';
+
+export * from './resume';
