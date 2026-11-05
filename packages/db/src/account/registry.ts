@@ -19,6 +19,7 @@ export const EXPORT_SECTIONS = [
   'revisions',
   'imports',
   'jobs',
+  'jobAnalyses',
 ] as const;
 export type ExportSection = (typeof EXPORT_SECTIONS)[number];
 
@@ -108,6 +109,11 @@ export const ACCOUNT_EXPORT_REGISTRY = {
     status: 'exported',
     section: 'jobs',
     note: 'Saved job postings: original text, metadata, status and notes.',
+  },
+  JobAnalysis: {
+    status: 'exported',
+    section: 'jobAnalyses',
+    note: 'Derived analyses of saved jobs (requirements, matches, plan) and the owner review.',
   },
   AccountDeletion: {
     status: 'excluded',

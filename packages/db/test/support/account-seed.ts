@@ -124,11 +124,20 @@ export async function seedOwner(
 
   // A saved job posting whose text carries the audit canary (it must be exported, and purged, with the account).
   const jobText = `Job posting text ${auditCanary}`;
-  await testDb.db.forOwner(ownerId).jobPosting.create({
+  const jobHash = createHash('sha256').update(jobText).digest('hex');
+  const job = await testDb.db.forOwner(ownerId).jobPosting.create({
+    data: { ownerId, description: jobText, descriptionHash: jobHash },
+  });
+  await testDb.db.forOwner(ownerId).jobAnalysis.create({
     data: {
       ownerId,
-      description: jobText,
-      descriptionHash: createHash('sha256').update(jobText).digest('hex'),
+      jobId: job.id,
+      descriptionHash: jobHash,
+      profileHash: createHash('sha256').update(`profile ${auditCanary}`).digest('hex'),
+      engine: 'deterministic',
+      engineVersion: 'test-1',
+      result: { note: auditCanary },
+      review: {},
     },
   });
 

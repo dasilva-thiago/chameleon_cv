@@ -46,6 +46,7 @@ export const PRIVATE_MODELS = [
   'ImportRecord',
   // Vagas salvas (P1)
   'JobPosting',
+  'JobAnalysis',
 ] as const satisfies readonly ModelName[];
 
 export const GLOBAL_MODELS = {

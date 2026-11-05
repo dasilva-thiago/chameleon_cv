@@ -130,6 +130,19 @@ export interface ExportedJob {
   updatedAt: string;
 }
 
+export interface ExportedJobAnalysis {
+  id: string;
+  jobId: string;
+  descriptionHash: string;
+  profileHash: string;
+  engine: string;
+  engineVersion: string;
+  result: Json;
+  review: Json;
+  reviewedAt: string | null;
+  createdAt: string;
+}
+
 export interface AccountExport {
   format: typeof ACCOUNT_EXPORT_FORMAT;
   version: typeof ACCOUNT_EXPORT_VERSION;
@@ -139,6 +152,7 @@ export interface AccountExport {
   revisions: ExportedRevision[];
   imports: ExportedImportRecord[];
   jobs: ExportedJob[];
+  jobAnalyses: ExportedJobAnalysis[];
   consents: ExportedConsent[];
   auditEvents: ExportedAuditEvent[];
   sessions: ExportedSession[];
@@ -258,6 +272,21 @@ export async function exportAccountData(
     },
     orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
   });
+  const jobAnalyses = await scoped.jobAnalysis.findMany({
+    select: {
+      id: true,
+      jobId: true,
+      descriptionHash: true,
+      profileHash: true,
+      engine: true,
+      engineVersion: true,
+      result: true,
+      review: true,
+      reviewedAt: true,
+      createdAt: true,
+    },
+    orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+  });
   const consents = await scoped.consentRecord.findMany({
     select: { id: true, purpose: true, granted: true, policyVersion: true, recordedAt: true },
     orderBy: [{ recordedAt: 'asc' }, { id: 'asc' }],
@@ -353,6 +382,18 @@ export async function exportAccountData(
       notes: row.notes,
       createdAt: iso(row.createdAt),
       updatedAt: iso(row.updatedAt),
+    })),
+    jobAnalyses: jobAnalyses.map((row) => ({
+      id: row.id,
+      jobId: row.jobId,
+      descriptionHash: row.descriptionHash,
+      profileHash: row.profileHash,
+      engine: row.engine,
+      engineVersion: row.engineVersion,
+      result: json(row.result),
+      review: json(row.review),
+      reviewedAt: isoOrNull(row.reviewedAt),
+      createdAt: iso(row.createdAt),
     })),
     consents: consents.map((row) => ({
       id: row.id,

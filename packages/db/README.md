@@ -58,16 +58,17 @@ pnpm db:reset                               # recusa host não local; migrate re
 
 ## Identidade (S1.1a)
 
-| Modelo            | Escopo | Observações                                                                                                 |
-| ----------------- | ------ | ----------------------------------------------------------------------------------------------------------- |
-| `User`            | global | e-mail `citext` único; `User.id` é o `ownerId` dos demais                                                   |
-| `Credential`      | dono   | só hash argon2id (CHECK `$argon2id$%`); uma por `(ownerId, kind)`                                           |
-| `Session`         | dono   | só `tokenHash` (SHA-256 hex, CHECK de formato); expiração deslizante + absoluta; sem IP                     |
-| `Invite`          | global | `tokenHash` único; um convite **em aberto** por e-mail (índice parcial `usedAt IS NULL`)                    |
-| `ConsentRecord`   | dono   | `purpose` (CHECK de formato), `granted`, `policyVersion`, `recordedAt`; append-only                         |
-| `AuditEvent`      | dono   | sem PII em `metadata`                                                                                       |
-| `JobPosting`      | dono   | vaga salva (P1): texto original, `descriptionHash` SHA-256, situação, metadados; CHECKs de tamanho/hash/URL |
-| `AccountDeletion` | global | registro minimo SEM PII de uma exclusao (id, instante, total agregado de linhas); append-only               |
+| Modelo            | Escopo | Observações                                                                                                                                                         |
+| ----------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `User`            | global | e-mail `citext` único; `User.id` é o `ownerId` dos demais                                                                                                           |
+| `Credential`      | dono   | só hash argon2id (CHECK `$argon2id$%`); uma por `(ownerId, kind)`                                                                                                   |
+| `Session`         | dono   | só `tokenHash` (SHA-256 hex, CHECK de formato); expiração deslizante + absoluta; sem IP                                                                             |
+| `Invite`          | global | `tokenHash` único; um convite **em aberto** por e-mail (índice parcial `usedAt IS NULL`)                                                                            |
+| `ConsentRecord`   | dono   | `purpose` (CHECK de formato), `granted`, `policyVersion`, `recordedAt`; append-only                                                                                 |
+| `AuditEvent`      | dono   | sem PII em `metadata`                                                                                                                                               |
+| `JobPosting`      | dono   | vaga salva (P1): texto original, `descriptionHash` SHA-256, situação, metadados; CHECKs de tamanho/hash/URL                                                         |
+| `JobAnalysis`     | dono   | análise derivada de uma vaga (P2): `result`/`review` JSON validados pelo contrato; chave de reaproveitamento (vaga, hash do texto, hash do perfil, versão do motor) |
+| `AccountDeletion` | global | registro minimo SEM PII de uma exclusao (id, instante, total agregado de linhas); append-only                                                                       |
 
 ## Agregado de perfil (S1.1b)
 
