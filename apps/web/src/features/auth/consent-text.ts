@@ -8,5 +8,5 @@ export const PROFILE_CONSENT_LABEL =
 
 export const PROFILE_CONSENT_PARAGRAPHS = [
   'Os dados do perfil que você cadastrar (por exemplo, experiências, formação, habilidades e documentos importados) serão armazenados e tratados somente para montar e adaptar os seus currículos. Eles pertencem à sua conta e não são visíveis a outros usuários.',
-  'Marcar esta opção é opcional para criar a conta. Sua escolha é registrada junto com a versão do texto da política exibida abaixo.',
+  'Esta autorização é necessária para criar a conta. Sua escolha é registrada junto com a versão do texto da política exibida abaixo.',
 ] as const;

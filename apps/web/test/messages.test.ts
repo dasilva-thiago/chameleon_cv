@@ -14,6 +14,15 @@ describe('messageForError', () => {
     },
   );
 
+  it('maps the consent codes to dedicated pt-BR messages', () => {
+    expect(messageForError(new ApiError({ code: 'CONSENT_REQUIRED', status: 400 }))).toBe(
+      'Para criar a conta é necessário autorizar o tratamento dos dados do perfil.',
+    );
+    expect(messageForError(new ApiError({ code: 'CONSENT_INVALID', status: 400 }))).toBe(
+      'O texto da política foi atualizado. Recarregue a página e tente novamente.',
+    );
+  });
+
   it('usa a resposta generica para credenciais, sem distinguir e-mail de senha', () => {
     const message = messageForError(new ApiError({ code: 'INVALID_CREDENTIALS', status: 401 }));
     expect(message).toBe('E-mail ou senha incorretos.');

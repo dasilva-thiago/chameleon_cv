@@ -2,6 +2,7 @@ import {
   DISPLAY_NAME_MAX_LENGTH,
   PASSWORD_MAX_LENGTH,
   PASSWORD_MIN_LENGTH,
+  SIGNUP_CONSENT_PURPOSE,
   displayNameSchema,
   inviteTokenSchema,
   type AcceptInviteRequest,
@@ -155,18 +156,10 @@ function AcceptInviteForm({ token, email }: { token: string; email: string }) {
       token,
       password: values.password,
       ...(displayName !== '' ? { displayName } : {}),
-      // Registra apenas o que o usuario marcou; sem consentimento de IA nesta etapa.
-      ...(values.consentProfile
-        ? {
-            consents: [
-              {
-                purpose: 'profile_processing',
-                granted: true,
-                policyVersion: PROFILE_POLICY_VERSION,
-              },
-            ],
-          }
-        : {}),
+      // The consent is mandatory and validated above; there is no AI consent at signup.
+      consents: [
+        { purpose: SIGNUP_CONSENT_PURPOSE, granted: true, policyVersion: PROFILE_POLICY_VERSION },
+      ],
     };
     accept.mutate(request, {
       onSuccess: () => {
@@ -176,6 +169,9 @@ function AcceptInviteForm({ token, email }: { token: string; email: string }) {
         if (isApiError(error, 'WEAK_PASSWORD')) {
           setError('password', { message: messageForError(error) });
           setFocus('password');
+        } else if (isApiError(error, 'CONSENT_REQUIRED')) {
+          setError('consentProfile', { message: messageForError(error) });
+          setFocus('consentProfile');
         } else if (isApiError(error, 'VALIDATION_ERROR')) {
           const paths = fieldPathsOf(error);
           if (paths.includes('displayName')) {
@@ -193,8 +189,12 @@ function AcceptInviteForm({ token, email }: { token: string; email: string }) {
   if (inviteGone) return <InvalidInvite reason="invalid" />;
 
   const passwordType = showPasswords ? 'text' : 'password';
+  // CONSENT_REQUIRED is shown on the checkbox; CONSENT_INVALID falls through to the banner.
   const genericError =
-    accept.isError && !isApiError(accept.error, 'WEAK_PASSWORD') && !hasFieldError(accept.error);
+    accept.isError &&
+    !isApiError(accept.error, 'WEAK_PASSWORD') &&
+    !isApiError(accept.error, 'CONSENT_REQUIRED') &&
+    !hasFieldError(accept.error);
 
   return (
     <form
@@ -294,7 +294,11 @@ function AcceptInviteForm({ token, email }: { token: string; email: string }) {
         <CheckboxField
           label={PROFILE_CONSENT_LABEL}
           description={`Versão da política: ${PROFILE_POLICY_VERSION}`}
-          {...register('consentProfile')}
+          aria-required="true"
+          error={errors.consentProfile?.message}
+          {...register('consentProfile', {
+            required: 'Você precisa autorizar o tratamento dos dados do perfil para criar a conta.',
+          })}
         />
       </fieldset>
 

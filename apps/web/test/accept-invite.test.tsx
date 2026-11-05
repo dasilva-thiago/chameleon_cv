@@ -30,9 +30,16 @@ function setupHappyPath() {
   return fake;
 }
 
-async function fillPasswords(user: ReturnType<typeof userEvent.setup>, confirm = PASSWORD) {
+const CONSENT_NAME = /Autorizo o tratamento dos dados/;
+
+/** Fills both password fields and, unless disabled, ticks the mandatory profile consent. */
+async function fillPasswords(
+  user: ReturnType<typeof userEvent.setup>,
+  { consent = true }: { consent?: boolean } = {},
+) {
   await user.type(await screen.findByLabelText(/^Senha/), PASSWORD);
-  await user.type(screen.getByLabelText(/^Confirme a senha/), confirm);
+  await user.type(screen.getByLabelText(/^Confirme a senha/), PASSWORD);
+  if (consent) await user.click(screen.getByRole('checkbox', { name: CONSENT_NAME }));
 }
 
 describe('aceite de convite: token no fragmento', () => {
@@ -206,7 +213,46 @@ describe('aceite de convite: formulario', () => {
     expect(password).toHaveAttribute('type', 'text');
   });
 
-  it('sem marcar o consentimento, nao envia consents; nome vazio nao e enviado', async () => {
+  it('submitting without the consent shows the error, focuses the checkbox and sends no request', async () => {
+    const fake = setupHappyPath();
+    const { user } = renderApp(INVITE_ROUTE);
+    await fillPasswords(user, { consent: false });
+    const consent = screen.getByRole('checkbox', { name: CONSENT_NAME });
+    expect(consent).not.toBeChecked();
+    await user.click(screen.getByRole('button', { name: 'Criar conta' }));
+
+    const message = await screen.findByText(
+      'Você precisa autorizar o tratamento dos dados do perfil para criar a conta.',
+    );
+    expect(consent).toHaveAttribute('aria-invalid', 'true');
+    expect(consent.getAttribute('aria-describedby')).toContain(message.id);
+    expect(consent).toHaveFocus();
+    expect(fake.requestsTo('POST /api/auth/invites/accept')).toHaveLength(0);
+  });
+
+  it('ticking the consent after the error clears it and allows submitting', async () => {
+    const fake = setupHappyPath();
+    const { user } = renderApp(INVITE_ROUTE);
+    await fillPasswords(user, { consent: false });
+    await user.click(screen.getByRole('button', { name: 'Criar conta' }));
+    await screen.findByText(/Você precisa autorizar o tratamento/);
+
+    await user.click(screen.getByRole('checkbox', { name: CONSENT_NAME }));
+    await user.click(screen.getByRole('button', { name: 'Criar conta' }));
+    await screen.findByRole('heading', { level: 1, name: 'Início' });
+    expect(fake.requestsTo('POST /api/auth/invites/accept')).toHaveLength(1);
+  });
+
+  it('shows that the authorization is required and no longer calls it optional', async () => {
+    setupHappyPath();
+    renderApp(INVITE_ROUTE);
+    expect(
+      await screen.findByText(/Esta autorização é necessária para criar a conta/),
+    ).toBeVisible();
+    expect(screen.queryByText(/opcional para criar a conta/)).not.toBeInTheDocument();
+  });
+
+  it('sends exactly the required consent entry; an empty name is not sent', async () => {
     const fake = setupHappyPath();
     const { user } = renderApp(INVITE_ROUTE);
     await fillPasswords(user);
@@ -214,19 +260,22 @@ describe('aceite de convite: formulario', () => {
 
     expect(await screen.findByText('Olá, Bia Souza.')).toBeInTheDocument();
     const [accept] = fake.requestsTo('POST /api/auth/invites/accept');
-    expect(accept?.body).toEqual({ token: INVITE_TOKEN, password: PASSWORD });
+    expect(accept?.body).toEqual({
+      token: INVITE_TOKEN,
+      password: PASSWORD,
+      consents: [
+        { purpose: 'profile_processing', granted: true, policyVersion: PROFILE_POLICY_VERSION },
+      ],
+    });
     expect(accept?.headers.get('X-CSRF-Token')).toMatch(/^Q{43}$/);
   });
 
-  it('marcando o consentimento, registra apenas profile_processing com a versao da politica', async () => {
+  it('with the consent ticked, registers only profile_processing with the policy version', async () => {
     const fake = setupHappyPath();
     const { user } = renderApp(INVITE_ROUTE);
     await user.type(await screen.findByLabelText(/^Nome/), '  Bia Souza ');
-    await fillPasswords(user);
-    const consent = screen.getByRole('checkbox', { name: /Autorizo o tratamento dos dados/ });
-    expect(consent).not.toBeChecked();
     expect(screen.getByText(`Versão da política: ${PROFILE_POLICY_VERSION}`)).toBeInTheDocument();
-    await user.click(consent);
+    await fillPasswords(user);
     await user.click(screen.getByRole('button', { name: 'Criar conta' }));
 
     await screen.findByRole('heading', { level: 1, name: 'Início' });
@@ -252,6 +301,41 @@ describe('aceite de convite: formulario', () => {
     expect(await screen.findByText(/Esta senha não é aceita/)).toBeInTheDocument();
     expect(screen.getByLabelText(/^Senha/)).toHaveAttribute('aria-invalid', 'true');
     expect(screen.getByLabelText(/^Senha/)).toHaveFocus();
+  });
+
+  it('CONSENT_REQUIRED from the server appears on the checkbox and focuses it', async () => {
+    const fake = setupHappyPath();
+    fake.on('POST /api/auth/invites/accept', errorResponse(400, 'CONSENT_REQUIRED'));
+    const { user } = renderApp(INVITE_ROUTE);
+    await fillPasswords(user);
+    await user.click(screen.getByRole('button', { name: 'Criar conta' }));
+
+    expect(
+      await screen.findByText(
+        'Para criar a conta é necessário autorizar o tratamento dos dados do perfil.',
+      ),
+    ).toBeInTheDocument();
+    const consent = screen.getByRole('checkbox', { name: CONSENT_NAME });
+    expect(consent).toHaveAttribute('aria-invalid', 'true');
+    expect(consent).toHaveFocus();
+    // The field error replaces the generic banner.
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('CONSENT_INVALID (stale policy version) shows the reload banner, not a field error', async () => {
+    const fake = setupHappyPath();
+    fake.acceptedPolicyVersions = ['2099-01.1'];
+    const { user } = renderApp(INVITE_ROUTE);
+    await fillPasswords(user);
+    await user.click(screen.getByRole('button', { name: 'Criar conta' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'O texto da política foi atualizado. Recarregue a página e tente novamente.',
+    );
+    expect(screen.getByRole('checkbox', { name: CONSENT_NAME })).not.toHaveAttribute(
+      'aria-invalid',
+    );
+    expect(fake.requestsTo('POST /api/auth/invites/accept')).toHaveLength(1);
   });
 
   it('convite consumido entre o preview e o aceite mostra convite invalido', async () => {

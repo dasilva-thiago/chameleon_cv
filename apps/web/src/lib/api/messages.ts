@@ -19,6 +19,8 @@ const MESSAGES: Record<ApiErrorKind, string> = {
   SIGNUP_CLOSED: 'O cadastro não está disponível no momento.',
   WEAK_PASSWORD:
     'Esta senha não é aceita. Escolha outra, evitando senhas comuns ou que contenham seu e-mail.',
+  CONSENT_REQUIRED: 'Para criar a conta é necessário autorizar o tratamento dos dados do perfil.',
+  CONSENT_INVALID: 'O texto da política foi atualizado. Recarregue a página e tente novamente.',
   RATE_LIMITED: 'Muitas tentativas em pouco tempo. Aguarde um pouco e tente novamente.',
   NOT_FOUND: 'O recurso solicitado não foi encontrado.',
   INTERNAL_ERROR: 'Ocorreu um erro inesperado. Tente novamente em instantes.',

@@ -10,6 +10,7 @@ import {
   type AuthSessionResponse,
 } from '@chameleon/contracts';
 import { vi } from 'vitest';
+import { PROFILE_POLICY_VERSION } from '../../src/lib/config';
 
 /** Token de convite valido para o formato do contrato (43 caracteres base64url). */
 export const INVITE_TOKEN = 'Tk3f9_aB-xYz0123456789ABCDEFGHIJKLMNOPQRStu';
@@ -97,6 +98,8 @@ const BODY_SCHEMAS: Record<string, { safeParse(data: unknown): { success: boolea
 export class FakeApi {
   readonly requests: RecordedRequest[] = [];
   session: AuthSessionResponse | null = null;
+  /** Policy versions the fake server accepts; any other yields 400 CONSENT_INVALID. */
+  acceptedPolicyVersions: string[] = [PROFILE_POLICY_VERSION];
   private readonly handlers = new Map<string, Handler>();
   readonly fetch = vi.fn(async (input: string, init: RequestInit = {}): Promise<Response> => {
     const method = (init.method ?? 'GET').toUpperCase();
@@ -121,6 +124,13 @@ export class FakeApi {
       const schema = BODY_SCHEMAS[`${method} ${input}`];
       if (schema && !schema.safeParse(request.body).success) {
         return errorResponse(400, 'VALIDATION_ERROR');
+      }
+      // Mirrors the server policy check (PROFILE_POLICY_VERSIONS) on invite acceptance.
+      if (`${method} ${input}` === 'POST /api/auth/invites/accept') {
+        const parsed = acceptInviteRequestSchema.parse(request.body);
+        if (!this.acceptedPolicyVersions.includes(parsed.consents[0]?.policyVersion ?? '')) {
+          return errorResponse(400, 'CONSENT_INVALID');
+        }
       }
     }
 
