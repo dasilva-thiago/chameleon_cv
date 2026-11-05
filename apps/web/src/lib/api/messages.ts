@@ -38,7 +38,15 @@ const MESSAGES: Record<ApiErrorKind, string> = {
     'O perfil foi alterado por outra ação ao mesmo tempo. Recarregue os dados e tente de novo.',
   RECORD_IN_USE:
     'Este item não pode ser excluído porque outros itens dependem dele. Remova o vínculo e tente de novo.',
-  PROFILE_REQUIRED: 'Cadastre ou importe o seu perfil profissional antes de analisar uma vaga.',
+  PROFILE_REQUIRED:
+    'Cadastre ou importe o seu perfil profissional antes de analisar uma vaga ou gerar um currículo.',
+  VERSION_APPROVED:
+    'Esta versão já foi aprovada e não pode ser alterada. Crie uma nova versão para editar.',
+  VERSION_NOT_APPROVED: 'Aprove a versão antes de exportar.',
+  RESUME_INVALID:
+    'O currículo tem itens sem fonte confirmada no perfil. Corrija os erros indicados antes de aprovar.',
+  EXPORT_UNAVAILABLE:
+    'Não foi possível gerar o arquivo agora. Para o PDF é preciso ter um navegador (Chromium, Chrome ou Edge) disponível no servidor.',
   INTERNAL_ERROR: 'Ocorreu um erro inesperado. Tente novamente em instantes.',
   NETWORK: 'Não foi possível conectar ao servidor. Verifique sua conexão e tente novamente.',
   TIMEOUT: 'O servidor demorou a responder. Tente novamente.',

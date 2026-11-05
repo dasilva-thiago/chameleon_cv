@@ -177,6 +177,7 @@ function setup(initial: JobAnalysis | null, stale: string[] = []): FakeApi {
   fake.session = makeSession();
   fake.on(`GET /api/jobs/${JOB_ID}`, jsonResponse(200, job));
   fake.on(`GET /api/jobs/${JOB_ID}/analysis`, jsonResponse(200, state(initial, stale)));
+  fake.on(`GET /api/jobs/${JOB_ID}/resumes`, jsonResponse(200, { resumes: [] }));
   return fake;
 }
 

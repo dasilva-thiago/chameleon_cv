@@ -73,6 +73,8 @@ function loggedIn(): FakeApi {
     `GET /api/jobs/${JOB_ID}/analysis`,
     jsonResponse(200, { analysis: null, stale: false, staleBecause: [] }),
   );
+  // ... and for the (still empty) list of resumes
+  fake.on(`GET /api/jobs/${JOB_ID}/resumes`, jsonResponse(200, { resumes: [] }));
   return fake;
 }
 

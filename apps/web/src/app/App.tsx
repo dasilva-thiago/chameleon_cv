@@ -18,6 +18,7 @@ import { PendingPanel } from '../features/profile/PendingPanel';
 import { ProfileLayout } from '../features/profile/ProfileLayout';
 import { ProfileOverviewPage } from '../features/profile/ProfileOverviewPage';
 import { ReviewPanel } from '../features/profile/ReviewPanel';
+import { ResumeEditorPage } from '../features/resumes/ResumeEditorPage';
 import { SectionPage } from '../features/profile/SectionPage';
 import { ErrorBoundary } from './ErrorBoundary';
 
@@ -42,6 +43,7 @@ export function AppRoutes() {
         <Route path="/vagas/nova" element={<NewJobPage />} />
         <Route path="/vagas/:jobId" element={<JobDetailPage />} />
         <Route path="/vagas/:jobId/editar" element={<EditJobPage />} />
+        <Route path="/curriculos/:resumeId/versoes/:versionId" element={<ResumeEditorPage />} />
         <Route path="/conta" element={<AccountPage />} />
       </Route>
       <Route element={<PublicLayout />}>
