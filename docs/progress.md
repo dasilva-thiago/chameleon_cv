@@ -37,6 +37,20 @@ Concluída. `pnpm check`: 62 arquivos / 1.585 testes; `pnpm test:integration`: 3
 
 Concluída com motor determinístico (sem IA). Novo: `packages/domain/src/matching`, `packages/contracts/src/api/analysis.ts`, tabela `JobAnalysis` (migração `20261105110000_job_analysis`), rotas `/api/jobs/:id/analysis`, `apps/web/src/features/jobs/AnalysisSection.tsx`, código de erro `PROFILE_REQUIRED`. Testes: unitários do matcher, fixtures sintéticas (todas as vagas × todos os perfis v2, incluindo a vaga com injeção de prompt), integração da API (cache, desatualização, revisão, consentimento, isolamento A×B) e UI com axe. Verificação com o perfil privado local: só contagens por força foram observadas (nenhum conteúdo impresso). Limitações: requisitos sem termo técnico ("boa comunicação") saem como ausentes com aviso de avaliação manual; "transferível" usa uma tabela pequena de famílias de tecnologia (heurística); a extração depende de a vaga ter seções reconhecíveis (senão avisa e usa listas/frases); nível de idioma e anos de experiência por tecnologia não são calculados (viram cautelas).
 
+### P3 e P4 — currículos e exportação; encerramento da primeira versão funcional (2026-11-05)
+
+Concluídos. Novo: contrato `api/resumes.ts`; `packages/domain/src/resume`; tabelas `Resume`/`ResumeVersion` (migração `20261105120000_resumes`, trigger que recusa qualquer UPDATE de versão aprovada); módulo `apps/api/src/modules/resumes` (11 rotas); `packages/documents` (DOCX/PDF); UI em `apps/web/src/features/resumes` (feita pelo agente `frontend-implementer` e revisada por inteiro); suíte E2E (`e2e/`, `playwright.config.ts`).
+
+Resultados dos gates no estado integrado final: `pnpm check` 69 arquivos / 1.698 testes; `pnpm test:integration` 42 arquivos / 766 testes; `pnpm test:e2e` 1 cenário passando (conta por convite → importar e confirmar perfil sintético → vaga → análise → gerar currículo → editar e salvar → aviso de termo sem fonte → pré-visualizar → aprovar → baixar DOCX e PDF e conferir o conteúdo); `pnpm build` ok (a API mantém `docx` e `playwright-core` externos; antes do ajuste o bundle falhava).
+
+Perfil privado local (fluxo completo pela API; só contagens observadas, nada impresso nem versionado): perfil de 266 registros → 3 vagas sintéticas → análise → geração → aprovação → DOCX e PDF; cada vaga gerou um currículo diferente (seções e itens variam), 0 erros e 0 avisos de proveniência, todos os itens com fonte, PDF com 2 páginas. Esse teste achou um defeito real (listas longas de competências passavam do limite de itens por entrada e a geração falhava com 500); corrigido e coberto por teste.
+
+Verificação visual: o HTML que alimenta o PDF foi renderizado e inspecionado com dados sintéticos (uma coluna, texto selecionável, datas alinhadas). **Não verificado:** a aparência do DOCX no Word/LibreOffice (ferramentas ausentes); o PDF do perfil real não foi visto (por privacidade); a UI não foi revisada visualmente em vários tamanhos de tela (só testes de componente e axe em jsdom, sem regra de contraste); o E2E cobre um navegador (Chromium) e dados sintéticos.
+
+Limitações conhecidas: sem IA (análise e texto são determinísticos); requisitos sem termo técnico aparecem como ausentes com aviso; "transferível" usa uma tabela pequena de famílias de tecnologia; a vaga precisa ter seções reconhecíveis (senão a análise avisa); sem fonte Arimo embarcada no PDF (quebras de linha podem variar entre máquinas); um único template; a descrição da vaga passa pelo campo de texto do navegador (quebras de linha normalizadas em LF); `pnpm test:integration` teve uma falha intermitente do clone de banco sob carga (timeout do teste ampliado).
+
+Próximo trabalho: uso real nas candidaturas e correção dos atritos observados (P5); depois, conforme a dor real, painel inicial, backup completo, verificação do DOCX, deploy privado e IA opcional. Nada de multiusuário, SaaS ou rotas de conta (S2.3b) sem necessidade funcional comprovada.
+
 ## Decisões da redefinição pessoal (2026-11-05)
 
 - Escopo: ferramenta privada de uso pessoal; sem SaaS, multiusuário novo, billing ou plataforma universal. `ownerId`, auth, sessões e testes de isolamento permanecem.

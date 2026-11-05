@@ -2,7 +2,7 @@
 
 A **private, personal tool** (single owner) that keeps one structured professional profile, stores job postings, analyzes each posting against the profile, generates tailored resumes with every claim traced to a profile fact, and exports DOCX/PDF. It is not a SaaS or multi-user product.
 
-> Status: work in progress. Done: monorepo, profile contract (v2.1.0) with YAML/JSON/Markdown import, database layer with owner scoping, session authentication, the profile API (import preview, export) and the web shell with login. In progress: the profile editor and import UI. Next: saved jobs, job analysis and matching, resume generation and editing, DOCX/PDF export. Product definition: [`docs/REDEFINICAO_PRODUTO_PESSOAL.md`](docs/REDEFINICAO_PRODUTO_PESSOAL.md); roadmap: [`docs/implementation-plan.md`](docs/implementation-plan.md); architecture: [`docs/architecture.md`](docs/architecture.md); progress: [`docs/progress.md`](docs/progress.md).
+> Status: **first functional version complete** (2026-11-05). You can maintain the profile (editor, YAML/JSON/Markdown import with preview, export, evidence, pending items), save job postings, analyze each posting against the profile (requirement -> evidence -> strength -> gap, deterministic and local), generate a tailored resume where every line carries the profile facts that support it, review and edit it, approve a version (immutable) and export DOCX/PDF. Not done: AI-assisted wording (needs a provider, key and budget chosen by the owner), visual verification of the DOCX in Word/LibreOffice, a home dashboard. Product definition: [`docs/REDEFINICAO_PRODUTO_PESSOAL.md`](docs/REDEFINICAO_PRODUTO_PESSOAL.md); roadmap and next steps: [`docs/implementation-plan.md`](docs/implementation-plan.md); architecture: [`docs/architecture.md`](docs/architecture.md); progress and test results: [`docs/progress.md`](docs/progress.md).
 
 ## Structure
 
@@ -46,14 +46,15 @@ The script locates the binaries through `PG_BIN` (the `bin` directory), the `PAT
 
 ## Commands
 
-| Command                         | What it does                                                                             |
-| ------------------------------- | ---------------------------------------------------------------------------------------- |
-| `pnpm dev`                      | API and web in development mode                                                          |
-| `pnpm check`                    | formatting, lint, types, contracts and tests (no database, no network)                   |
-| `pnpm test`                     | unit and component tests                                                                 |
-| `pnpm test:integration`         | tests against a real PostgreSQL (needs `TEST_DATABASE_ADMIN_URL` and a running database) |
-| `pnpm format` / `pnpm lint:fix` | fix formatting and lint                                                                  |
-| `pnpm build`                    | build the API and the web app                                                            |
+| Command                         | What it does                                                                                                                             |
+| ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm dev`                      | API and web in development mode                                                                                                          |
+| `pnpm check`                    | formatting, lint, types, contracts and tests (no database, no network)                                                                   |
+| `pnpm test`                     | unit and component tests                                                                                                                 |
+| `pnpm test:integration`         | tests against a real PostgreSQL (needs `TEST_DATABASE_ADMIN_URL` and a running database)                                                 |
+| `pnpm format` / `pnpm lint:fix` | fix formatting and lint                                                                                                                  |
+| `pnpm test:e2e`                 | Playwright on the real stack (API on a throw-away database, Vite, Chromium): profile -> job -> analysis -> resume -> approve -> DOCX/PDF |
+| `pnpm build`                    | build the API and the web app                                                                                                            |
 
 Test conventions: `*.test.ts(x)` are unit tests (or component tests in `apps/web`); `*.int.test.ts` and `tests/integration/**` are integration tests; `e2e/**/*.spec.ts` uses Playwright.
 
