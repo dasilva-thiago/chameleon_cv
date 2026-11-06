@@ -14,6 +14,8 @@ export interface RequestOptions<T> {
   /** Valida a resposta de sucesso contra o contrato publicado. */
   schema: ResponseSchema<T>;
   signal?: AbortSignal | undefined;
+  /** Substitui o timeout padrao do cliente nesta requisicao (operacoes longas, como aplicar uma importacao). */
+  timeoutMs?: number | undefined;
 }
 
 export interface ApiClientOptions {
@@ -26,7 +28,11 @@ export interface ApiClientOptions {
   readCsrf?: () => string | undefined;
 }
 
-export const DEFAULT_TIMEOUT_MS = 15_000;
+/**
+ * Com o banco remoto (Neon) cada consulta custa uma ida e volta de rede; 15 s cortava operacoes legitimas
+ * (a importacao do perfil real levou ~29 s e o cliente desistiu enquanto o servidor concluia).
+ */
+export const DEFAULT_TIMEOUT_MS = 30_000;
 
 function parseRetryAfter(value: string | null): number | undefined {
   if (value === null) return undefined;
@@ -58,7 +64,10 @@ export interface ApiClient {
   patch<T>(path: string, options: RequestOptions<T>): Promise<T>;
   delete<T>(path: string, options: Omit<RequestOptions<T>, 'body'>): Promise<T>;
   /** GET autenticado que devolve o corpo como arquivo (nao como JSON). */
-  download(path: string, options?: { signal?: AbortSignal | undefined }): Promise<DownloadedFile>;
+  download(
+    path: string,
+    options?: { signal?: AbortSignal | undefined; timeoutMs?: number | undefined },
+  ): Promise<DownloadedFile>;
 }
 
 /** Aceita apenas nomes simples (letras, digitos, ponto, hifen, sublinhado): o servidor so emite esses. */
@@ -85,6 +94,7 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
     body: unknown,
     signal: AbortSignal | undefined,
     accept = 'application/json',
+    requestTimeoutMs: number = timeoutMs,
   ): Promise<Response> {
     const headers = new Headers({ Accept: accept });
     const init: RequestInit = { method, headers, credentials: 'same-origin' };
@@ -102,7 +112,7 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
     const timer = setTimeout(() => {
       timedOut = true;
       controller.abort();
-    }, timeoutMs);
+    }, requestTimeoutMs);
     const onExternalAbort = (): void => controller.abort();
     if (signal?.aborted) controller.abort();
     signal?.addEventListener('abort', onExternalAbort, { once: true });
@@ -158,18 +168,18 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
   async function request<T>(
     method: HttpMethod,
     path: string,
-    { body, schema, signal }: RequestOptions<T>,
+    { body, schema, signal, timeoutMs: perRequestTimeoutMs }: RequestOptions<T>,
   ): Promise<T> {
     const mutating = method !== 'GET';
     if (mutating) await ensureCsrfToken(signal);
 
-    let response = await send(method, path, body, signal);
+    let response = await send(method, path, body, signal, 'application/json', perRequestTimeoutMs);
     if (!response.ok && mutating && response.status === 403) {
       // Cookie CSRF ausente ou rotacionado: obtem um novo e repete uma unica vez.
       const error = await toApiError(response.clone());
       if (error.code === 'CSRF_TOKEN') {
         await ensureCsrfToken(signal);
-        response = await send(method, path, body, signal);
+        response = await send(method, path, body, signal, 'application/json', perRequestTimeoutMs);
       }
     }
     if (!response.ok) throw await toApiError(response);
@@ -188,9 +198,12 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
 
   async function download(
     path: string,
-    { signal }: { signal?: AbortSignal | undefined } = {},
+    {
+      signal,
+      timeoutMs: downloadTimeoutMs,
+    }: { signal?: AbortSignal | undefined; timeoutMs?: number | undefined } = {},
   ): Promise<DownloadedFile> {
-    const response = await send('GET', path, undefined, signal, '*/*');
+    const response = await send('GET', path, undefined, signal, '*/*', downloadTimeoutMs);
     if (!response.ok) throw await toApiError(response);
     const blob = await response.blob().catch(() => undefined);
     if (blob === undefined) {

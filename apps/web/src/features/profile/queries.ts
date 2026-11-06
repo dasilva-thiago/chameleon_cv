@@ -90,10 +90,20 @@ export const useUnlinkEvidence = () =>
 export const usePreviewImport = () =>
   useMutation({ mutationFn: (input: ImportPreviewRequest) => profileApi.previewImport(input) });
 
-export const useApplyImport = () =>
-  useProfileMutation((vars: { importId: string; input: ApplyImportRequest }) =>
-    profileApi.applyImport(vars.importId, vars.input),
-  );
+/**
+ * Alem do sucesso, recarrega o perfil do servidor quando a chamada falha: um timeout ou queda de rede nao
+ * prova que a importacao nao foi aplicada (a transacao pode ter concluido no servidor).
+ */
+export const useApplyImport = () => {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: { importId: string; input: ApplyImportRequest }) =>
+      profileApi.applyImport(vars.importId, vars.input),
+    onSettled: async () => {
+      await client.invalidateQueries({ queryKey: PROFILE_KEY });
+    },
+  });
+};
 
 export const useDiscardImport = () =>
   useMutation({ mutationFn: (importId: string) => profileApi.discardImport(importId) });

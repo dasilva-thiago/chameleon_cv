@@ -44,6 +44,9 @@ import { validated } from './validated';
 
 const BASE = '/api/profile';
 
+/** Aplicar uma importacao grande faz centenas de consultas na transacao; com banco remoto passa de 30 s. */
+export const APPLY_IMPORT_TIMEOUT_MS = 180_000;
+
 /** Ids de registro vao no caminho: so aceitamos UUID para nao montar URL com texto arbitrario. */
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 function idPath(id: string): string {
@@ -155,6 +158,7 @@ export function createProfileApi(client: ApiClient): ProfileApi {
       return client.post(`${BASE}/imports/${idPath(importId)}/apply`, {
         body,
         schema: applyImportResponseSchema,
+        timeoutMs: APPLY_IMPORT_TIMEOUT_MS,
       });
     },
     discardImport: (importId) =>

@@ -12,7 +12,7 @@ import { Button } from '../../components/ui/Button';
 import { CheckboxField } from '../../components/ui/CheckboxField';
 import { SelectField } from '../../components/ui/SelectField';
 import { TextAreaField } from '../../components/ui/TextAreaField';
-import { messageForError } from '../../lib/api';
+import { isApiError, messageForError } from '../../lib/api';
 import { RECORD_KIND_LABELS } from './labels';
 import { useApplyImport, useDiscardImport, usePreviewImport } from './queries';
 
@@ -338,7 +338,9 @@ function PreviewStage({
 
       {apply.isError ? (
         <Alert tone="error" title="Não foi possível aplicar">
-          {messageForError(apply.error)}
+          {isApiError(apply.error, 'TIMEOUT') || isApiError(apply.error, 'NETWORK')
+            ? 'Perdemos a resposta do servidor. A importação pode ter sido concluída: confira o seu perfil antes de tentar de novo.'
+            : messageForError(apply.error)}
         </Alert>
       ) : null}
       {discard.isError ? (

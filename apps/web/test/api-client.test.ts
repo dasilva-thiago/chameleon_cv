@@ -191,6 +191,28 @@ describe('cliente de API: erros tipados', () => {
     expect(aborted).toBe(true);
   });
 
+  it('timeoutMs da requisicao sobrescreve o padrao do cliente (operacoes longas nao estouram)', async () => {
+    const slowOk = ((_input: string, init: RequestInit) =>
+      new Promise<Response>((resolve, reject) => {
+        init.signal?.addEventListener('abort', () => {
+          reject(new DOMException('aborted', 'AbortError'));
+        });
+        setTimeout(() => {
+          resolve(new Response(JSON.stringify({ ok: true }), { status: 200 }));
+        }, 60);
+      })) as unknown as typeof fetch;
+    const schema = { safeParse: (data: unknown) => ({ success: true as const, data }) };
+
+    // Padrao de 20 ms: a resposta de 60 ms chega tarde demais.
+    const strict = createApiClient({ fetchImpl: slowOk, timeoutMs: 20 });
+    await expect(strict.get('/api/lento', { schema })).rejects.toMatchObject({ code: 'TIMEOUT' });
+
+    // Com 500 ms so nesta requisicao, a mesma resposta lenta e aceita.
+    await expect(strict.get('/api/lento', { schema, timeoutMs: 500 })).resolves.toEqual({
+      ok: true,
+    });
+  });
+
   it('respeita o AbortSignal externo (ABORTED)', async () => {
     const fetchImpl = ((_input: string, init: RequestInit) =>
       new Promise<Response>((_resolve, reject) => {
