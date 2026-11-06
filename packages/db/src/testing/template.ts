@@ -59,7 +59,8 @@ function runMigrateDeploy(databaseUrl: string): Promise<void> {
   return new Promise((resolvePromise, reject) => {
     const child = spawn(process.execPath, [prismaBin, 'migrate', 'deploy'], {
       cwd: PACKAGE_ROOT,
-      env: { ...process.env, DATABASE_URL: databaseUrl },
+      // The CLI prefers DATABASE_URL_UNPOOLED (a Neon direct URL in the developer .env): point both at the test DB.
+      env: { ...process.env, DATABASE_URL: databaseUrl, DATABASE_URL_UNPOOLED: databaseUrl },
       stdio: ['ignore', 'pipe', 'pipe'],
     });
     let output = '';
