@@ -40,9 +40,21 @@ const isJson = (value: unknown): value is Json =>
 
 const TITLES = {
   pt: {
-    summary: 'Resumo',
-    skills: 'Competências',
-    skillsEntry: 'Tecnologias e competências',
+    summary: 'Resumo profissional',
+    competencies: 'Principais competências',
+    competenciesEntry: 'Principais competências',
+    skills: 'Habilidades',
+    skillCategories: {
+      language: 'Linguagens',
+      framework: 'Frameworks e bibliotecas',
+      library: 'Frameworks e bibliotecas',
+      database: 'Dados e bancos de dados',
+      tool: 'Ferramentas e infraestrutura',
+      method: 'Práticas e métodos',
+      domain: 'Áreas de conhecimento',
+      soft_skill: 'Competências comportamentais',
+      other: 'Outras',
+    },
     experience: 'Experiência profissional',
     projects: 'Projetos',
     education: 'Formação acadêmica',
@@ -53,9 +65,21 @@ const TITLES = {
     unnamed: 'Nome não informado',
   },
   en: {
-    summary: 'Summary',
+    summary: 'Professional summary',
+    competencies: 'Key skills',
+    competenciesEntry: 'Key skills',
     skills: 'Skills',
-    skillsEntry: 'Technologies and skills',
+    skillCategories: {
+      language: 'Languages',
+      framework: 'Frameworks and libraries',
+      library: 'Frameworks and libraries',
+      database: 'Data and databases',
+      tool: 'Tools and infrastructure',
+      method: 'Practices and methods',
+      domain: 'Knowledge areas',
+      soft_skill: 'Soft skills',
+      other: 'Other',
+    },
     experience: 'Professional experience',
     projects: 'Projects',
     education: 'Education',
@@ -91,7 +115,7 @@ function period(
 ): string | null {
   const from = formatPartialDate(start, labels.present);
   const to = formatPartialDate(end, labels.present) ?? fallbackEnd;
-  if (from !== undefined && to !== undefined) return `${from} – ${to}`;
+  if (from !== undefined && to !== undefined) return from === to ? from : `${from} – ${to}`;
   return from ?? to ?? null;
 }
 
@@ -99,6 +123,29 @@ const sortKey = (value: unknown): string => {
   const text = str(value);
   return text === undefined || text === 'present' ? '9999' : text;
 };
+
+/** `Pindamonhangaba - SP` from a location object, or the plain string. */
+function placeOf(value: unknown): string | null {
+  if (typeof value === 'string') return str(value) ?? null;
+  if (!isJson(value)) return null;
+  const parts = [str(value.city), str(value.region)].filter((p): p is string => p !== undefined);
+  return parts.length > 0 ? parts.join(' - ') : null;
+}
+
+/** Comma-joined keywords that fit one line (cut at a whole item, never mid-word). */
+function lineOfKeywords(value: unknown, max: number): string | null {
+  if (!Array.isArray(value)) return null;
+  const picked: string[] = [];
+  for (const raw of value) {
+    const word = str(raw);
+    if (word === undefined || picked.includes(word)) continue;
+    if ([...picked, word].join(', ').length > max) break;
+    picked.push(word);
+  }
+  return picked.length > 0 ? picked.join(', ') : null;
+}
+
+const HTTP_URL = /^https?:\/\/\S+$/i;
 
 /** Newest first by end date (open-ended first), then by start date. */
 function byRecency(a: IndexedFact, b: IndexedFact): number {
@@ -237,29 +284,92 @@ export function generateResume(
     );
   };
   const skills = ofKind('skill')
-    .filter((skill) => (wanted(skill) || !weakOnly(skill)) && str(skill.value.name) !== undefined)
+    .filter(
+      (skill) =>
+        (wanted(skill) || !weakOnly(skill)) &&
+        str(skill.value.name) !== undefined &&
+        str(skill.value.category) !== 'spoken_language',
+    )
     .sort(byRank)
-    .slice(0, 20);
-  if (skills.length > 0) {
-    const entryId = ids.next('skills');
-    sections.push({
-      id: 'skills',
-      kind: 'skills',
-      title: labels.skills,
+    .slice(0, 36);
+
+  // "Principais competências": the few technical skills the analysis ranked first, shown as tags right after
+  // the summary. The grouped "Habilidades" section below keeps the full list.
+  const TAG_CATEGORIES = new Set([
+    'language',
+    'framework',
+    'library',
+    'database',
+    'tool',
+    'domain',
+  ]);
+  const topSkills = skills
+    .filter((skill) => TAG_CATEGORIES.has(str(skill.value.category) ?? 'other'))
+    .slice(0, 8);
+  let competenciesSection: ResumeBodySection | undefined;
+  if (topSkills.length > 0) {
+    const entryId = ids.next('competencies');
+    competenciesSection = {
+      id: 'competencies',
+      kind: 'competencies',
+      title: labels.competencies,
       entries: [
         {
           id: entryId,
-          heading: labels.skillsEntry,
+          heading: labels.competenciesEntry,
           subheading: null,
           period: null,
-          bullets: skills.map((skill, n) =>
+          bullets: topSkills.map((skill, n) =>
             bullet(entryId, n + 1, str(skill.value.name) ?? '', skill.id),
           ),
-          sourceIds: skills.map((skill) => skill.id).slice(0, RESUME_LIMITS.sourcesPerItem),
+          sourceIds: topSkills.map((skill) => skill.id).slice(0, RESUME_LIMITS.sourcesPerItem),
         },
       ],
-    });
+    };
   }
+
+  // Grouped by the skill category, in a fixed, readable order.
+  const CATEGORY_ORDER = [
+    'language',
+    'framework',
+    'database',
+    'tool',
+    'method',
+    'domain',
+    'soft_skill',
+    'other',
+  ] as const;
+  const categoryOf = (skill: IndexedFact): (typeof CATEGORY_ORDER)[number] => {
+    const raw = str(skill.value.category);
+    if (raw === 'library') return 'framework'; // same group label
+    return (CATEGORY_ORDER as readonly string[]).includes(raw ?? '')
+      ? (raw as (typeof CATEGORY_ORDER)[number])
+      : 'other';
+  };
+  const skillEntries: ResumeEntry[] = CATEGORY_ORDER.flatMap((category) => {
+    const members = skills
+      .filter((skill) => categoryOf(skill) === category)
+      .slice(0, RESUME_LIMITS.bulletsPerEntry);
+    if (members.length === 0) return [];
+    const entryId = ids.next('skills');
+    return [
+      {
+        id: entryId,
+        heading: labels.skillCategories[category],
+        subheading: null,
+        period: null,
+        bullets: members.map((skill, n) =>
+          bullet(entryId, n + 1, str(skill.value.name) ?? '', skill.id),
+        ),
+        sourceIds: members.map((skill) => skill.id).slice(0, RESUME_LIMITS.sourcesPerItem),
+      },
+    ];
+  });
+  const skillsSection: ResumeBodySection | undefined =
+    skillEntries.length > 0
+      ? { id: 'skills', kind: 'skills', title: labels.skills, entries: skillEntries }
+      : undefined;
+  if (competenciesSection) sections.push(competenciesSection);
 
   // --- experience --------------------------------------------------------------------------
   const experienceEntries: ResumeEntry[] = ofKind('experience')
@@ -292,6 +402,7 @@ export function generateResume(
             str(experience.value.organization_name) ??
             null,
           period: period(experience.value.start_date, experience.value.end_date, labels),
+          detail: placeOf(experience.value.location),
           bullets,
           sourceIds: [experience.id],
         },
@@ -313,6 +424,13 @@ export function generateResume(
       ? allProjects.filter(wanted)
       : allProjects
   ).slice(0, experienceEntries.length > 0 ? 4 : 3);
+  // Only a project the owner marked as public may expose its link.
+  const publicUrlOf = (project: IndexedFact): string | null => {
+    const access = str(project.value.public_access);
+    if (access !== 'public' && access !== 'partial') return null;
+    const url = str(project.value.public_url) ?? str(project.value.repository_url);
+    return url !== undefined && HTTP_URL.test(url) ? url : null;
+  };
   const projectEntries: ResumeEntry[] = projects.flatMap((project) => {
     const heading = str(project.value.name);
     if (heading === undefined) return [];
@@ -329,12 +447,20 @@ export function generateResume(
     if (texts.length === 0 && contribution !== undefined) {
       texts.push({ text: contribution, sourceId: project.id });
     }
+    // A project with no itemized facts still says what it is, in the owner's own words.
+    const description =
+      str(project.value.short_description) ?? str(project.value.one_line_description);
+    if (texts.length === 0 && description !== undefined) {
+      texts.push({ text: description, sourceId: project.id });
+    }
     return [
       {
         id: entryId,
         heading,
         subheading: str(project.value.role) ?? null,
         period: period(project.value.start_date, project.value.end_date, labels),
+        detail: lineOfKeywords(project.value.resume_keywords, RESUME_LIMITS.line),
+        url: publicUrlOf(project),
         bullets: texts
           .filter((entry) => fits(entry.text, 'Um item de projeto'))
           .map((entry, n) => bullet(entryId, n + 1, entry.text, entry.sourceId)),
@@ -367,6 +493,7 @@ export function generateResume(
           id: ids.next('education'),
           heading,
           subheading: str(education.value.institution) ?? null,
+          detail: placeOf(education.value.location),
           period: period(
             education.value.start_date,
             education.value.completion_date,
@@ -430,6 +557,8 @@ export function generateResume(
       entries: certificationEntries,
     });
   }
+
+  if (skillsSection) sections.push(skillsSection);
 
   // --- languages ---------------------------------------------------------------------------
   const languageEntries: ResumeEntry[] = ofKind('language').flatMap((language_) => {

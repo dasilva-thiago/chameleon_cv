@@ -1,4 +1,8 @@
-import type { ResumeExportFormat, ResumeVersionResponse } from '@chameleon/contracts';
+import type {
+  ResumeExportFormat,
+  ResumeExportTemplate,
+  ResumeVersionResponse,
+} from '@chameleon/contracts';
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { resumesApi } from '../../lib/api';
 import { saveBlob } from '../../lib/download';
@@ -111,8 +115,14 @@ export function useExportVersion() {
       resumeId: string;
       versionId: string;
       format: ResumeExportFormat;
+      template: ResumeExportTemplate;
     }) => {
-      const file = await resumesApi.exportVersion(vars.resumeId, vars.versionId, vars.format);
+      const file = await resumesApi.exportVersion(
+        vars.resumeId,
+        vars.versionId,
+        vars.format,
+        vars.template,
+      );
       saveBlob(file.blob, file.filename ?? `curriculo.${vars.format}`);
       return vars.format;
     },

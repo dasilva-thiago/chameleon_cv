@@ -65,6 +65,17 @@ export const resumeEntrySchema = z.strictObject({
   heading: line(RESUME_LIMITS.line),
   subheading: nullableLine(RESUME_LIMITS.line),
   period: nullableLine(RESUME_LIMITS.period),
+  /**
+   * Linha de apoio sob o cabeçalho: local (experiência e formação) ou tecnologias (projeto). Opcional: versões
+   * antigas não têm. Vem dos mesmos registros que sustentam a entrada (`sourceIds`).
+   */
+  detail: nullableLine(RESUME_LIMITS.line).optional(),
+  /** Link público da entrada (projeto publicado, repositório). Só http(s). */
+  url: nullableLine(2048)
+    .refine((value) => value === null || /^https?:\/\/\S+$/i.test(value), {
+      message: 'Use uma URL http(s) válida.',
+    })
+    .optional(),
   bullets: z.array(resumeBulletSchema).max(RESUME_LIMITS.bulletsPerEntry),
   /** Registros que sustentam o cabeçalho da entrada (cargo, empresa, curso...). */
   sourceIds,
@@ -73,6 +84,7 @@ export type ResumeEntry = z.infer<typeof resumeEntrySchema>;
 
 export const RESUME_SECTION_KINDS = [
   'summary',
+  'competencies',
   'skills',
   'experience',
   'projects',
@@ -102,7 +114,7 @@ export type ResumeContact = z.infer<typeof resumeContactSchema>;
 
 export const resumeHeaderSchema = z.strictObject({
   name: line(RESUME_LIMITS.line),
-  /** Título descritivo escolhido pela própria pessoa (`professional_headline`); nunca sintetizado. */
+  /** Título descritivo: o do perfil (`professional_headline`) ou um proposto pela IA e validado (sem senioridade, cargo ou tecnologia que o perfil não sustente). */
   headline: nullableLine(RESUME_LIMITS.line),
   location: nullableLine(RESUME_LIMITS.line),
   contacts: z.array(resumeContactSchema).max(RESUME_LIMITS.contacts),
@@ -227,15 +239,25 @@ export type DeleteResumeResponse = z.infer<typeof deleteResumeResponseSchema>;
 
 // --- Exportação (P4) ------------------------------------------------------------------------
 
-export const RESUME_EXPORT_FORMATS = ['docx', 'pdf'] as const;
+export const RESUME_EXPORT_FORMATS = ['pdf', 'docx', 'html'] as const;
 export const resumeExportFormatSchema = z.enum(RESUME_EXPORT_FORMATS);
 export type ResumeExportFormat = z.infer<typeof resumeExportFormatSchema>;
 
-/** `GET /api/resumes/:resumeId/versions/:versionId/export?format=docx|pdf`: só versões aprovadas (409 caso contrário). */
-export const exportResumeQuerySchema = z.strictObject({ format: resumeExportFormatSchema });
+/** `modern` (padrão): cabeçalho com destaque, competências e seções em cor. `classic`: o modelo original, simples. */
+export const RESUME_EXPORT_TEMPLATES = ['modern', 'classic'] as const;
+export const resumeExportTemplateSchema = z.enum(RESUME_EXPORT_TEMPLATES);
+export type ResumeExportTemplate = z.infer<typeof resumeExportTemplateSchema>;
+export const DEFAULT_RESUME_EXPORT_TEMPLATE: ResumeExportTemplate = 'modern';
+
+/** `GET /api/resumes/:resumeId/versions/:versionId/export?format=pdf|docx|html&template=modern|classic`: só versões aprovadas (409 caso contrário). */
+export const exportResumeQuerySchema = z.strictObject({
+  format: resumeExportFormatSchema,
+  template: resumeExportTemplateSchema.default(DEFAULT_RESUME_EXPORT_TEMPLATE),
+});
 export type ExportResumeQuery = z.input<typeof exportResumeQuerySchema>;
 
 export const RESUME_EXPORT_CONTENT_TYPES = {
   docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   pdf: 'application/pdf',
+  html: 'text/html; charset=utf-8',
 } as const;

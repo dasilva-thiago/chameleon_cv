@@ -489,7 +489,7 @@ export const createResumesModule = (): ApiModule => (context) => {
     {
       auth: 'session',
       description:
-        'Download an APPROVED version as DOCX or PDF, rendered from its stored content (409 VERSION_NOT_APPROVED otherwise).',
+        'Download an APPROVED version as PDF, DOCX or HTML (template modern or classic), rendered from its stored content (409 VERSION_NOT_APPROVED otherwise).',
     },
     requireProfileConsent,
     async (req, res) => {
@@ -510,7 +510,9 @@ export const createResumesModule = (): ApiModule => (context) => {
       const job = await auth.db.jobPosting.findFirst({ where: { id: resume.jobId } });
       let bytes: Uint8Array;
       try {
-        bytes = await exclusiveExport(() => renderResume(content, query.format));
+        bytes = await exclusiveExport(() =>
+          renderResume(content, query.format, { template: query.template }),
+        );
       } catch (error) {
         if (error instanceof ExportUnavailableError) {
           throw new HttpError(
@@ -523,6 +525,7 @@ export const createResumesModule = (): ApiModule => (context) => {
       }
       await audit(auth, req, 'resume.export', row.id, {
         format: query.format,
+        template: query.template,
         versionNumber: row.versionNumber,
         contentHash: row.contentHash,
         bytes: bytes.length,

@@ -245,7 +245,7 @@ describe('editor de currículo: rascunho', () => {
     expect(within(article).getByText('ana@example.com')).toBeVisible();
     expect(within(article).getByRole('heading', { level: 3, name: 'Competências' })).toBeVisible();
     // competências em uma linha separada por pontos
-    expect(within(article).getByText('TypeScript · Node.js')).toBeVisible();
+    expect(within(article).getByText('TypeScript, Node.js')).toBeVisible();
     expect(
       within(article).getByRole('heading', { level: 4, name: 'Dev Backend — Acme' }),
     ).toBeVisible();
@@ -391,7 +391,7 @@ describe('editor de currículo: versão aprovada', () => {
   it('o botão de download baixa o arquivo da versão aprovada', async () => {
     const fake = setup(approved);
     fake.on(
-      `GET ${VERSION_ROUTE(V2)}/export?format=pdf`,
+      `GET ${VERSION_ROUTE(V2)}/export?format=pdf&template=modern`,
       () =>
         new Response(new Blob(['pdf'], { type: 'application/pdf' }), {
           status: 200,

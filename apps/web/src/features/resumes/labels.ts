@@ -1,4 +1,8 @@
-import type { ResumeExportFormat, ResumeVersionStatus } from '@chameleon/contracts';
+import type {
+  ResumeExportFormat,
+  ResumeExportTemplate,
+  ResumeVersionStatus,
+} from '@chameleon/contracts';
 
 export const VERSION_STATUS_LABELS: Record<ResumeVersionStatus, string> = {
   draft: 'Rascunho',
@@ -6,8 +10,14 @@ export const VERSION_STATUS_LABELS: Record<ResumeVersionStatus, string> = {
 };
 
 export const EXPORT_FORMAT_LABELS: Record<ResumeExportFormat, string> = {
-  docx: 'DOCX',
   pdf: 'PDF',
+  docx: 'DOCX',
+  html: 'HTML',
+};
+
+export const EXPORT_TEMPLATE_LABELS: Record<ResumeExportTemplate, string> = {
+  modern: 'Moderno (padrão)',
+  classic: 'Clássico (modelo original)',
 };
 
 export const CONTACT_KIND_LABELS = {

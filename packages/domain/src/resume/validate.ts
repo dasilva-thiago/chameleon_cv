@@ -13,7 +13,7 @@ import { tokenize } from '../matching/text';
 
 const NUMBER = /\d[\d.,]*%?/g;
 
-function unsupportedIn(text: string, sources: readonly IndexedFact[]): string[] {
+export function unsupportedIn(text: string, sources: readonly IndexedFact[]): string[] {
   if (sources.length === 0) return [];
   const haystack = sources.map((source) => source.haystack).join(' ');
   const terms = [...(text.match(NUMBER) ?? []), ...extractKeywords(text)];
@@ -115,9 +115,13 @@ export function validateResume(content: ResumeContent, document: ProfileDocument
       const entryPath = `sections.${String(s)}.entries.${String(e)}`;
       unique(`entry:${entry.id}`, entryPath);
       const entrySources = sourcesOf(entryPath, entry.sourceIds, 'A entrada');
-      if (section.kind !== 'summary' && section.kind !== 'skills') {
+      if (
+        section.kind !== 'summary' &&
+        section.kind !== 'skills' &&
+        section.kind !== 'competencies'
+      ) {
         const missing = headingMissing(
-          [entry.heading, entry.subheading ?? ''].join(' '),
+          [entry.heading, entry.subheading ?? '', entry.detail ?? ''].join(' '),
           entrySources,
         );
         if (missing.length > 0) {

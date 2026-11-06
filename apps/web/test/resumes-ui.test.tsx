@@ -206,7 +206,7 @@ describe('currículos na página da vaga', () => {
 
   it('baixar DOCX pede o arquivo da versão aprovada e entrega com o nome do servidor', async () => {
     const fake = setup();
-    const route = `GET /api/resumes/${RESUME_ID}/versions/${V2}/export?format=docx`;
+    const route = `GET /api/resumes/${RESUME_ID}/versions/${V2}/export?format=docx&template=modern`;
     fake.on(route, () => fileResponse('curriculo-v2.docx', 'application/octet-stream'));
     const { user } = renderApp(`/vagas/${JOB_ID}`);
     const section = await findSection();
@@ -220,10 +220,26 @@ describe('currículos na página da vaga', () => {
     expect(await within(row).findByText(/Arquivo DOCX gerado/)).toBeInTheDocument();
   });
 
+  it('o modelo escolhido vai na requisição e há o botão HTML', async () => {
+    const fake = setup();
+    const route = `GET /api/resumes/${RESUME_ID}/versions/${V2}/export?format=html&template=classic`;
+    fake.on(route, () => fileResponse('curriculo-v2.html', 'text/html'));
+    const { user } = renderApp(`/vagas/${JOB_ID}`);
+    const section = await findSection();
+    const row = rowOf(section, 'Versão 2');
+    await user.selectOptions(within(row).getByLabelText('Modelo do arquivo'), 'classic');
+    await user.click(await within(row).findByRole('button', { name: /^Baixar HTML/ }));
+
+    await waitFor(() => {
+      expect(downloads).toEqual(['curriculo-v2.html']);
+    });
+    expect(fake.requestsTo(route)).toHaveLength(1);
+  });
+
   it('falha no download mostra a mensagem em português e não baixa nada', async () => {
     const fake = setup();
     fake.on(
-      `GET /api/resumes/${RESUME_ID}/versions/${V2}/export?format=pdf`,
+      `GET /api/resumes/${RESUME_ID}/versions/${V2}/export?format=pdf&template=modern`,
       errorResponse(409, 'VERSION_NOT_APPROVED'),
     );
     const { user } = renderApp(`/vagas/${JOB_ID}`);

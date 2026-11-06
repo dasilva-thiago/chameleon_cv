@@ -1,3 +1,4 @@
+import type { ResumeExportTemplate } from '@chameleon/contracts';
 import { chromium, type Browser } from 'playwright-core';
 import { renderHtml } from './html';
 import type { RenderModel } from './render-model';
@@ -16,6 +17,8 @@ export interface PdfOptions {
   /** Absolute path to a Chromium/Chrome binary (`PDF_BROWSER_PATH` overrides). */
   executablePath?: string;
   timeoutMs?: number;
+  /** Layout of the file (default `modern`). */
+  template?: ResumeExportTemplate;
 }
 
 async function launch(options: PdfOptions): Promise<Browser> {
@@ -56,10 +59,12 @@ export async function renderPdf(model: RenderModel, options: PdfOptions = {}): P
       else await route.abort();
     });
     const page = await context.newPage();
-    await page.setContent(renderHtml(model), { waitUntil: 'load' });
+    const template = options.template ?? 'modern';
+    await page.setContent(renderHtml(model, template), { waitUntil: 'load' });
     const pdf = await page.pdf({
       format: model.paper,
-      printBackground: false,
+      // The modern template paints the key-skill tags and the header rule.
+      printBackground: template === 'modern',
       preferCSSPageSize: true,
     });
     return new Uint8Array(pdf);

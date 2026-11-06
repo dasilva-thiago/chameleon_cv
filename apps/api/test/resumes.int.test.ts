@@ -428,6 +428,41 @@ describe('export (P4)', () => {
     expect(xml).not.toMatch(/Terraform|40%|99999/);
   });
 
+  it('downloads HTML in the modern template by default and in the classic one on request', async () => {
+    const { resume, version } = await approved();
+    const modern = await a.client.request(
+      'get',
+      exportUrl(resume.id, version.id, 'html'),
+      undefined,
+      { binary: true },
+    );
+    expect(modern.status).toBe(200);
+    expect(modern.headers['content-type']).toContain('text/html');
+    expect(modern.headers['content-disposition']).toMatch(
+      /^attachment; filename="Ana-Teste_Dev_Acme_\d{8}\.html"$/,
+    );
+    expect(modern.headers['x-content-type-options']).toBe('nosniff');
+    const modernHtml = (modern.body as Buffer).toString('utf8');
+    expect(modernHtml).toContain('class="header-gradient"');
+    expect(modernHtml).toContain('Criou APIs REST em Node.js.');
+    // Only the document body: the stylesheet legitimately contains values such as "40%".
+    expect(modernHtml.split('</style>')[1] ?? '').not.toMatch(/<script|Terraform|40%|99999/);
+
+    const classic = await a.client.request(
+      'get',
+      `${exportUrl(resume.id, version.id, 'html')}&template=classic`,
+      undefined,
+      { binary: true },
+    );
+    expect(classic.status).toBe(200);
+    const classicHtml = (classic.body as Buffer).toString('utf8');
+    expect(classicHtml).toContain('<h1>Ana Teste</h1>');
+    expect(classicHtml).not.toContain('header-gradient');
+
+    const unknown = await a.client.get(`${exportUrl(resume.id, version.id, 'html')}&template=neon`);
+    expect(unknown.status).toBe(400);
+  });
+
   it('downloads a PDF when a browser is available (503 otherwise) and records an audit event without content', async () => {
     const { resume, version } = await approved();
     const response = await a.client.request(

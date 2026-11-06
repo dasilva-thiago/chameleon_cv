@@ -1,5 +1,6 @@
 import {
   EMPTY_REVIEW,
+  RESUME_LIMITS,
   cloneJson,
   parseProfileDocument,
   resumeContentSchema,
@@ -210,7 +211,7 @@ describe('generateResume', () => {
     expect(out.notes.join(' ')).toMatch(/resumo foi omitido/i);
   });
 
-  it('a profile with many skills still yields a valid document (skills are capped, not rejected)', () => {
+  it('a profile with many skills still yields a valid document (each group is capped, not rejected)', () => {
     const many = profile({
       skills: Array.from({ length: 40 }, (_, n) => ({
         id: id(500 + n),
@@ -221,7 +222,8 @@ describe('generateResume', () => {
     });
     const out = generate(many).content;
     expect(() => resumeContentSchema.parse(out)).not.toThrow();
-    expect(bulletsOf(out, 'skills')).toHaveLength(20);
+    // No category: they all fall in the "other" group, capped at the contract limit per entry.
+    expect(bulletsOf(out, 'skills')).toHaveLength(RESUME_LIMITS.bulletsPerEntry);
   });
 
   it('an empty profile yields no sections and says why', () => {
@@ -312,5 +314,123 @@ describe('reconcileOrigins', () => {
     expect(flat[0]?.origin).toBe('edited');
     expect(flat[1]?.origin).toBe('generated');
     expect(flat.find((b) => b.id === 'novo-1')?.origin).toBe('added');
+  });
+});
+
+describe('generateResume: layout fields', () => {
+  const SK = (n: number): string => id(600 + n);
+  const rich = profile({
+    skills: [
+      { id: SK(1), name: 'Python', category: 'language', meta: confirmed },
+      { id: SK(2), name: 'Express', category: 'framework', meta: confirmed },
+      { id: SK(3), name: 'Prisma', category: 'library', meta: confirmed },
+      { id: SK(4), name: 'PostgreSQL', category: 'database', meta: confirmed },
+      { id: SK(5), name: 'Documentação', category: 'method', meta: confirmed },
+      { id: SK(6), name: 'Inglês', category: 'spoken_language', meta: confirmed },
+    ],
+    skill_usages: [],
+    experiences: [
+      {
+        id: EXP,
+        official_title: 'Suporte Técnico',
+        organization_name: 'Acme',
+        location: { city: 'Taubaté', region: 'SP' },
+        start_date: '2025',
+        end_date: '2025',
+        meta: confirmed,
+        items: [
+          {
+            id: EXP_ITEM_OK,
+            kind: 'responsibility',
+            text: 'Triagem de chamados.',
+            meta: confirmed,
+          },
+        ],
+      },
+    ],
+    projects: [
+      {
+        id: PROJECT,
+        name: 'Painel público',
+        public_access: 'public',
+        public_url: 'https://example.test/painel',
+        resume_keywords: ['TypeScript', 'Node.js', 'PostgreSQL'],
+        short_description: 'Painel de métricas de equipamentos.',
+        meta: confirmed,
+      },
+      {
+        id: id(9001),
+        name: 'Projeto privado',
+        public_access: 'not_public',
+        public_url: 'https://example.test/segredo',
+        meta: confirmed,
+      },
+    ],
+    education: [
+      {
+        id: EDU,
+        course_name: 'Engenharia',
+        institution: 'UNIVESP',
+        location: 'São Paulo, SP',
+        meta: confirmed,
+      },
+    ],
+  });
+  const pin = [PROJECT, id(9001)];
+  const out = generate(rich, {
+    analysis: null,
+    review: { ...EMPTY_REVIEW, pinnedRecordIds: pin },
+  }).content;
+
+  it('is still a valid document', () => {
+    expect(() => resumeContentSchema.parse(out)).not.toThrow();
+  });
+
+  it('puts the key technical skills in a "competencies" section right after the summary', () => {
+    const kinds = out.sections.map((section) => section.kind);
+    expect(kinds.indexOf('competencies')).toBe(kinds.indexOf('summary') + 1);
+    // Methods are not tags; a spoken language is never a skill here.
+    expect(bulletsOf(out, 'competencies').map((b) => b.text)).toEqual([
+      'Python',
+      'Express',
+      'Prisma',
+      'PostgreSQL',
+    ]);
+  });
+
+  it('groups the full skill list by category (library joins frameworks, spoken languages are excluded)', () => {
+    const skills = out.sections.find((section) => section.kind === 'skills');
+    expect(
+      skills?.entries.map((entry) => [entry.heading, entry.bullets.map((b) => b.text)]),
+    ).toEqual([
+      ['Linguagens', ['Python']],
+      ['Frameworks e bibliotecas', ['Express', 'Prisma']],
+      ['Dados e bancos de dados', ['PostgreSQL']],
+      ['Práticas e métodos', ['Documentação']],
+    ]);
+    const kinds = out.sections.map((section) => section.kind);
+    expect(kinds.indexOf('skills')).toBeGreaterThan(kinds.indexOf('education'));
+  });
+
+  it('carries the place on experiences and education, and collapses a one-year period', () => {
+    const experience = out.sections.find((s) => s.kind === 'experience')?.entries[0];
+    expect(experience).toMatchObject({ detail: 'Taubaté - SP', period: '2025' });
+    const education = out.sections.find((s) => s.kind === 'education')?.entries[0];
+    expect(education?.detail).toBe('São Paulo, SP');
+  });
+
+  it('shows technologies and the link of a PUBLIC project only, and falls back to its description', () => {
+    const projects = out.sections.find((s) => s.kind === 'projects')?.entries ?? [];
+    const publicProject = projects.find((entry) => entry.heading === 'Painel público');
+    expect(publicProject).toMatchObject({
+      detail: 'TypeScript, Node.js, PostgreSQL',
+      url: 'https://example.test/painel',
+    });
+    expect(publicProject?.bullets.map((b) => b.text)).toEqual([
+      'Painel de métricas de equipamentos.',
+    ]);
+    const privateProject = projects.find((entry) => entry.heading === 'Projeto privado');
+    expect(privateProject?.url ?? null).toBeNull();
+    expect(JSON.stringify(out)).not.toContain('segredo');
   });
 });

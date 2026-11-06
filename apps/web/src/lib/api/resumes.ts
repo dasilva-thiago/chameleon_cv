@@ -1,4 +1,5 @@
 import {
+  DEFAULT_RESUME_EXPORT_TEMPLATE,
   createResumeRequestSchema,
   createResumeResponseSchema,
   deleteResumeResponseSchema,
@@ -6,6 +7,7 @@ import {
   newResumeVersionRequestSchema,
   renameResumeRequestSchema,
   resumeExportFormatSchema,
+  resumeExportTemplateSchema,
   resumeResponseSchema,
   resumeVersionResponseSchema,
   updateResumeVersionRequestSchema,
@@ -14,11 +16,15 @@ import {
   type DeleteResumeResponse,
   type ListResumesResponse,
   type ResumeExportFormat,
+  type ResumeExportTemplate,
   type ResumeResponse,
   type ResumeVersionResponse,
 } from '@chameleon/contracts';
 import { createApiClient, type ApiClient, type DownloadedFile } from './client';
 import { validated } from './validated';
+
+/** Gerar o PDF abre um navegador no servidor e, com banco remoto, a consulta do conteudo tambem demora. */
+const EXPORT_TIMEOUT_MS = 120_000;
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -50,6 +56,7 @@ export interface ResumesApi {
     resumeId: string,
     versionId: string,
     format: ResumeExportFormat,
+    template?: ResumeExportTemplate,
   ): Promise<DownloadedFile>;
 }
 
@@ -104,9 +111,13 @@ export function createResumesApi(client: ApiClient): ResumesApi {
         schema: resumeVersionResponseSchema,
       });
     },
-    exportVersion(resumeId, versionId, format) {
+    exportVersion(resumeId, versionId, format, template = DEFAULT_RESUME_EXPORT_TEMPLATE) {
       const checked = validated(resumeExportFormatSchema, format);
-      return client.download(`${versionPath(resumeId, versionId)}/export?format=${checked}`);
+      const layout = validated(resumeExportTemplateSchema, template);
+      return client.download(
+        `${versionPath(resumeId, versionId)}/export?format=${checked}&template=${layout}`,
+        { timeoutMs: EXPORT_TIMEOUT_MS },
+      );
     },
   };
 }

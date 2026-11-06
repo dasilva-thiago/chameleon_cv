@@ -1,5 +1,6 @@
-import type { ResumeContent, ResumeExportFormat } from '@chameleon/contracts';
+import type { ResumeContent, ResumeExportFormat, ResumeExportTemplate } from '@chameleon/contracts';
 import { renderDocx } from './docx';
+import { renderHtml } from './html';
 import { renderPdf, type PdfOptions } from './pdf';
 import { toRenderModel } from './render-model';
 
@@ -9,12 +10,14 @@ export { renderHtml, escapeHtml } from './html';
 export { renderDocx } from './docx';
 export { ExportUnavailableError, renderPdf, type PdfOptions } from './pdf';
 export {
+  displayPhone,
   textLinesOf,
   toRenderModel,
   type RenderContact,
   type RenderEntry,
   type RenderModel,
   type RenderSection,
+  type RenderSkillGroup,
 } from './render-model';
 
 export interface RenderedDocument {
@@ -22,14 +25,17 @@ export interface RenderedDocument {
   contentType: string;
 }
 
-/** Renders an approved resume to the requested file format. */
+/** Renders an approved resume to the requested file format and template (`modern` by default). */
 export async function renderResume(
   content: ResumeContent,
   format: ResumeExportFormat,
-  options: PdfOptions = {},
+  options: PdfOptions & { template?: ResumeExportTemplate } = {},
 ): Promise<Uint8Array> {
   const model = toRenderModel(content);
-  return format === 'docx' ? renderDocx(model) : renderPdf(model, options);
+  const template = options.template ?? 'modern';
+  if (format === 'docx') return renderDocx(model, template);
+  if (format === 'html') return new TextEncoder().encode(renderHtml(model, template));
+  return renderPdf(model, { ...options, template });
 }
 
 /**

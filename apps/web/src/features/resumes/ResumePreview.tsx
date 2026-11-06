@@ -39,8 +39,22 @@ export function ResumePreview({ content }: { content: ResumeContent }) {
                   {entry.period !== null ? <p className="text-sm">{entry.period}</p> : null}
                 </div>
               )}
-              {section.kind === 'skills' ? (
-                <p>{entry.bullets.map((bullet) => bullet.text).join(' · ')}</p>
+              {entry.detail !== null && entry.detail !== undefined ? (
+                <p className="text-sm text-slate-600">{entry.detail}</p>
+              ) : null}
+              {section.kind === 'competencies' ? (
+                <ul className="flex flex-wrap gap-2">
+                  {entry.bullets.map((bullet) => (
+                    <li
+                      key={bullet.id}
+                      className="rounded border border-teal-200 bg-teal-50 px-2 py-0.5 text-sm text-teal-900"
+                    >
+                      {bullet.text}
+                    </li>
+                  ))}
+                </ul>
+              ) : section.kind === 'skills' ? (
+                <p>{entry.bullets.map((bullet) => bullet.text).join(', ')}</p>
               ) : entry.bullets.length > 0 ? (
                 <ul className="list-disc pl-5">
                   {entry.bullets.map((bullet) => (
