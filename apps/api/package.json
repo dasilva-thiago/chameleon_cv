@@ -9,6 +9,7 @@
   "scripts": {
     "dev": "tsx watch --env-file-if-exists=../../.env src/main.ts",
     "admin:invite": "tsx --env-file-if-exists=../../.env src/cli/admin-invite.main.ts",
+    "ai:check": "tsx --env-file-if-exists=../../.env src/cli/ai-check.main.ts",
     "build": "tsup",
     "start": "node --env-file-if-exists=../../.env dist/main.js",
     "typecheck": "tsc --noEmit -p tsconfig.json"

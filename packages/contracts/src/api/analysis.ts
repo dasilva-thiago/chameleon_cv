@@ -6,11 +6,12 @@ const recordKindSchema = z.enum(RECORD_KIND_VALUES);
 /**
  * Analise de uma vaga contra o perfil (P2): requisitos extraidos do texto, correspondencia
  * requisito -> evidencia -> forca -> origem -> lacuna, e plano de adaptacao revisavel. O resultado e
- * DERIVADO (deterministico, local, sem IA): nada aqui afirma algo que nao esteja em um registro do perfil,
- * e cada evidencia aponta para o id do registro que a sustenta.
+ * DERIVADO: nada aqui afirma algo que nao esteja em um registro do perfil, e cada evidencia aponta para o id do
+ * registro que a sustenta. Com IA (`engine: "ai"`), ela so extrai requisitos e PROPOE vinculos; o codigo confere que o
+ * registro existe e pode sustentar, e a forca da evidencia continua sendo decidida pelas regras locais.
  */
 
-export const MATCHER_ENGINES = ['deterministic'] as const;
+export const MATCHER_ENGINES = ['deterministic', 'ai'] as const;
 
 export const REQUIREMENT_IMPORTANCES = ['mandatory', 'desirable', 'responsibility'] as const;
 export const requirementImportanceSchema = z.enum(REQUIREMENT_IMPORTANCES);
@@ -105,6 +106,14 @@ const strengthCountsSchema = z.strictObject({
 export const analysisResultSchema = z.strictObject({
   engine: z.enum(MATCHER_ENGINES),
   engineVersion: z.string().max(40),
+  /** Quem gerou (so com `engine: "ai"`): provedor, modelo e versao do prompt. Sem conteudo da vaga ou do perfil. */
+  ai: z
+    .strictObject({
+      provider: z.string().max(40),
+      model: z.string().max(120),
+      promptVersion: z.string().max(40),
+    })
+    .nullish(),
   requirements: z.array(jobRequirementSchema).max(ANALYSIS_LIMITS.requirements),
   matches: z.array(requirementMatchSchema).max(ANALYSIS_LIMITS.requirements),
   summary: z.strictObject({

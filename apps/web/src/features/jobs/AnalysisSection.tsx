@@ -15,6 +15,8 @@ import { CheckboxField } from '../../components/ui/CheckboxField';
 import { LoadingStatus } from '../../components/ui/LoadingStatus';
 import { TextAreaField } from '../../components/ui/TextAreaField';
 import { isApiError, messageForError } from '../../lib/api';
+import { AiPanel } from '../ai/AiPanel';
+import { useAiStatus } from '../ai/queries';
 import { RECORD_KIND_LABELS } from '../profile/labels';
 import { slugForKind } from '../profile/sections';
 import { useAnalysis, useRunAnalysis, useSaveReview } from './queries';
@@ -180,6 +182,11 @@ function AnalysisView({ jobId, analysis }: { jobId: string; analysis: JobAnalysi
         <h3 id="analysis-summary" className="text-base font-semibold">
           Resumo
         </h3>
+        <p className="text-sm text-slate-700">
+          {result.engine === 'ai' && result.ai
+            ? `Analisado com IA (${result.ai.provider}, ${result.ai.model}). A IA propõe os requisitos e os vínculos; a força de cada evidência vem das regras locais.`
+            : 'Análise local, sem IA.'}
+        </p>
         <dl className="grid grid-cols-2 gap-3 sm:grid-cols-5">
           {STRENGTH_ORDER.map((strength) => (
             <div key={strength} className="rounded-md border border-slate-400 bg-white p-3">
@@ -295,10 +302,11 @@ function AnalysisView({ jobId, analysis }: { jobId: string; analysis: JobAnalysi
   );
 }
 
-/** Análise local da vaga contra o perfil: requisitos, evidências, lacunas e plano revisável. */
+/** Análise da vaga contra o perfil: requisitos, evidências, lacunas e plano revisável (local ou com IA). */
 export function AnalysisSection({ jobId }: { jobId: string }) {
   const query = useAnalysis(jobId);
   const run = useRunAnalysis();
+  const ai = useAiStatus();
 
   const analyze = (force: boolean): void => {
     run.mutate({ id: jobId, force });
@@ -311,10 +319,15 @@ export function AnalysisSection({ jobId }: { jobId: string }) {
           Análise da vaga
         </h2>
         <p className="text-sm text-slate-700">
-          Compara os requisitos da vaga com o seu perfil. Roda neste computador e não envia nada a
-          serviços externos. Só itens confirmados contam como evidência.
+          Compara os requisitos da vaga com o seu perfil. Só itens confirmados contam como
+          evidência.{' '}
+          {ai.data?.active === true
+            ? 'Com a IA ligada, o texto da vaga e os itens confirmados escolhidos são enviados ao provedor de IA.'
+            : 'Sem IA, roda neste computador e não envia nada a serviços externos.'}
         </p>
       </div>
+
+      <AiPanel />
 
       {query.isPending ? <LoadingStatus label="Carregando a análise…" /> : null}
       {query.isError ? (

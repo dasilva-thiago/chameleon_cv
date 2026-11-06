@@ -188,6 +188,35 @@ export const CROSS_CASES: Record<string, CrossCase> = {
     },
   },
 
+  'ai.api/status-and-consent-never-cross-owners': {
+    description:
+      'IA: o status e o consentimento sao sempre do proprio chamador. A conceder ou retirar o consentimento nao ' +
+      'muda nada para B, e uma entrada invalida e um 400 (nunca um 500).',
+    routes: ['GET /api/ai', 'PUT /api/ai/consent'],
+    async run(ctx) {
+      const pair = await ctx.pair('ai-api');
+      const a = ctx.http(pair.a.client);
+      const b = ctx.http(pair.b.client);
+
+      const beforeB = await b.get('/api/ai');
+      ctx.observe(pair.b, beforeB);
+      expect(beforeB.status).toBe(200);
+
+      for (const granted of [true, false]) {
+        const response = await a.put('/api/ai/consent', { granted });
+        ctx.observe(pair.a, response);
+        expect(response.status).toBe(200);
+      }
+      const afterB = await b.get('/api/ai');
+      ctx.observe(pair.b, afterB);
+      expect(bodyOf(afterB)).toEqual(bodyOf(beforeB));
+
+      const bad = await b.put('/api/ai/consent', { granted: 'yes' });
+      ctx.observe(pair.b, bad);
+      expect(bad.status).toBe(400);
+    },
+  },
+
   'jobs.api/cross-owner-behaves-like-not-found': {
     description:
       'P1: B com o id de uma vaga de A recebe o MESMO status e corpo que para um id inexistente ou malformado ' +

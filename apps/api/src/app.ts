@@ -17,7 +17,9 @@ import {
   requestId,
 } from './http';
 import { createHttpLogger } from './logging';
+import { createAiModule } from './modules/ai';
 import { createJobsModule } from './modules/jobs';
+import { disabledAiService, type AiService } from './ai/service';
 import { createResumesModule } from './modules/resumes';
 import {
   type ProfilesModuleOptions,
@@ -42,6 +44,8 @@ export interface ApiModuleContext {
    * scoped to the authenticated owner.
    */
   profileStore: ProfileStore;
+  /** AI access (providers, budget, consent). Off unless the composition root passes a configured service. */
+  ai: AiService;
   logger: Logger;
   config: AppConfig;
 }
@@ -62,6 +66,8 @@ export interface AppDeps {
   modules?: readonly ApiModule[];
   /** Limits of the built-in profile module (preview cache, import quota); defaults in production. */
   profiles?: ProfilesModuleOptions;
+  /** AI providers (`createAiService`). Default: off (deterministic engine only). */
+  ai?: AiService;
 }
 
 /** Evita cache de respostas da API (dados de sessao e de conta). */
@@ -126,10 +132,12 @@ export function createApp(deps: AppDeps): Express {
     routes,
     requireAuth: auth.requireAuth,
     profileStore,
+    ai: deps.ai ?? disabledAiService,
     logger,
     config,
   };
   createProfilesModule({ now, ...deps.profiles })(moduleContext);
+  createAiModule()(moduleContext);
   createJobsModule()(moduleContext);
   createResumesModule()(moduleContext);
   for (const mount of deps.modules ?? []) mount(moduleContext);

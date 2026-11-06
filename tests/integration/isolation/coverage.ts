@@ -18,7 +18,12 @@ const JOBS_CASE = 'jobs.api/cross-owner-behaves-like-not-found';
 /** P3/P4: one A x B case covers the resumes routes (see cross-cases.ts). */
 const RESUMES_CASE = 'resumes.api/cross-owner-behaves-like-not-found';
 
+/** IA: status and consent are per owner (see cross-cases.ts). */
+const AI_CASE = 'ai.api/status-and-consent-never-cross-owners';
+
 export const ROUTE_COVERAGE: CoverageMap = {
+  'GET /api/ai': { kind: 'cross-case', caseId: AI_CASE },
+  'PUT /api/ai/consent': { kind: 'cross-case', caseId: AI_CASE },
   'GET /api/jobs': { kind: 'cross-case', caseId: JOBS_CASE },
   'POST /api/jobs': { kind: 'cross-case', caseId: JOBS_CASE },
   'GET /api/jobs/:jobId': { kind: 'cross-case', caseId: JOBS_CASE },

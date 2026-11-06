@@ -1,3 +1,4 @@
+import { tailorResumeWithAi } from '@chameleon/ai';
 import {
   EMPTY_REVIEW,
   analysisReviewSchema,
@@ -125,7 +126,7 @@ function exclusiveExport<T>(task: () => Promise<T>): Promise<T> {
 }
 
 export const createResumesModule = (): ApiModule => (context) => {
-  const { routes, profileStore } = context;
+  const { routes, profileStore, ai } = context;
 
   const store = (auth: AuthContext): OwnerProfileStore =>
     bindProfileStore(profileStore, auth.ownerId);
@@ -241,13 +242,67 @@ export const createResumesModule = (): ApiModule => (context) => {
         document,
         hashProfileDocument(document),
         false,
+        ai,
       );
       const parsedReview = analysisReviewSchema.safeParse(analysis.row.review);
       const review = parsedReview.success ? parsedReview.data : EMPTY_REVIEW;
 
       // Freeze the profile this resume is built from (immutable revision; reused when nothing changed).
       const { revision } = await store(auth).createRevision({ reason: 'pre_generation' });
-      const generated = generateResume(document, { analysis: analysis.result, review });
+      let generated = generateResume(document, { analysis: analysis.result, review });
+
+      // AI tailoring (headline, summary, key skills, choice and order of items). Whatever the AI cannot support is
+      // dropped by the program; if no provider answers, the deterministic resume above is used, with no error.
+      const access = await ai.access(auth);
+      let aiNotes: string[] = [];
+      let aiMeta: Record<string, string | number | boolean> = {
+        aiUsed: false,
+        aiReason: access.reason,
+      };
+      if (access.router) {
+        try {
+          const out = await tailorResumeWithAi(access.router, {
+            content: generated.content,
+            document,
+            analysis: analysis.result,
+            jobTitle: job.title ?? null,
+          });
+          if (
+            validateResume(out.applied.content, document).some(
+              (issue) => issue.severity === 'error',
+            )
+          ) {
+            aiNotes = [
+              'A versão escrita pela IA foi descartada por ter itens sem fonte: este currículo usa o texto original dos seus registros.',
+            ];
+            aiMeta = { aiUsed: false, aiReason: 'rejected' };
+          } else {
+            generated = { content: out.applied.content, notes: generated.notes };
+            aiNotes = [
+              `Redigido com IA (${out.run.provider}, ${out.run.model}): revise o texto antes de aprovar.`,
+              ...out.applied.notes,
+            ];
+            aiMeta = {
+              aiUsed: true,
+              aiProvider: out.run.provider,
+              aiModel: out.run.model,
+              aiTokens: out.run.usage.totalTokens,
+              aiApplied: Object.entries(out.applied.applied)
+                .filter(([, used]) => used)
+                .map(([part]) => part)
+                .join(','),
+              aiAttempts: out.run.attempts
+                .map((attempt) => `${attempt.provider}:${attempt.outcome}`)
+                .join(','),
+            };
+          }
+        } catch {
+          aiNotes = [
+            'A IA não respondeu agora: este currículo usa o texto original dos seus registros.',
+          ];
+          aiMeta = { aiUsed: false, aiReason: 'unavailable' };
+        }
+      }
       const issues = validateResume(generated.content, document);
       const name =
         body.name ??
@@ -282,11 +337,12 @@ export const createResumesModule = (): ApiModule => (context) => {
       await audit(auth, req, 'resume.create', resume.id, {
         versionNumber: 1,
         sections: generated.content.sections.length,
+        ...aiMeta,
       });
       const response: CreateResumeResponse = {
         resume: resumeDto(resume, [version]),
         version: await detailDto(auth, version, document),
-        notes: generated.notes.slice(0, 20),
+        notes: [...aiNotes, ...generated.notes].slice(0, 20),
       };
       res.status(201).json(response);
     },

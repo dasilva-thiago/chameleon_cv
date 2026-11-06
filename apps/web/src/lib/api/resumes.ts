@@ -75,6 +75,7 @@ export function createResumesApi(client: ApiClient): ResumesApi {
       return client.post(`/api/jobs/${idPath(jobId)}/resumes`, {
         body,
         schema: createResumeResponseSchema,
+        timeoutMs: EXPORT_TIMEOUT_MS,
       });
     },
     get: (resumeId, signal) =>

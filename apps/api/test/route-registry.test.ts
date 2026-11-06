@@ -19,12 +19,17 @@ describe('manifesto de rotas (gate de isolamento, ADR-0008 item 5b)', () => {
     const jobs = full.filter((r) => r.path.startsWith('/api/jobs'));
     expect(jobs).toHaveLength(10);
     expect(jobs.every((r) => r.auth === 'session')).toBe(true);
+    // The AI module (status and consent) is covered by ai.int.test.ts.
+    const ai = full.filter((r) => r.path.startsWith('/api/ai'));
+    expect(ai.map((r) => `${r.method} ${r.path}`)).toEqual(['GET /api/ai', 'PUT /api/ai/consent']);
+    expect(ai.every((r) => r.auth === 'session')).toBe(true);
     const resumes = full.filter((r) => r.path.startsWith('/api/resumes'));
     expect(resumes).toHaveLength(8);
     expect(resumes.every((r) => r.auth === 'session')).toBe(true);
     const manifest = full.filter(
       (r) =>
         !r.path.startsWith('/api/profile') &&
+        !r.path.startsWith('/api/ai') &&
         !r.path.startsWith('/api/jobs') &&
         !r.path.startsWith('/api/resumes'),
     );
@@ -190,6 +195,7 @@ describe('manifesto de rotas (gate de isolamento, ADR-0008 item 5b)', () => {
       ],
     });
     expect(Object.keys(context).sort()).toEqual([
+      'ai',
       'config',
       'logger',
       'profileStore',

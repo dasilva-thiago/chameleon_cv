@@ -15,7 +15,9 @@ describe('loadConfig', () => {
       API_PORT: 3000,
       SIGNUP_MODE: 'invite',
       UPLOAD_MAX_BYTES: 2 * 1024 * 1024,
-      AI_PROVIDER: 'deterministic',
+      AI_PROVIDER: 'auto',
+      AI_DAILY_REQUESTS_TOTAL: 120,
+      AI_DAILY_TOKEN_LIMIT_PER_USER: 200_000,
       PDF_BROWSER: 'bundled',
       LOG_LEVEL: 'info',
     });
@@ -24,12 +26,9 @@ describe('loadConfig', () => {
   it('trata variaveis vazias como ausentes', () => {
     const config = loadConfig({
       ...VALID,
-      AI_MODEL: '',
-      ANTHROPIC_API_KEY: '',
-      OPENAI_API_KEY: '',
+      AI_PROVIDER_ORDER: '',
     });
-    expect(config.AI_MODEL).toBeUndefined();
-    expect(config.ANTHROPIC_API_KEY).toBeUndefined();
+    expect(config.AI_PROVIDER_ORDER).toBeUndefined();
   });
 
   it('rejeita valores invalidos sem vazar o valor na mensagem', () => {

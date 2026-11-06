@@ -55,7 +55,7 @@ function analysisDto(row: AnalysisRow): JobAnalysis {
  * (job, text hash, profile hash, engine version): same input -> the stored analysis is returned untouched.
  */
 export function registerAnalysisRoutes(context: ApiModuleContext): void {
-  const { routes, profileStore } = context;
+  const { routes, profileStore, ai } = context;
 
   async function load(req: Request) {
     const auth = requireAuthContext(req);
@@ -143,6 +143,7 @@ export function registerAnalysisRoutes(context: ApiModuleContext): void {
         document,
         profileHash,
         body.force,
+        ai,
       );
       if (reused) {
         const response: RunAnalysisResponse = { ...stateOf(row, job, profileHash), reused: true };

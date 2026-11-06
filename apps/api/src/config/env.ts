@@ -59,11 +59,17 @@ const envSchema = z.object({
     .positive()
     .max(50 * 1024 * 1024)
     .default(2 * 1024 * 1024),
-  AI_PROVIDER: z.enum(['deterministic', 'anthropic', 'openai']).default('deterministic'),
-  AI_MODEL: optionalString,
+  /**
+   * `auto`: use the AI providers that have a key (GEMINI_API_KEY, GROQ_API_KEY...; see packages/ai) and fall back
+   * to the local deterministic engine when none answers. `deterministic`: never call an AI provider.
+   */
+  AI_PROVIDER: z.enum(['deterministic', 'auto']).default('auto'),
+  /** Comma-separated provider ids in order of preference (default: every known provider that has a key). */
+  AI_PROVIDER_ORDER: optionalString,
+  /** Cap of requests per UTC day across ALL providers (protects the free allowances as a whole). */
+  AI_DAILY_REQUESTS_TOTAL: z.coerce.number().int().positive().default(120),
+  /** Cap of tokens per UTC day across all providers. */
   AI_DAILY_TOKEN_LIMIT_PER_USER: z.coerce.number().int().positive().default(200_000),
-  ANTHROPIC_API_KEY: optionalString,
-  OPENAI_API_KEY: optionalString,
   PDF_BROWSER: z.enum(['bundled', 'chrome']).default('bundled'),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
 });

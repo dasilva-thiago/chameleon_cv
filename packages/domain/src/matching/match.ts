@@ -293,12 +293,91 @@ function uniqueByFact(candidates: Candidate[]): Candidate[] {
   });
 }
 
-function matchRequirement(index: MatchIndex, requirement: JobRequirement): RequirementMatch {
+const AI_HINT_CAUTION =
+  'Vínculo sugerido por IA e conferido contra o seu perfil: revise antes de usar.';
+
+/**
+ * Facts suggested by an AI for one requirement. Same rules as everywhere else: the fact must exist in the profile,
+ * a skill is only as strong as its registered use (professional experience = direct, anything else = partial), a
+ * record kind has its own fixed level, and a fact that is not confirmed stays "pending". The suggestion can add
+ * evidence; it can never make a fact stronger than what the profile says about it.
+ */
+function hintCandidates(
+  index: MatchIndex,
+  hintIds: readonly string[],
+): { usable: Candidate[]; pending: Candidate[] } {
+  const usable: Candidate[] = [];
+  const pending: Candidate[] = [];
+  for (const rawId of hintIds) {
+    const fact = index.byId.get(rawId.toLowerCase());
+    if (fact === undefined || (!fact.usable && !fact.pending)) continue;
+    const approval = fact.requiresApproval
+      ? ['O uso deste item em currículos exige a sua aprovação.']
+      : [];
+    if (!fact.usable) {
+      pending.push({
+        fact,
+        level: 'partial',
+        via: fact.kind === 'skill' ? 'skill' : 'record_text',
+        context: null,
+        supportingRecordId: null,
+        matchedTerms: [],
+        cautions: ['O item ainda aguarda a sua confirmação.', ...approval],
+      });
+      continue;
+    }
+    if (fact.kind === 'skill') {
+      const usages = (index.usagesBySkill.get(fact.id) ?? []).filter((usage) => usage.usable);
+      const best = usages.find((usage) => CONTEXT_LEVEL[usage.context] === 'direct') ?? usages[0];
+      const level: Level =
+        best !== undefined ? (CONTEXT_LEVEL[best.context] ?? 'partial') : 'partial';
+      const contextCaution = best !== undefined ? CONTEXT_CAUTION[best.context] : undefined;
+      usable.push({
+        fact,
+        level,
+        via: 'skill',
+        context: best?.context ?? null,
+        supportingRecordId: best?.usageId ?? null,
+        matchedTerms: [],
+        cautions: [
+          AI_HINT_CAUTION,
+          ...(contextCaution !== undefined
+            ? [contextCaution]
+            : ['Habilidade confirmada, mas sem contexto de uso registrado.']),
+          ...approval,
+        ],
+      });
+      continue;
+    }
+    const level = TEXT_KIND_LEVEL[fact.kind];
+    if (level === undefined) continue; // e.g. a contact or a statement: never evidence
+    const kindCaution = KIND_CAUTION[fact.kind];
+    usable.push({
+      fact,
+      level,
+      via: 'record_text',
+      context: null,
+      supportingRecordId: null,
+      matchedTerms: [],
+      cautions: [AI_HINT_CAUTION, ...(kindCaution !== undefined ? [kindCaution] : []), ...approval],
+    });
+  }
+  return { usable, pending };
+}
+
+function matchRequirement(
+  index: MatchIndex,
+  requirement: JobRequirement,
+  hintIds: readonly string[] = [],
+): RequirementMatch {
   const haystack = haystackOf(requirement.text);
   const skills = skillCandidates(index, requirement, haystack);
   const texts = textCandidates(index, requirement, haystack);
-  const usable = uniqueByFact(sortCandidates([...skills.usable, ...texts.usable]));
-  const pending = uniqueByFact(sortCandidates([...skills.pending, ...texts.pending]));
+  const hints = hintCandidates(index, hintIds);
+  const usable = uniqueByFact(sortCandidates([...skills.usable, ...texts.usable, ...hints.usable]));
+  const pending = uniqueByFact(
+    sortCandidates([...skills.pending, ...texts.pending, ...hints.pending]),
+  );
   const cautions: string[] = [];
   const evidenceCap = ANALYSIS_LIMITS.evidencePerRequirement;
 
@@ -429,8 +508,36 @@ function buildPlan(
  */
 export function analyzeJob(jobText: string, document: ProfileDocument): AnalysisResult {
   const { requirements, warnings } = extractRequirements(jobText);
+  return analyzeRequirements({ jobText, document, requirements, warnings });
+}
+
+export interface AnalyzeRequirementsInput {
+  jobText: string;
+  document: ProfileDocument;
+  requirements: readonly JobRequirement[];
+  /** Warnings produced while extracting the requirements. */
+  warnings?: readonly string[];
+  /** Fact ids suggested for each requirement id (by an AI); checked against the profile, never trusted. */
+  hints?: ReadonlyMap<string, readonly string[]>;
+  /** One short remark per requirement id (by an AI), shown to the owner as a caution. */
+  notes?: ReadonlyMap<string, string>;
+  engine?: AnalysisResult['engine'];
+  engineVersion?: string;
+  ai?: AnalysisResult['ai'];
+}
+
+/** Builds the full analysis from requirements already extracted (by the local extractor or by an AI). */
+export function analyzeRequirements(input: AnalyzeRequirementsInput): AnalysisResult {
+  const { jobText, document, requirements } = input;
+  const warnings = input.warnings ?? [];
   const index = buildMatchIndex(document);
-  const matches = requirements.map((requirement) => matchRequirement(index, requirement));
+  const matches = requirements.map((requirement) => {
+    const match = matchRequirement(index, requirement, input.hints?.get(requirement.id) ?? []);
+    const note = input.notes?.get(requirement.id);
+    return note === undefined || note === ''
+      ? match
+      : { ...match, cautions: [`Observação da IA: ${note}`, ...match.cautions].slice(0, 5) };
+  });
 
   const byStrength = emptyCounts();
   const mandatoryByStrength = emptyCounts();
@@ -452,9 +559,10 @@ export function analyzeJob(jobText: string, document: ProfileDocument): Analysis
   }
 
   return {
-    engine: 'deterministic',
-    engineVersion: MATCHER_VERSION,
-    requirements,
+    engine: input.engine ?? 'deterministic',
+    engineVersion: input.engineVersion ?? MATCHER_VERSION,
+    ...(input.ai !== undefined ? { ai: input.ai } : {}),
+    requirements: [...requirements],
     matches,
     summary: { requirements: requirements.length, byStrength, mandatoryByStrength },
     prioritized: buildPlan(requirements, matches, index),

@@ -1,3 +1,4 @@
+export { aiApi, createAiApi, type AiApi } from './ai';
 export { authApi, createAuthApi, type AuthApi } from './auth';
 export { createJobsApi, jobsApi, type JobsApi } from './jobs';
 export { createProfileApi, profileApi, type ProfileApi } from './profile';

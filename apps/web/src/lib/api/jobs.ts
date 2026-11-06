@@ -22,6 +22,9 @@ import { createApiClient, type ApiClient } from './client';
 import { validated } from './validated';
 
 const BASE = '/api/jobs';
+
+/** Com IA a análise espera um provedor externo (e pode tentar mais de um): bem acima do padrão. */
+const AI_TIMEOUT_MS = 120_000;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function idPath(id: string): string {
@@ -67,6 +70,7 @@ export function createJobsApi(client: ApiClient): JobsApi {
       return client.post(`${BASE}/${idPath(id)}/analysis`, {
         body,
         schema: runAnalysisResponseSchema,
+        timeoutMs: AI_TIMEOUT_MS,
       });
     },
     saveReview(id, review) {
