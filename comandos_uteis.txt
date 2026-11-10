@@ -1,0 +1,97 @@
+COMANDOS UTEIS - CHAMELEON CV
+=============================================================================
+Rode todos na raiz do repositorio (chameleon_cv). Funcionam em PowerShell e Bash.
+
+REQUISITOS
+-----------------------------------------------------------------------------
+- Node.js 24 (ver .node-version). O Node 25 funciona, mas o Prisma avisa.
+- pnpm 12.16.1 (versao fixada em "packageManager" no package.json)
+- PostgreSQL 16+ (binarios initdb, pg_ctl, psql, postgres). Docker NAO e necessario.
+
+
+1) INSTALACAO APOS O CLONE
+-----------------------------------------------------------------------------
+npm i -g pnpm@12.16.1          # instalar o pnpm (so na primeira vez)
+pnpm install                   # instala o workspace inteiro e gera o cliente Prisma (postinstall)
+cp .env.example .env           # PowerShell: Copy-Item .env.example .env
+                               # ajuste o .env; ele nunca e commitado
+
+# Alternativa sem instalar o pnpm globalmente:
+npx --yes pnpm@12.16.1 install
+
+# NAO use "npm install": o projeto usa pnpm-lock.yaml (npm gera um package-lock.json solto).
+
+
+2) BANCO DE DADOS LOCAL (cluster PostgreSQL proprio em .data/pg, 127.0.0.1:54329)
+-----------------------------------------------------------------------------
+pnpm db:local:init             # cria o cluster (uma vez so)
+pnpm db:local:start            # inicia e garante os bancos chameleon e chameleon_dev
+pnpm db:local:status           # mostra estado e versao do servidor
+pnpm db:local:stop             # para o servidor
+
+# Se o PostgreSQL estiver em outro lugar: defina PG_BIN (diretorio bin) ou
+# DATABASE_URL e TEST_DATABASE_ADMIN_URL no .env.
+
+
+3) PRISMA / MIGRATIONS / SEED
+-----------------------------------------------------------------------------
+pnpm db:generate               # regenera o cliente Prisma
+pnpm db:migrate                # cria/aplica migration em desenvolvimento (prisma migrate dev)
+pnpm db:migrate:deploy         # aplica migrations existentes (sem criar novas)
+pnpm db:reset                  # APAGA e recria o banco (so roda se o banco for local)
+pnpm db:seed                   # popula dados de exemplo
+pnpm db:seed:pilot             # popula dados do piloto
+
+
+4) EXECUTAR O APP
+-----------------------------------------------------------------------------
+pnpm dev                       # API (porta 3000, ver API_PORT) + web (Vite, porta 5173)
+pnpm build                     # build da API (tsup) e do web (tsc + vite build)
+
+# Individualmente:
+pnpm --filter @chameleon/api dev
+pnpm --filter @chameleon/web dev
+
+# Verificar a configuracao dos provedores de IA (chaves/limites do .env):
+pnpm ai:check
+
+
+5) QUALIDADE: FORMATACAO, LINT, TIPOS
+-----------------------------------------------------------------------------
+pnpm check                     # tudo de uma vez: format:check + lint + typecheck + contracts:check + test
+pnpm format                    # corrige a formatacao (prettier --write)
+pnpm format:check              # so verifica a formatacao
+pnpm lint                      # eslint
+pnpm lint:fix                  # eslint com correcao automatica
+pnpm typecheck                 # TypeScript em todos os pacotes
+
+
+6) CONTRATOS (packages/contracts)
+-----------------------------------------------------------------------------
+pnpm contracts:generate        # regenera os contratos/JSON Schema
+pnpm contracts:check           # confere se os contratos gerados estao atualizados
+
+
+7) TESTES
+-----------------------------------------------------------------------------
+pnpm test                      # unitarios + componentes (sem banco, sem rede)
+pnpm test:integration          # contra PostgreSQL real (precisa do banco rodando e TEST_DATABASE_ADMIN_URL)
+pnpm test:e2e                  # Playwright no stack real (API em banco descartavel, Vite, Chromium)
+pnpm test:all                  # test + test:integration + test:e2e
+
+# Rodar um unico arquivo de teste:
+pnpm exec vitest run caminho/do/arquivo.test.ts
+
+# Primeira vez com Playwright (baixar o Chromium):
+pnpm exec playwright install chromium
+
+# Convencoes: *.test.ts(x) = unitario/componente | *.int.test.ts e tests/integration/** = integracao
+#             e2e/**/*.spec.ts = Playwright
+
+
+8) DICAS
+-----------------------------------------------------------------------------
+pnpm install --frozen-lockfile # instalacao reprodutivel (igual ao lockfile, ideal para CI)
+pnpm -r build                  # build recursivo em todos os pacotes
+pnpm --filter <nome> <script>  # roda um script em um pacote (ex.: @chameleon/db, @chameleon/api)
+git status; git worktree list  # ao retomar o trabalho (exigido pelo CLAUDE.md do projeto)
