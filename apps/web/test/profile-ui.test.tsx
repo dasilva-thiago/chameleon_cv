@@ -232,6 +232,54 @@ describe('perfil: visao geral e navegacao', () => {
     expect(await violations(container)).toEqual([]);
   });
 
+  it('Revisar reúne as três listas em abas com contagem, e o menu lateral tem um só item de revisão', async () => {
+    const fake = loggedIn(filledState());
+    fake.on(
+      'GET /api/profile/pending?status=open',
+      jsonResponse(
+        200,
+        pendingListResponseSchema.parse({
+          pending: [],
+          counts: { open: 0, resolved: 0, dismissed: 0 },
+        }),
+      ),
+    );
+    const { user, container } = renderApp('/perfil/confirmar');
+    expect(await screen.findByRole('heading', { level: 1, name: 'Revisar' })).toBeVisible();
+    const tabs = screen.getByRole('navigation', { name: 'Revisar' });
+    expect(
+      within(tabs)
+        .getAllByRole('link')
+        .map((link) => link.textContent),
+    ).toEqual(['Para confirmar 1', 'Pendências 0', 'Evidências 1']);
+    expect(within(tabs).getByRole('link', { name: /Para confirmar/ })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+    const side = screen.getByRole('navigation', { name: 'Seções do perfil' });
+    expect(within(side).getAllByRole('link', { name: /^Revisar/ })).toHaveLength(1);
+    expect(within(side).queryByRole('link', { name: /Pendências/ })).toBeNull();
+
+    await user.click(within(tabs).getByRole('link', { name: /Pendências/ }));
+    expect(await screen.findByText(/Nenhuma pendência/)).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: 'Revisar' })).toBeVisible();
+    expect(await violations(container)).toEqual([]);
+  });
+
+  it('o cartão de um item tem Editar à vista e o resto no menu de ações', async () => {
+    loggedIn(filledState());
+    const { user } = renderApp('/perfil/competencias');
+    await screen.findByText('TypeScript');
+    expect(screen.getByRole('button', { name: 'Editar TypeScript' })).toBeVisible();
+    expect(screen.queryByRole('button', { name: /^Arquivar/ })).toBeNull();
+    await user.click(screen.getByRole('button', { name: 'Mais ações de TypeScript' }));
+    expect(screen.getAllByRole('menuitem').map((item) => item.textContent)).toEqual([
+      'Situação e uso',
+      'Arquivar',
+      'Excluir…',
+    ]);
+  });
+
   it('pendencias: lista vazia acessivel', async () => {
     const fake = loggedIn(filledState());
     fake.on(
@@ -325,7 +373,8 @@ describe('perfil: importacao com previa', () => {
     );
     const { user } = renderApp('/perfil/importar');
     await toPreview(fake, user);
-    await user.click(screen.getByRole('button', { name: 'Descartar prévia' }));
+    await user.click(screen.getByRole('button', { name: 'Mais opções' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Descartar prévia' }));
     expect(await screen.findByText(/Nada foi alterado no seu perfil/)).toBeInTheDocument();
     expect(fake.requestsTo(`POST /api/profile/imports/${IMPORT_ID}/apply`)).toHaveLength(0);
     await user.click(screen.getByRole('button', { name: 'Importar outro arquivo' }));

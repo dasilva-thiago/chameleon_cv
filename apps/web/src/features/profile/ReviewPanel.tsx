@@ -1,7 +1,7 @@
 import { MAX_CONFIRM_BATCH, isFactKind, type RecordKind } from '@chameleon/contracts';
 import { useState } from 'react';
 import { Link } from 'react-router';
-import { PageHeading, usePageTitle } from '../../components/layout/PageHeading';
+import { usePageTitle } from '../../components/layout/PageHeading';
 import { Alert } from '../../components/ui/Alert';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
@@ -24,7 +24,7 @@ const SKIP_TEXT = {
  * vez, ainda por escolha) e confirma so os marcados. Nao existe "confirmar tudo" implicito.
  */
 export function ReviewPanel() {
-  usePageTitle('Para confirmar');
+  usePageTitle('Revisar: para confirmar');
   const { index } = useProfileData();
   const confirm = useConfirmRecords();
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
@@ -68,14 +68,10 @@ export function ReviewPanel() {
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="flex flex-col gap-2">
-        <PageHeading>Para confirmar</PageHeading>
-        <p className="text-base text-slate-800">
-          Itens importados ou cadastrados para revisar depois. Só itens <strong>confirmados</strong>{' '}
-          sustentam afirmações em currículos. Marque os itens que você revisou e confirma que estão
-          corretos.
-        </p>
-      </div>
+      <p className="text-sm text-slate-700">
+        Só itens <strong>confirmados</strong> sustentam afirmações em currículos. Marque os que você
+        revisou: ao confirmar, você declara que estão corretos.
+      </p>
 
       <div role="status" aria-live="polite">
         {confirm.isSuccess ? (
@@ -122,16 +118,18 @@ export function ReviewPanel() {
                     {RECORD_KIND_LABELS[kind]} ({records.length})
                   </legend>
                   <div>
-                    <Button
-                      variant="secondary"
+                    <button
+                      type="button"
+                      className="min-h-11 text-sm font-medium text-blue-800 underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700"
                       onClick={() => {
                         toggleGroup(ids, !allSelected);
                       }}
                     >
                       {allSelected
-                        ? `Desmarcar os itens de ${RECORD_KIND_LABELS[kind].toLowerCase()}`
-                        : `Marcar os ${String(records.length)} itens de ${RECORD_KIND_LABELS[kind].toLowerCase()}`}
-                    </Button>
+                        ? 'Limpar seleção'
+                        : `Selecionar todos (${String(records.length)})`}
+                      <span className="sr-only"> de {RECORD_KIND_LABELS[kind].toLowerCase()}</span>
+                    </button>
                   </div>
                   <ul className="flex flex-col gap-3">
                     {records.map((record) => {
@@ -188,10 +186,6 @@ export function ReviewPanel() {
                       : `Confirmar ${String(effective.size)} itens selecionados`}
               </Button>
             </div>
-            <p className="text-sm text-slate-700">
-              Ao confirmar, você declara que revisou os itens marcados. Os demais continuam
-              aguardando.
-            </p>
           </div>
         </>
       )}

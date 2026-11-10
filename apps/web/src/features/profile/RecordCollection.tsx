@@ -61,6 +61,21 @@ export function RecordCollection({
         {notice !== undefined ? <Alert tone="success">{notice}</Alert> : null}
       </div>
 
+      {mode.type !== 'create' ? (
+        <div>
+          <Button
+            ref={addRef}
+            variant={records.length === 0 ? 'primary' : 'secondary'}
+            onClick={() => {
+              setNotice(undefined);
+              setMode({ type: 'create' });
+            }}
+          >
+            {addLabel}
+          </Button>
+        </div>
+      ) : null}
+
       {records.length === 0 && mode.type !== 'create' ? (
         <p className="rounded-md border border-dashed border-slate-400 bg-white p-4 text-base text-slate-800">
           {emptyText}
@@ -120,20 +135,7 @@ export function RecordCollection({
             close();
           }}
         />
-      ) : (
-        <div>
-          <Button
-            ref={addRef}
-            variant={records.length === 0 ? 'primary' : 'secondary'}
-            onClick={() => {
-              setNotice(undefined);
-              setMode({ type: 'create' });
-            }}
-          >
-            {addLabel}
-          </Button>
-        </div>
-      )}
+      ) : null}
     </div>
   );
 }

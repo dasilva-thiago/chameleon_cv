@@ -1,8 +1,10 @@
 import { useRef, useState } from 'react';
-import { PageHeading, usePageTitle } from '../../components/layout/PageHeading';
+import { usePageTitle } from '../../components/layout/PageHeading';
 import { Alert } from '../../components/ui/Alert';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
+import { MoreIcon } from '../../components/ui/icons';
+import { MenuButton, type MenuEntry } from '../../components/ui/MenuButton';
 import { LoadingStatus } from '../../components/ui/LoadingStatus';
 import { SelectField } from '../../components/ui/SelectField';
 import { messageForError } from '../../lib/api';
@@ -53,22 +55,23 @@ function PendingCard({ entry, onEdit }: { entry: PendingEntry; onEdit: () => voi
   const targetRecord = targetId !== undefined ? index.byId.get(targetId) : undefined;
   const slug = targetRecord ? slugForKind(targetRecord.kind) : undefined;
   const subject = str(record.subject) ?? 'Pendência sem assunto';
+  const [mainAction, ...otherActions] = NEXT_ACTIONS[status] ?? NEXT_ACTIONS.open ?? [];
 
   return (
     <article className="flex flex-col gap-3 rounded-md border border-slate-400 bg-white p-4">
       <h2 className="text-base font-semibold text-slate-900">{subject}</h2>
       <div className="flex flex-wrap gap-2">
-        <Badge tone={status === 'open' ? 'warn' : 'neutral'} prefix="Situação">
-          {PENDING_STATUS_LABELS[status as keyof typeof PENDING_STATUS_LABELS] ?? status}
-        </Badge>
-        {reason !== undefined && reason in PENDING_REASON_LABELS ? (
-          <Badge prefix="Motivo">
-            {PENDING_REASON_LABELS[reason as keyof typeof PENDING_REASON_LABELS]}
+        {status !== 'open' ? (
+          <Badge>
+            {PENDING_STATUS_LABELS[status as keyof typeof PENDING_STATUS_LABELS] ?? status}
           </Badge>
         ) : null}
+        {reason !== undefined && reason in PENDING_REASON_LABELS ? (
+          <Badge>{PENDING_REASON_LABELS[reason as keyof typeof PENDING_REASON_LABELS]}</Badge>
+        ) : null}
         {priority !== undefined && priority in PRIORITY_LABELS ? (
-          <Badge prefix="Prioridade">
-            {PRIORITY_LABELS[priority as keyof typeof PRIORITY_LABELS]}
+          <Badge tone={priority === 'high' ? 'warn' : 'neutral'}>
+            Prioridade {PRIORITY_LABELS[priority as keyof typeof PRIORITY_LABELS].toLowerCase()}
           </Badge>
         ) : null}
       </div>
@@ -108,25 +111,36 @@ function PendingCard({ entry, onEdit }: { entry: PendingEntry; onEdit: () => voi
           {messageForError(patch.error)}
         </Alert>
       ) : null}
-      <div className="flex flex-wrap gap-2">
-        {id !== undefined
-          ? (NEXT_ACTIONS[status] ?? NEXT_ACTIONS.open ?? []).map((action) => (
-              <Button
-                key={action.status}
-                variant="secondary"
-                aria-label={`${action.label}: ${subject}`}
-                disabled={patch.isPending}
-                onClick={() => {
-                  patch.mutate({ id, status: action.status });
-                }}
-              >
-                {action.label}
-              </Button>
-            ))
-          : null}
-        <Button variant="secondary" aria-label={`Editar pendência: ${subject}`} onClick={onEdit}>
-          Editar
-        </Button>
+      <div className="flex flex-wrap items-start gap-2">
+        {id !== undefined && mainAction !== undefined ? (
+          <Button
+            variant="secondary"
+            aria-label={`${mainAction.label}: ${subject}`}
+            disabled={patch.isPending}
+            onClick={() => {
+              patch.mutate({ id, status: mainAction.status });
+            }}
+          >
+            {mainAction.label}
+          </Button>
+        ) : null}
+        <MenuButton
+          label={`Mais ações: ${subject}`}
+          icon={<MoreIcon />}
+          entries={[
+            ...(id !== undefined
+              ? otherActions.map((action): MenuEntry => ({
+                  kind: 'item',
+                  label: action.label,
+                  disabled: patch.isPending,
+                  onSelect: () => {
+                    patch.mutate({ id, status: action.status });
+                  },
+                }))
+              : []),
+            { kind: 'item', label: 'Editar', onSelect: onEdit },
+          ]}
+        />
       </div>
     </article>
   );
@@ -134,7 +148,7 @@ function PendingCard({ entry, onEdit }: { entry: PendingEntry; onEdit: () => voi
 
 /** Painel de pendencias: o que falta confirmar ou esclarecer. Listar, editar e mudar o estado. */
 export function PendingPanel() {
-  usePageTitle('Pendências');
+  usePageTitle('Revisar: pendências');
   const [filter, setFilter] = useState<PendingFilter>('open');
   const list = usePendingList(filter);
   const [mode, setMode] = useState<
@@ -153,24 +167,40 @@ export function PendingPanel() {
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="flex flex-col gap-2">
-        <PageHeading>Pendências</PageHeading>
-        <p className="text-base text-slate-800">
-          Dúvidas e informações a esclarecer sobre o seu perfil. Elas ajudam a não afirmar nada que
-          ainda não foi confirmado.
-        </p>
-      </div>
+      <p className="text-sm text-slate-700">
+        Dúvidas a esclarecer sobre o seu perfil, para não afirmar o que ainda não foi confirmado.
+      </p>
 
-      <div className="max-w-xs">
-        <SelectField
-          label="Mostrar"
-          placeholder={null}
-          options={FILTERS}
-          value={filter}
-          onChange={(event) => {
-            setFilter(event.target.value as PendingFilter);
-          }}
-        />
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div className="min-w-48">
+          <SelectField
+            label="Mostrar"
+            placeholder={null}
+            options={FILTERS.map((option) => ({
+              ...option,
+              label:
+                list.isSuccess && option.value !== 'all'
+                  ? `${option.label} (${String(list.data.counts[option.value])})`
+                  : option.label,
+            }))}
+            value={filter}
+            onChange={(event) => {
+              setFilter(event.target.value as PendingFilter);
+            }}
+          />
+        </div>
+        {mode.type === 'create' ? null : (
+          <Button
+            ref={addRef}
+            variant="secondary"
+            onClick={() => {
+              setNotice(undefined);
+              setMode({ type: 'create' });
+            }}
+          >
+            Registrar pendência
+          </Button>
+        )}
       </div>
 
       <div role="status" aria-live="polite">
@@ -194,10 +224,6 @@ export function PendingPanel() {
       ) : null}
       {list.isSuccess ? (
         <>
-          <p className="text-sm text-slate-700">
-            {String(list.data.counts.open)} aberta(s) · {String(list.data.counts.resolved)}{' '}
-            resolvida(s) · {String(list.data.counts.dismissed)} dispensada(s)
-          </p>
           {list.data.pending.length === 0 ? (
             <p className="rounded-md border border-dashed border-slate-400 bg-white p-4 text-base text-slate-800">
               Nenhuma pendência {filter === 'all' ? 'cadastrada' : 'neste filtro'}.
@@ -250,20 +276,7 @@ export function PendingPanel() {
             close();
           }}
         />
-      ) : (
-        <div>
-          <Button
-            ref={addRef}
-            variant="secondary"
-            onClick={() => {
-              setNotice(undefined);
-              setMode({ type: 'create' });
-            }}
-          >
-            Registrar pendência
-          </Button>
-        </div>
-      )}
+      ) : null}
     </div>
   );
 }

@@ -105,8 +105,8 @@ async function importAndConfirmProfile(page: Page): Promise<void> {
   await expect(page.getByText('Importação aplicada')).toBeVisible();
 
   await page.getByRole('link', { name: 'Revisar itens importados' }).click();
-  await expect(page.getByRole('heading', { level: 1, name: 'Para confirmar' })).toBeVisible();
-  const group = page.getByRole('button', { name: /^Marcar os \d+ itens/ });
+  await expect(page.getByRole('heading', { level: 1, name: 'Revisar' })).toBeVisible();
+  const group = page.getByRole('button', { name: /^Selecionar todos/ });
   while ((await group.count()) > 0) {
     await group.first().click();
   }
@@ -131,6 +131,8 @@ test('profile -> job -> analysis -> resume -> edit -> approve -> DOCX and PDF', 
 
   await page.getByRole('button', { name: 'Analisar vaga' }).click();
   await expect(page.getByRole('heading', { name: 'Resumo', exact: true })).toBeVisible();
+  // the analysis sections start collapsed: open the mandatory requirements
+  await page.getByRole('heading', { name: /^Requisitos obrigatórios/ }).click();
   await expect(page.getByText('Sem evidência').first()).toBeVisible(); // Kubernetes has no support
   await expect(page.getByRole('link', { name: 'Competência: Node.js' }).first()).toBeVisible();
 

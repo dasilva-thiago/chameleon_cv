@@ -1,6 +1,6 @@
 import { isFactKind, type EvidenceEntry } from '@chameleon/contracts';
 import { useRef, useState } from 'react';
-import { PageHeading, usePageTitle } from '../../components/layout/PageHeading';
+import { usePageTitle } from '../../components/layout/PageHeading';
 import { Alert } from '../../components/ui/Alert';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
@@ -122,7 +122,7 @@ function EvidenceCard({ entry, onEdit }: { entry: EvidenceEntry; onEdit: () => v
 
 /** Evidencias de apoio (links, documentos) e os fatos do perfil que cada uma sustenta. */
 export function EvidencePanel() {
-  usePageTitle('Evidências');
+  usePageTitle('Revisar: evidências');
   const list = useEvidenceList();
   const [mode, setMode] = useState<
     { type: 'idle' } | { type: 'create' } | { type: 'edit'; id: string }
@@ -138,17 +138,28 @@ export function EvidencePanel() {
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="flex flex-col gap-2">
-        <PageHeading>Evidências</PageHeading>
-        <p className="text-base text-slate-800">
-          Links, documentos e referências que comprovam o que está no seu perfil. Vincule cada
-          evidência aos itens que ela sustenta.
-        </p>
-      </div>
+      <p className="text-sm text-slate-700">
+        Links e documentos que comprovam o seu perfil, vinculados aos itens que sustentam.
+      </p>
 
       <div role="status" aria-live="polite">
         {notice !== undefined ? <Alert tone="success">{notice}</Alert> : null}
       </div>
+
+      {mode.type === 'create' ? null : (
+        <div>
+          <Button
+            ref={addRef}
+            variant="secondary"
+            onClick={() => {
+              setNotice(undefined);
+              setMode({ type: 'create' });
+            }}
+          >
+            Cadastrar evidência
+          </Button>
+        </div>
+      )}
 
       {list.isPending ? <LoadingStatus label="Carregando evidências…" /> : null}
       {list.isError ? (
@@ -217,20 +228,7 @@ export function EvidencePanel() {
             close();
           }}
         />
-      ) : (
-        <div>
-          <Button
-            ref={addRef}
-            variant="secondary"
-            onClick={() => {
-              setNotice(undefined);
-              setMode({ type: 'create' });
-            }}
-          >
-            Cadastrar evidência
-          </Button>
-        </div>
-      )}
+      ) : null}
     </div>
   );
 }

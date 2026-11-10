@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Navigate, useParams } from 'react-router';
-import { PageHeading, usePageTitle } from '../../components/layout/PageHeading';
+import { PageHeader } from '../../components/layout/PageHeader';
+import { usePageTitle } from '../../components/layout/PageHeading';
 import { Alert } from '../../components/ui/Alert';
 import { Badge } from '../../components/ui/Badge';
 import { useProfileData } from './context';
@@ -190,19 +191,23 @@ export function SectionPage() {
   const completion = completionOf(def, document);
 
   return (
-    <div className="flex flex-col gap-5">
-      <div className="flex flex-col gap-2">
-        <PageHeading>{def.label}</PageHeading>
-        <p className="text-base text-slate-800">{def.description}</p>
-        <div className="flex flex-wrap gap-2">
-          <Badge tone={completion.state === 'to_review' ? 'warn' : 'neutral'}>
-            {completion.text}
-          </Badge>
-          {PRIVATE_SECTIONS.has(def.section) ? (
-            <Badge tone="info">Privada: nunca vai a currículos</Badge>
-          ) : null}
-        </div>
-      </div>
+    <div className="flex flex-col gap-6">
+      <PageHeader
+        title={def.label}
+        meta={
+          <div className="flex flex-col gap-2">
+            <p className="text-base text-slate-800">{def.description}</p>
+            <div className="flex flex-wrap gap-2">
+              <Badge tone={completion.state === 'to_review' ? 'warn' : 'neutral'}>
+                {completion.text}
+              </Badge>
+              {PRIVATE_SECTIONS.has(def.section) ? (
+                <Badge tone="info">Privada: nunca vai a currículos</Badge>
+              ) : null}
+            </div>
+          </div>
+        }
+      />
       {def.type === 'block' ? (
         <BlockSection key={def.slug} def={def} />
       ) : (

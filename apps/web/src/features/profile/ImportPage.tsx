@@ -5,11 +5,14 @@ import type {
 } from '@chameleon/contracts';
 import { useId, useState, type ChangeEvent } from 'react';
 import { Link } from 'react-router';
-import { PageHeading, usePageTitle } from '../../components/layout/PageHeading';
+import { PageHeader } from '../../components/layout/PageHeader';
+import { usePageTitle } from '../../components/layout/PageHeading';
 import { Alert } from '../../components/ui/Alert';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { CheckboxField } from '../../components/ui/CheckboxField';
+import { MoreIcon } from '../../components/ui/icons';
+import { MenuButton } from '../../components/ui/MenuButton';
 import { SelectField } from '../../components/ui/SelectField';
 import { TextAreaField } from '../../components/ui/TextAreaField';
 import { isApiError, messageForError } from '../../lib/api';
@@ -133,23 +136,30 @@ function InputStage({
         }}
         className="font-mono"
       />
-      <SelectField
-        label="Formato"
-        placeholder={null}
-        options={FORMAT_OPTIONS}
-        value={format}
-        onChange={(event) => {
-          setFormat(event.target.value as Format);
-        }}
-      />
-      <CheckboxField
-        label="Aceitar campos desconhecidos"
-        description="Por padrão, campos que o perfil não conhece rejeitam o arquivo. Marque para importar o resto e listar o que foi ignorado."
-        checked={lenient}
-        onChange={(event) => {
-          setLenient(event.target.checked);
-        }}
-      />
+      <details className="rounded-md border border-slate-300">
+        <summary className="cursor-pointer px-3 py-2 text-sm font-medium text-slate-900 focus-visible:outline-2 focus-visible:outline-blue-700">
+          Opções avançadas
+        </summary>
+        <div className="flex flex-col gap-4 border-t border-slate-300 p-3">
+          <SelectField
+            label="Formato"
+            placeholder={null}
+            options={FORMAT_OPTIONS}
+            value={format}
+            onChange={(event) => {
+              setFormat(event.target.value as Format);
+            }}
+          />
+          <CheckboxField
+            label="Aceitar campos desconhecidos"
+            description="Por padrão, campos que o perfil não conhece rejeitam o arquivo. Marque para importar o resto e listar o que foi ignorado."
+            checked={lenient}
+            onChange={(event) => {
+              setLenient(event.target.checked);
+            }}
+          />
+        </div>
+      </details>
       {preview.isError ? (
         <Alert tone="error" title="Não foi possível gerar a prévia">
           {messageForError(preview.error)}
@@ -323,14 +333,21 @@ function PreviewStage({
             }}
           />
         ) : null}
-        <CheckboxField
-          label="Gerar novos identificadores se houver conflito"
-          description="Use só se o arquivo veio de outra conta e a aplicação foi recusada por conflito de ids."
-          checked={regenerate}
-          onChange={(event) => {
-            setRegenerate(event.target.checked);
-          }}
-        />
+        <details className="text-sm">
+          <summary className="w-fit cursor-pointer font-medium underline decoration-dotted">
+            Opções avançadas
+          </summary>
+          <div className="mt-2">
+            <CheckboxField
+              label="Gerar novos identificadores se houver conflito"
+              description="Use só se o arquivo veio de outra conta e a aplicação foi recusada por conflito de ids."
+              checked={regenerate}
+              onChange={(event) => {
+                setRegenerate(event.target.checked);
+              }}
+            />
+          </div>
+        </details>
         <p className="text-sm text-slate-700">
           Tudo que for importado fica <strong>aguardando confirmação</strong> até você revisar.
         </p>
@@ -368,18 +385,22 @@ function PreviewStage({
         >
           {apply.isPending ? 'Aplicando…' : 'Aplicar importação'}
         </Button>
-        <Button
-          variant="secondary"
+        <MenuButton
+          label="Mais opções"
+          icon={<MoreIcon />}
           disabled={busy}
-          onClick={() => {
-            discard.mutate(importRecord.id, { onSuccess: onDiscarded });
-          }}
-        >
-          {discard.isPending ? 'Descartando…' : 'Descartar prévia'}
-        </Button>
-        <Button variant="secondary" disabled={busy} onClick={onBack}>
-          Voltar e editar o texto
-        </Button>
+          entries={[
+            { kind: 'item', label: 'Voltar e editar o texto', onSelect: onBack },
+            {
+              kind: 'item',
+              label: 'Descartar prévia',
+              danger: true,
+              onSelect: () => {
+                discard.mutate(importRecord.id, { onSuccess: onDiscarded });
+              },
+            },
+          ]}
+        />
       </div>
     </div>
   );
@@ -395,14 +416,17 @@ export function ImportPage() {
   const [text, setText] = useState('');
 
   return (
-    <div className="flex flex-col gap-5">
-      <div className="flex flex-col gap-2">
-        <PageHeading>Importar arquivo</PageHeading>
-        <p className="text-base text-slate-800">
-          Traga um perfil em YAML ou JSON (por exemplo, um backup exportado daqui). O conteúdo do
-          arquivo é tratado como dado, nunca como instrução.
-        </p>
-      </div>
+    <div className="flex flex-col gap-6">
+      <PageHeader
+        back={{ to: '/perfil', label: 'Perfil' }}
+        title="Importar arquivo"
+        meta={
+          <p className="text-base text-slate-800">
+            YAML ou JSON, por exemplo um backup exportado daqui. O conteúdo é tratado como dado,
+            nunca como instrução.
+          </p>
+        }
+      />
 
       {stage.name === 'input' ? (
         <InputStage

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { NavLink, Outlet } from 'react-router';
+import { Link, NavLink, Outlet, useLocation } from 'react-router';
 import { PageHeading, usePageTitle } from '../../components/layout/PageHeading';
 import { Alert } from '../../components/ui/Alert';
 import { Button } from '../../components/ui/Button';
@@ -15,10 +15,14 @@ const navLinkClass = ({ isActive }: { isActive: boolean }): string =>
     isActive ? 'bg-slate-200 font-semibold text-slate-900' : 'text-slate-800 hover:bg-slate-100'
   }`;
 
+const REVIEW_PATHS = ['/perfil/confirmar', '/perfil/pendencias', '/perfil/evidencias'];
+
 function ProfileNav() {
   const { document, summary } = useProfileData();
+  const { pathname } = useLocation();
   const [open, setOpen] = useState(false);
-  const toReview = summary.byStatus.needs_review;
+  const attention = summary.byStatus.needs_review + summary.pending.open;
+  const reviewActive = REVIEW_PATHS.includes(pathname);
 
   return (
     <div className="flex flex-col gap-2">
@@ -45,46 +49,28 @@ function ProfileNav() {
             </NavLink>
           </li>
           <li>
+            <Link
+              to="/perfil/confirmar"
+              aria-current={reviewActive ? 'page' : undefined}
+              className={navLinkClass({ isActive: reviewActive })}
+            >
+              <span className="flex items-center justify-between gap-2">
+                Revisar
+                {attention > 0 ? (
+                  <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-950">
+                    {String(attention)}
+                    <span className="sr-only"> a revisar</span>
+                  </span>
+                ) : null}
+              </span>
+            </Link>
+          </li>
+          <li>
             <NavLink to="/perfil/importar" className={navLinkClass}>
               Importar arquivo
             </NavLink>
           </li>
         </ul>
-        <div className="flex flex-col gap-1">
-          <p className="px-3 text-xs font-semibold uppercase tracking-wide text-slate-700">
-            Revisar e organizar
-          </p>
-          <ul className="flex flex-col gap-1">
-            <li>
-              <NavLink to="/perfil/confirmar" className={navLinkClass}>
-                <span>Para confirmar</span>
-                <span className="text-xs font-normal text-slate-700">
-                  {toReview === 0 ? 'Nenhum item aguardando' : `${String(toReview)} aguardando`}
-                </span>
-              </NavLink>
-            </li>
-            <li>
-              <NavLink to="/perfil/pendencias" className={navLinkClass}>
-                <span>Pendências</span>
-                <span className="text-xs font-normal text-slate-700">
-                  {summary.pending.open === 0
-                    ? 'Nenhuma aberta'
-                    : `${String(summary.pending.open)} aberta(s)`}
-                </span>
-              </NavLink>
-            </li>
-            <li>
-              <NavLink to="/perfil/evidencias" className={navLinkClass}>
-                <span>Evidências</span>
-                <span className="text-xs font-normal text-slate-700">
-                  {summary.evidenceCount === 0
-                    ? 'Nenhuma cadastrada'
-                    : `${String(summary.evidenceCount)} cadastrada(s)`}
-                </span>
-              </NavLink>
-            </li>
-          </ul>
-        </div>
         {SECTION_GROUPS.map((group) => (
           <div key={group.id} className="flex flex-col gap-1">
             <p className="px-3 text-xs font-semibold uppercase tracking-wide text-slate-700">
@@ -96,8 +82,15 @@ function ProfileNav() {
                 return (
                   <li key={section.slug}>
                     <NavLink to={`/perfil/${section.slug}`} className={navLinkClass}>
-                      <span>{section.label}</span>
-                      <span className="text-xs font-normal text-slate-700">{completion.text}</span>
+                      <span className="flex items-center justify-between gap-2">
+                        {section.label}
+                        {section.type === 'collection' && completion.count > 0 ? (
+                          <span className="text-xs font-normal text-slate-700">
+                            {String(completion.count)}
+                            <span className="sr-only"> itens</span>
+                          </span>
+                        ) : null}
+                      </span>
                     </NavLink>
                   </li>
                 );

@@ -48,7 +48,6 @@ function GroupSection({ group }: { group: FieldGroup }) {
     >
       <summary className="cursor-pointer px-4 py-3 text-base font-medium text-slate-900 focus-visible:outline-2 focus-visible:outline-blue-700">
         {group.title}
-        <span className="font-normal text-slate-700"> (opcional)</span>
       </summary>
       <div className="border-t border-slate-300 p-4">{body}</div>
     </details>
@@ -108,9 +107,7 @@ export function FormFrame({
       >
         {title}
       </h2>
-      <p className="text-sm text-slate-700">
-        Todos os campos são opcionais, exceto os marcados com *. Preencha só o que souber agora.
-      </p>
+      <p className="text-sm text-slate-700">Só os campos com * são obrigatórios.</p>
       {formError !== undefined ? <Alert tone="error">{formError}</Alert> : null}
       {apiError !== undefined ? (
         <Alert tone="error" title="Não foi possível salvar">
@@ -121,7 +118,7 @@ export function FormFrame({
         <GroupSection key={group.id} group={group} />
       ))}
       {extra}
-      <div className="flex flex-wrap gap-3">
+      <div className="sticky bottom-0 -mx-4 flex flex-wrap gap-3 border-t border-slate-300 bg-white px-4 py-3 sm:-mx-5 sm:px-5">
         <Button type="submit" disabled={pending}>
           {pending ? 'Salvando…' : submitLabel}
         </Button>

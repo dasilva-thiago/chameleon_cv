@@ -1,6 +1,6 @@
 import { QueryClientProvider, type QueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import { Route, Routes } from 'react-router';
+import { Navigate, Route, Routes } from 'react-router';
 import { PublicLayout } from '../components/layout/PublicLayout';
 import { AcceptInvitePage } from '../features/auth/AcceptInvitePage';
 import { LoginPage } from '../features/auth/LoginPage';
@@ -17,6 +17,7 @@ import { ImportPage } from '../features/profile/ImportPage';
 import { PendingPanel } from '../features/profile/PendingPanel';
 import { ProfileLayout } from '../features/profile/ProfileLayout';
 import { ProfileOverviewPage } from '../features/profile/ProfileOverviewPage';
+import { ReviewLayout } from '../features/profile/ReviewLayout';
 import { ReviewPanel } from '../features/profile/ReviewPanel';
 import { ResumeEditorPage } from '../features/resumes/ResumeEditorPage';
 import { SectionPage } from '../features/profile/SectionPage';
@@ -34,9 +35,12 @@ export function AppRoutes() {
         <Route path="/perfil" element={<ProfileLayout />}>
           <Route index element={<ProfileOverviewPage />} />
           <Route path="importar" element={<ImportPage />} />
-          <Route path="confirmar" element={<ReviewPanel />} />
-          <Route path="pendencias" element={<PendingPanel />} />
-          <Route path="evidencias" element={<EvidencePanel />} />
+          <Route element={<ReviewLayout />}>
+            <Route path="confirmar" element={<ReviewPanel />} />
+            <Route path="pendencias" element={<PendingPanel />} />
+            <Route path="evidencias" element={<EvidencePanel />} />
+          </Route>
+          <Route path="revisar" element={<Navigate to="/perfil/confirmar" replace />} />
           <Route path=":slug" element={<SectionPage />} />
         </Route>
         <Route path="/vagas" element={<JobsPage />} />
