@@ -99,8 +99,10 @@ describe('vagas: painel', () => {
     const { user, container } = renderApp('/vagas');
     const link = await screen.findByRole('link', { name: 'Dev Backend' });
     expect(link).toHaveAttribute('href', `/vagas/${JOB_ID}`);
-    expect(screen.getByText('Acme')).toBeInTheDocument();
-    expect(screen.getByText('Situação:')).toBeInTheDocument();
+    expect(screen.getByText('Acme · Brasil · Remoto')).toBeInTheDocument();
+    expect(
+      within(screen.getByRole('list', { name: 'Vagas salvas' })).getByText('Salva'),
+    ).toBeInTheDocument();
     expect(screen.getByText('1 em andamento · 1 no total')).toBeInTheDocument();
     expect(await violations(container)).toEqual([]);
 
@@ -188,6 +190,20 @@ describe('vagas: adicionar', () => {
     await user.click(screen.getByRole('button', { name: 'Salvar vaga' }));
     expect(await screen.findByText(/endereço http:\/\/ ou https:\/\/ válido/)).toBeInTheDocument();
     expect(fake.requestsTo('POST /api/jobs')).toHaveLength(0);
+  });
+
+  it('os campos opcionais ficam recolhidos e abrem sozinhos quando há erro neles', async () => {
+    loggedIn();
+    const { user } = renderApp('/vagas/nova');
+    await screen.findByRole('heading', { level: 1, name: 'Adicionar vaga' });
+    const more = screen.getByText(/Mais detalhes/).closest('details')!;
+    expect(more).not.toHaveAttribute('open');
+    await user.click(screen.getByLabelText(/Descrição da vaga/));
+    await user.paste('texto');
+    await user.type(screen.getByLabelText(/Endereço da vaga/), 'javascript:alert(1)');
+    await user.click(screen.getByRole('button', { name: 'Salvar vaga' }));
+    await screen.findByText(/endereço http:\/\/ ou https:\/\/ válido/);
+    expect(more).toHaveAttribute('open');
   });
 
   it('erro da API é mostrado e o texto digitado é preservado', async () => {

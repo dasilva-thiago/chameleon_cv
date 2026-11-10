@@ -8,6 +8,7 @@ import type {
 } from '@chameleon/contracts';
 import { useState, type ReactNode } from 'react';
 import { Link } from 'react-router';
+import { Section } from '../../components/layout/Section';
 import { Alert } from '../../components/ui/Alert';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
@@ -350,21 +351,34 @@ export function AnalysisSection({ jobId }: { jobId: string }) {
     run.mutate({ id: jobId, force });
   };
 
+  const canAnalyze = query.isSuccess;
   return (
-    <section aria-labelledby="job-analysis" className="flex flex-col gap-4">
-      <div className="flex flex-col gap-1">
-        <h2 id="job-analysis" className="text-lg font-semibold">
-          Análise da vaga
-        </h2>
-        <p className="text-sm text-slate-700">
-          Compara os requisitos da vaga com o seu perfil. Só itens confirmados contam como
-          evidência.{' '}
-          {ai.data?.active === true
-            ? 'Com a IA ligada, o texto da vaga e os itens confirmados escolhidos são enviados ao provedor de IA.'
-            : 'Sem IA, roda neste computador e não envia nada a serviços externos.'}
-        </p>
-      </div>
-
+    <Section
+      id="job-analysis"
+      title="Análise da vaga"
+      description={
+        ai.data?.active === true
+          ? 'Requisitos × perfil confirmado. Com a IA ligada, o texto da vaga e itens confirmados escolhidos vão ao provedor.'
+          : 'Requisitos × perfil confirmado. Roda neste computador, sem enviar nada a serviços externos.'
+      }
+      actions={
+        canAnalyze ? (
+          <Button
+            variant={query.data.analysis === null ? 'primary' : 'secondary'}
+            disabled={run.isPending}
+            onClick={() => {
+              analyze(false);
+            }}
+          >
+            {run.isPending
+              ? 'Analisando…'
+              : query.data.analysis === null
+                ? 'Analisar vaga'
+                : 'Analisar de novo'}
+          </Button>
+        ) : undefined
+      }
+    >
       <AiPanel />
 
       {query.isPending ? <LoadingStatus label="Carregando a análise…" /> : null}
@@ -395,22 +409,6 @@ export function AnalysisSection({ jobId }: { jobId: string }) {
         </Alert>
       ) : null}
 
-      {query.isSuccess ? (
-        <div>
-          <Button
-            disabled={run.isPending}
-            onClick={() => {
-              analyze(false);
-            }}
-          >
-            {run.isPending
-              ? 'Analisando…'
-              : query.data.analysis === null
-                ? 'Analisar vaga'
-                : 'Analisar de novo'}
-          </Button>
-        </div>
-      ) : null}
       <div role="status" aria-live="polite" className="text-sm text-slate-700">
         {run.isSuccess && run.data.reused
           ? 'Nada mudou desde a última análise: ela foi mantida.'
@@ -424,6 +422,6 @@ export function AnalysisSection({ jobId }: { jobId: string }) {
           analysis={query.data.analysis}
         />
       ) : null}
-    </section>
+    </Section>
   );
 }

@@ -1,5 +1,6 @@
 import { useNavigate, useParams } from 'react-router';
-import { PageHeading, usePageTitle } from '../../components/layout/PageHeading';
+import { PageHeader } from '../../components/layout/PageHeader';
+import { usePageTitle } from '../../components/layout/PageHeading';
 import { Alert } from '../../components/ui/Alert';
 import { LoadingStatus } from '../../components/ui/LoadingStatus';
 import { isApiError, messageForError } from '../../lib/api';
@@ -13,8 +14,8 @@ export function NewJobPage() {
   const create = useCreateJob();
 
   return (
-    <div className="flex max-w-3xl flex-col gap-5">
-      <PageHeading>Adicionar vaga</PageHeading>
+    <div className="flex max-w-3xl flex-col gap-6">
+      <PageHeader back={{ to: '/vagas', label: 'Vagas' }} title="Adicionar vaga" />
       <JobForm
         submitLabel="Salvar vaga"
         pending={create.isPending}
@@ -54,8 +55,11 @@ export function EditJobPage() {
   const { job } = query.data;
 
   return (
-    <div className="flex max-w-3xl flex-col gap-5">
-      <PageHeading>Editar: {job.title ?? UNTITLED_JOB}</PageHeading>
+    <div className="flex max-w-3xl flex-col gap-6">
+      <PageHeader
+        back={{ to: `/vagas/${job.id}`, label: job.title ?? UNTITLED_JOB }}
+        title={`Editar: ${job.title ?? UNTITLED_JOB}`}
+      />
       <JobForm
         job={job}
         submitLabel="Salvar alterações"

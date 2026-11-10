@@ -5,6 +5,7 @@ import type {
 } from '@chameleon/contracts';
 import { useId, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
+import { Section } from '../../components/layout/Section';
 import { Alert } from '../../components/ui/Alert';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
@@ -101,9 +102,36 @@ function ResumeCard({ resume }: { resume: ResumeSummary }) {
 
   return (
     <li className="flex flex-col gap-3 rounded-md border border-slate-400 bg-white p-4">
-      <div className="flex flex-col gap-1">
-        <h3 className="text-base font-semibold text-slate-900">{resume.name}</h3>
-        <p className="text-sm text-slate-700">Atualizado em {formatDateTime(resume.updatedAt)}</p>
+      <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
+        <div className="flex min-w-0 flex-col gap-0.5">
+          <h3 className="text-base font-semibold text-slate-900">{resume.name}</h3>
+          <p className="text-sm text-slate-700">Atualizado em {formatDateTime(resume.updatedAt)}</p>
+        </div>
+        {renaming ? null : (
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="secondary"
+              disabled={busy}
+              onClick={() => {
+                setName(resume.name);
+                setRenaming(true);
+              }}
+            >
+              Renomear <span className="sr-only">{resume.name}</span>
+            </Button>
+            {confirming ? null : (
+              <Button
+                variant="secondary"
+                disabled={busy}
+                onClick={() => {
+                  setConfirming(true);
+                }}
+              >
+                Excluir… <span className="sr-only">{resume.name}</span>
+              </Button>
+            )}
+          </div>
+        )}
       </div>
 
       {renaming ? (
@@ -145,31 +173,7 @@ function ResumeCard({ resume }: { resume: ResumeSummary }) {
             </Button>
           </div>
         </form>
-      ) : (
-        <div className="flex flex-wrap gap-3">
-          <Button
-            variant="secondary"
-            disabled={busy}
-            onClick={() => {
-              setName(resume.name);
-              setRenaming(true);
-            }}
-          >
-            Renomear <span className="sr-only">{resume.name}</span>
-          </Button>
-          {confirming ? null : (
-            <Button
-              variant="secondary"
-              disabled={busy}
-              onClick={() => {
-                setConfirming(true);
-              }}
-            >
-              Excluir… <span className="sr-only">{resume.name}</span>
-            </Button>
-          )}
-        </div>
-      )}
+      ) : null}
 
       {confirming ? (
         <div
@@ -247,23 +251,23 @@ function Generated({ result }: { result: CreateResumeResponse }) {
     <Alert tone="info" title={`Currículo "${result.resume.name}" gerado`}>
       <p>
         A versão 1 é um rascunho montado só com itens confirmados do seu perfil. Revise antes de
-        aprovar.
-      </p>
-      {result.notes.length > 0 ? (
-        <>
-          <p className="mt-2 font-medium">O que ficou de fora e por quê:</p>
-          <ul className="list-disc pl-5">
-            {result.notes.map((note) => (
-              <li key={note}>{note}</li>
-            ))}
-          </ul>
-        </>
-      ) : null}
-      <p className="mt-2">
+        aprovar.{' '}
         <Link to={editorPath(result.resume.id, result.version.id)} className={inlineLinkClass}>
           Abrir a versão 1 no editor
         </Link>
       </p>
+      {result.notes.length > 0 ? (
+        <details className="mt-2">
+          <summary className="w-fit cursor-pointer font-medium underline decoration-dotted">
+            O que ficou de fora e por quê ({String(result.notes.length)})
+          </summary>
+          <ul className="mt-1 list-disc pl-5">
+            {result.notes.map((note) => (
+              <li key={note}>{note}</li>
+            ))}
+          </ul>
+        </details>
+      ) : null}
     </Alert>
   );
 }
@@ -274,18 +278,11 @@ export function ResumesSection({ jobId }: { jobId: string }) {
   const create = useCreateResume();
 
   return (
-    <section aria-labelledby="job-resumes" className="flex flex-col gap-4">
-      <div className="flex flex-col gap-1">
-        <h2 id="job-resumes" className="text-lg font-semibold">
-          Currículos desta vaga
-        </h2>
-        <p className="text-sm text-slate-700">
-          O currículo é montado só com itens confirmados do seu perfil, cada um com a sua fonte.
-          Você revisa e edita um rascunho; só uma versão aprovada pode ser baixada.
-        </p>
-      </div>
-
-      <div>
+    <Section
+      id="job-resumes"
+      title="Currículos desta vaga"
+      description="Montados só com itens confirmados do perfil. Só uma versão aprovada pode ser baixada."
+      actions={
         <Button
           disabled={create.isPending}
           onClick={() => {
@@ -294,8 +291,8 @@ export function ResumesSection({ jobId }: { jobId: string }) {
         >
           {create.isPending ? 'Gerando…' : 'Gerar currículo'}
         </Button>
-      </div>
-
+      }
+    >
       {create.isError ? (
         <Alert tone="error" title="Não foi possível gerar o currículo">
           {messageForError(create.error)}
@@ -329,6 +326,6 @@ export function ResumesSection({ jobId }: { jobId: string }) {
           ))}
         </ul>
       ) : null}
-    </section>
+    </Section>
   );
 }
