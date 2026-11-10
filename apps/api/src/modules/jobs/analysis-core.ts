@@ -32,9 +32,9 @@ const LOCAL_FALLBACK_WARNING =
   'A IA não respondeu agora; esta é a análise local, mais simples. Use "Refazer análise" para tentar a IA de novo.';
 
 /**
- * Cache key = (job, text hash, profile hash, engine version). The engine version is the AI prompt version for an
- * AI analysis and the matcher version for the local one, so the two never overwrite each other and a provider
- * change does not invalidate a stored analysis. Same key -> the stored analysis is returned untouched (`reused`).
+ * Cache key = (job, text hash, profile hash, engine version). The engine version is the AI prompt version plus the
+ * matcher version for an AI analysis and the matcher version alone for the local one, so the two never overwrite
+ * each other and a provider change does not invalidate a stored analysis. Same key -> the stored analysis is returned untouched (`reused`).
  *
  * With AI available (configured + consented) a missing AI analysis is requested; when no provider answers (limits,
  * outages, bad keys) the local, deterministic analysis is used instead and the user sees no error. `force`
@@ -51,7 +51,8 @@ export async function analyzeOrReuse(
   ai: AiService,
 ): Promise<{ row: AnalysisRowCore; reused: boolean; created: boolean; result: AnalysisResult }> {
   const base = { jobId: job.id, descriptionHash: job.descriptionHash, profileHash };
-  const aiKey = { ...base, engineVersion: ANALYSIS_PROMPT_VERSION };
+  // An AI analysis is also scored by the local matcher, so a matcher change must invalidate it too.
+  const aiKey = { ...base, engineVersion: `${ANALYSIS_PROMPT_VERSION}+${MATCHER_VERSION}` };
   const localKey = { ...base, engineVersion: MATCHER_VERSION };
 
   const reuse = (row: AnalysisRowCore) => ({

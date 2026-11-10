@@ -6,7 +6,7 @@ import type {
   RequirementImportance,
   RequirementMatch,
 } from '@chameleon/contracts';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Link } from 'react-router';
 import { Alert } from '../../components/ui/Alert';
 import { Badge } from '../../components/ui/Badge';
@@ -72,6 +72,37 @@ function reviewSnapshot(review: AnalysisReview): AnalysisReview {
   };
 }
 
+/** Seção recolhida por padrão: o título (com um resumo curto) abre e fecha o conteúdo, sem perder o que foi digitado. */
+function Collapsible({
+  id,
+  title,
+  hint,
+  children,
+}: {
+  id: string;
+  title: string;
+  hint?: string;
+  children: ReactNode;
+}) {
+  return (
+    <details className="group rounded-md border border-slate-400 bg-white">
+      <summary className="flex cursor-pointer list-none flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700 [&::-webkit-details-marker]:hidden">
+        <span
+          aria-hidden="true"
+          className="text-slate-700 transition-transform group-open:rotate-90"
+        >
+          ▸
+        </span>
+        <h3 id={id} className="text-base font-semibold">
+          {title}
+        </h3>
+        {hint !== undefined ? <span className="text-sm text-slate-700">{hint}</span> : null}
+      </summary>
+      <div className="flex flex-col gap-3 border-t border-slate-300 p-4">{children}</div>
+    </details>
+  );
+}
+
 function RequirementItem({
   requirement,
   match,
@@ -123,6 +154,14 @@ function RequirementItem({
             <li key={caution}>{caution}</li>
           ))}
         </ul>
+      ) : null}
+      {match.experienceNote !== undefined ? (
+        <details className="text-sm text-slate-700">
+          <summary className="cursor-pointer text-slate-700 underline decoration-dotted">
+            Sobre experiência
+          </summary>
+          <p className="mt-1">{match.experienceNote}</p>
+        </details>
       ) : null}
       <TextAreaField
         label={`Sua anotação sobre este requisito (${requirement.id})`}
@@ -178,10 +217,11 @@ function AnalysisView({ jobId, analysis }: { jobId: string; analysis: JobAnalysi
         </Alert>
       ) : null}
 
-      <section aria-labelledby="analysis-summary" className="flex flex-col gap-2">
-        <h3 id="analysis-summary" className="text-base font-semibold">
-          Resumo
-        </h3>
+      <Collapsible
+        id="analysis-summary"
+        title="Resumo"
+        hint={`${String(result.summary.byStrength.direct)} diretas · ${String(result.summary.byStrength.partial)} parciais · ${String(result.summary.byStrength.absent)} sem evidência`}
+      >
         <p className="text-sm text-slate-700">
           {result.engine === 'ai' && result.ai
             ? `Analisado com IA (${result.ai.provider}, ${result.ai.model}). A IA propõe os requisitos e os vínculos; a força de cada evidência vem das regras locais.`
@@ -203,20 +243,17 @@ function AnalysisView({ jobId, analysis }: { jobId: string; analysis: JobAnalysi
           Requisitos obrigatórios com alguma sustentação confirmada: {String(supportedMandatory)} de{' '}
           {String(totalMandatory)}.
         </p>
-      </section>
+      </Collapsible>
 
       {IMPORTANCE_GROUPS.map((group) => {
         const items = result.requirements.filter((r) => r.importance === group.id);
         if (items.length === 0) return null;
         return (
-          <section
+          <Collapsible
             key={group.id}
-            aria-labelledby={`analysis-${group.id}`}
-            className="flex flex-col gap-3"
+            id={`analysis-${group.id}`}
+            title={`${group.title} (${String(items.length)})`}
           >
-            <h3 id={`analysis-${group.id}`} className="text-base font-semibold">
-              {group.title} ({String(items.length)})
-            </h3>
             <ul className="flex flex-col gap-3">
               {items.map((requirement) => {
                 const match = matchOf.get(requirement.id);
@@ -234,14 +271,15 @@ function AnalysisView({ jobId, analysis }: { jobId: string; analysis: JobAnalysi
                 );
               })}
             </ul>
-          </section>
+          </Collapsible>
         );
       })}
 
-      <section aria-labelledby="analysis-plan" className="flex flex-col gap-3">
-        <h3 id="analysis-plan" className="text-base font-semibold">
-          Plano de adaptação
-        </h3>
+      <Collapsible
+        id="analysis-plan"
+        title="Plano de adaptação"
+        hint={`${String(result.prioritized.length)} itens`}
+      >
         <p className="text-sm text-slate-800">
           Itens confirmados do seu perfil que mais sustentam esta vaga. Desmarque o que não quer
           destacar no currículo. Nada aqui altera o seu perfil.
@@ -267,7 +305,7 @@ function AnalysisView({ jobId, analysis }: { jobId: string; analysis: JobAnalysi
             ))}
           </ul>
         )}
-      </section>
+      </Collapsible>
 
       <div className="flex flex-wrap items-center gap-3">
         <Button

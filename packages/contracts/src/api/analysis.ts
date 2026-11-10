@@ -80,6 +80,8 @@ export const requirementMatchSchema = z.strictObject({
   gap: z.string().max(500).nullable(),
   /** Cuidados ao usar a evidencia (ex.: so estudo, exige N anos). */
   cautions: z.array(z.string().max(300)).max(5),
+  /** Aviso discreto sobre "experiencia" (a vaga pede tempo/experiencia, ou a evidencia e de projeto); a tela o recolhe. */
+  experienceNote: z.string().max(700).optional(),
 });
 export type RequirementMatch = z.infer<typeof requirementMatchSchema>;
 

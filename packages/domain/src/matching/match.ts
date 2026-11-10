@@ -14,7 +14,7 @@ import { buildMatchIndex, type IndexedFact, type MatchIndex } from './profile-in
 import { containsPhrase, haystackOf, termInText, tokenize } from './text';
 
 /** Versao do conjunto extrator + matcher: muda quando o resultado para a mesma entrada pode mudar. */
-export const MATCHER_VERSION = `${EXTRACTOR_VERSION}.match-1`;
+export const MATCHER_VERSION = `${EXTRACTOR_VERSION}.match-4`;
 
 type Level = 'direct' | 'partial';
 
@@ -28,8 +28,15 @@ const STRENGTH_RANK: Record<MatchStrength, number> = {
 
 const IMPORTANCE_WEIGHT = { mandatory: 3, responsibility: 2, desirable: 1 } as const;
 
+/**
+ * Este perfil mira vagas juniores: "experiencia profissional" nao e exigida. O que conta e ter PRATICADO a habilidade
+ * (emprego, projeto, voluntariado); estudo (curso, certificacao) e declaracao continuam parciais. O aviso de que a
+ * evidencia nao e de emprego segue visivel, mas recolhido (`experienceNote`).
+ */
 const CONTEXT_LEVEL: Record<string, Level> = {
   professional_experience: 'direct',
+  project_experience: 'direct',
+  volunteer_experience: 'direct',
 };
 
 const CONTEXT_CAUTION: Record<string, string> = {
@@ -43,6 +50,24 @@ const CONTEXT_CAUTION: Record<string, string> = {
   unverified: 'Contexto de uso não verificado: confirme antes de usar.',
 };
 
+const SKILL_NOT_NAMED_CAUTION =
+  'A vaga pede um termo específico que esta habilidade não nomeia: confirme que é a mesma atividade antes de afirmar.';
+
+const EXPERIENCE_TEXT_CAUTION =
+  'Coincidência pelo texto da experiência, sem todos os termos pedidos pela vaga: confirme que é a mesma atividade antes de afirmar.';
+
+/** Palavras genericas em comum que bastam para citar uma experiencia (uma so nao basta). */
+const MIN_GENERIC_KEYWORD_HITS = 2;
+
+const isExperienceKind = (kind: RecordKind): boolean =>
+  kind === 'experience' || kind === 'experience_item';
+
+/**
+ * Termo especifico (".NET", "Swagger", "C#", "REST") = tem maiuscula, digito ou simbolo; palavra comum em minusculas
+ * ("backend", "documentacao") e generica. Recebe um termo ja extraido: nao depende da posicao numa frase.
+ */
+const isSpecificTerm = (term: string): boolean => /[\p{Lu}0-9+#.]/u.test(term);
+
 const KIND_CAUTION: Partial<Record<RecordKind, string>> = {
   project: CONTEXT_CAUTION.project_experience!,
   project_item: CONTEXT_CAUTION.project_experience!,
@@ -52,20 +77,26 @@ const KIND_CAUTION: Partial<Record<RecordKind, string>> = {
   certification: CONTEXT_CAUTION.certification!,
 };
 
-/** Tipos de registro com texto proprio que podem mencionar um requisito, e o nivel da evidencia. */
+/**
+ * Tipos de registro com texto proprio que podem mencionar um requisito, e o nivel da evidencia.
+ *
+ * Experiencia profissional so e "direta" quando o requisito e sustentado por um termo ESPECIFICO (tecnologia,
+ * ferramenta, sigla) citado nela; palavras genericas ("backend", "documentacao", "qualidade") aparecem em empregos
+ * de qualquer area e inflavam a analise de quem busca o primeiro emprego na area. Veja `experienceLevel`.
+ */
 const TEXT_KIND_LEVEL: Partial<Record<RecordKind, Level>> = {
   experience: 'direct',
   experience_item: 'direct',
   language: 'direct',
   competency_example: 'partial',
-  project: 'partial',
-  project_item: 'partial',
+  project: 'direct',
+  project_item: 'direct',
   education: 'partial',
   course: 'partial',
   certification: 'partial',
   award: 'partial',
   publication: 'partial',
-  volunteering: 'partial',
+  volunteering: 'direct',
 };
 
 const KIND_NOUN: Partial<Record<RecordKind, string>> = {
@@ -113,6 +144,17 @@ interface Candidate {
 }
 
 const dedupe = (items: readonly string[]): string[] => [...new Set(items)];
+
+/**
+ * Nivel de uma experiencia profissional citada para um requisito. Direto se o texto da experiencia nomeia TODOS os
+ * termos especificos do requisito (".NET" e "APIs" juntos, nao so "APIs"), ou se o requisito nao pede nenhum termo
+ * especifico (atividade, nao tecnologia). Caso contrario, so parcial: falta uma tecnologia que a vaga pede.
+ */
+function experienceLevel(requirement: JobRequirement, factHaystack: string): Level {
+  const specific = requirement.keywords.filter(isSpecificTerm);
+  if (specific.length === 0) return 'direct';
+  return specific.every((term) => containsPhrase(factHaystack, term)) ? 'direct' : 'partial';
+}
 
 function skillCandidates(
   index: MatchIndex,
@@ -214,7 +256,21 @@ function textCandidates(
       ANALYSIS_LIMITS.keywordsPerRequirement,
     );
     if (matchedTerms.length === 0) continue;
-    const kindCaution = KIND_CAUTION[fact.kind];
+    let factLevel = level;
+    if (isExperienceKind(fact.kind) && byName.length === 0) {
+      if (byKeyword.some(isSpecificTerm)) {
+        factLevel = experienceLevel(requirement, fact.haystack);
+      } else if (byKeyword.length >= MIN_GENERIC_KEYWORD_HITS) {
+        factLevel = 'partial';
+      } else {
+        continue; // uma palavra generica nao basta para citar um emprego
+      }
+    }
+    const kindCaution =
+      KIND_CAUTION[fact.kind] ??
+      (factLevel === 'partial' && isExperienceKind(fact.kind)
+        ? EXPERIENCE_TEXT_CAUTION
+        : undefined);
     const cautions = [
       ...(kindCaution !== undefined ? [kindCaution] : []),
       ...(fact.kind === 'language'
@@ -225,7 +281,7 @@ function textCandidates(
     ];
     (fact.usable ? usable : pending).push({
       fact,
-      level,
+      level: factLevel,
       via: 'record_text',
       context: null,
       supportingRecordId: null,
@@ -304,6 +360,7 @@ const AI_HINT_CAUTION =
  */
 function hintCandidates(
   index: MatchIndex,
+  requirement: JobRequirement,
   hintIds: readonly string[],
 ): { usable: Candidate[]; pending: Candidate[] } {
   const usable: Candidate[] = [];
@@ -329,9 +386,18 @@ function hintCandidates(
     if (fact.kind === 'skill') {
       const usages = (index.usagesBySkill.get(fact.id) ?? []).filter((usage) => usage.usable);
       const best = usages.find((usage) => CONTEXT_LEVEL[usage.context] === 'direct') ?? usages[0];
-      const level: Level =
+      let level: Level =
         best !== undefined ? (CONTEXT_LEVEL[best.context] ?? 'partial') : 'partial';
-      const contextCaution = best !== undefined ? CONTEXT_CAUTION[best.context] : undefined;
+      let contextCaution = best !== undefined ? CONTEXT_CAUTION[best.context] : undefined;
+      // Professional use of a skill only counts as direct for a requirement that names it (or names no specific term).
+      if (
+        level === 'direct' &&
+        requirement.keywords.some(isSpecificTerm) &&
+        !fact.names.some((name) => termInText(requirement.text, haystackOf(requirement.text), name))
+      ) {
+        level = 'partial';
+        contextCaution = SKILL_NOT_NAMED_CAUTION;
+      }
       usable.push({
         fact,
         level,
@@ -349,9 +415,16 @@ function hintCandidates(
       });
       continue;
     }
-    const level = TEXT_KIND_LEVEL[fact.kind];
-    if (level === undefined) continue; // e.g. a contact or a statement: never evidence
-    const kindCaution = KIND_CAUTION[fact.kind];
+    const baseLevel = TEXT_KIND_LEVEL[fact.kind];
+    if (baseLevel === undefined) continue; // e.g. a contact or a statement: never evidence
+    // A suggestion cannot make a job stronger than the text allows: a requirement that names a technology the
+    // experience never mentions is partial evidence, however related the AI finds the two.
+    const level = isExperienceKind(fact.kind)
+      ? experienceLevel(requirement, fact.haystack)
+      : baseLevel;
+    const kindCaution =
+      KIND_CAUTION[fact.kind] ??
+      (level === 'partial' && isExperienceKind(fact.kind) ? EXPERIENCE_TEXT_CAUTION : undefined);
     usable.push({
       fact,
       level,
@@ -373,7 +446,7 @@ function matchRequirement(
   const haystack = haystackOf(requirement.text);
   const skills = skillCandidates(index, requirement, haystack);
   const texts = textCandidates(index, requirement, haystack);
-  const hints = hintCandidates(index, hintIds);
+  const hints = hintCandidates(index, requirement, hintIds);
   const usable = uniqueByFact(sortCandidates([...skills.usable, ...texts.usable, ...hints.usable]));
   const pending = uniqueByFact(
     sortCandidates([...skills.pending, ...texts.pending, ...hints.pending]),
@@ -385,14 +458,19 @@ function matchRequirement(
     const strength: MatchStrength = usable.some((c) => c.level === 'direct') ? 'direct' : 'partial';
     const lead = usable[0]!;
     cautions.push(...usable.slice(0, 3).flatMap((candidate) => candidate.cautions));
-    if (strength === 'direct' && requirement.yearsRequired !== null) {
-      cautions.push(
-        `A vaga pede ${String(requirement.yearsRequired)} ano(s): confira se o tempo confirmado no seu perfil cobre isso.`,
-      );
-    }
     if (pending.length > 0) {
       cautions.push('Há também itens relacionados aguardando a sua confirmação.');
     }
+    const uncovered = requirement.keywords
+      .filter(isSpecificTerm)
+      .filter(
+        (term) =>
+          !usable.some(
+            (candidate) =>
+              containsPhrase(candidate.fact.haystack, term) ||
+              candidate.matchedTerms.some((matched) => containsPhrase(haystackOf(matched), term)),
+          ),
+      );
     const noun = KIND_NOUN[lead.fact.kind] ?? 'registro do perfil';
     return {
       requirementId: requirement.id,
@@ -401,8 +479,13 @@ function matchRequirement(
       rationale:
         strength === 'direct'
           ? `Sustentado por ${noun} confirmada: ${lead.fact.label}.`
-          : `Sustentado por registro confirmado que não é experiência profissional: ${lead.fact.label}.`,
-      gap: null,
+          : isExperienceKind(lead.fact.kind)
+            ? `Citado em experiência profissional, mas sem o termo pedido pela vaga: ${lead.fact.label}.`
+            : `Sustentado por registro confirmado que não é experiência profissional: ${lead.fact.label}.`,
+      gap:
+        uncovered.length > 0
+          ? `Nenhum registro confirmado cita: ${uncovered.slice(0, 6).join(', ')}.`
+          : null,
       cautions: dedupe(cautions).slice(0, 5),
     };
   }
@@ -526,13 +609,49 @@ export interface AnalyzeRequirementsInput {
   ai?: AnalysisResult['ai'];
 }
 
+const EXPERIENCE_CAUTIONS: ReadonlySet<string> = new Set([
+  CONTEXT_CAUTION.project_experience!,
+  CONTEXT_CAUTION.volunteer_experience!,
+]);
+
+const ASKS_EXPERIENCE = /(?<![\p{L}])(experi[eê]ncia|vivência|vivencia|experience)(?![\p{L}])/iu;
+
+/**
+ * Moves everything about "experience" out of the visible cautions into one collapsed note: whether the posting asks
+ * for experience/years (ignored for this junior profile) and whether the evidence is a project, not a job.
+ */
+function withExperienceNote(
+  match: RequirementMatch,
+  requirement: JobRequirement,
+): RequirementMatch {
+  const notes: string[] = [];
+  if (requirement.yearsRequired !== null || ASKS_EXPERIENCE.test(requirement.text)) {
+    notes.push(
+      requirement.yearsRequired !== null
+        ? `A vaga pede ${String(requirement.yearsRequired)} ano(s) de experiência. Isso não foi exigido nesta análise: prática em projetos conta como evidência.`
+        : 'A vaga menciona experiência. Isso não foi exigido nesta análise: prática em projetos conta como evidência.',
+    );
+  }
+  const kept = match.cautions.filter((caution) => {
+    if (!EXPERIENCE_CAUTIONS.has(caution)) return true;
+    notes.push(caution);
+    return false;
+  });
+  return notes.length === 0
+    ? match
+    : { ...match, cautions: kept, experienceNote: dedupe(notes).join(' ') };
+}
+
 /** Builds the full analysis from requirements already extracted (by the local extractor or by an AI). */
 export function analyzeRequirements(input: AnalyzeRequirementsInput): AnalysisResult {
   const { jobText, document, requirements } = input;
   const warnings = input.warnings ?? [];
   const index = buildMatchIndex(document);
   const matches = requirements.map((requirement) => {
-    const match = matchRequirement(index, requirement, input.hints?.get(requirement.id) ?? []);
+    const match = withExperienceNote(
+      matchRequirement(index, requirement, input.hints?.get(requirement.id) ?? []),
+      requirement,
+    );
     const note = input.notes?.get(requirement.id);
     return note === undefined || note === ''
       ? match

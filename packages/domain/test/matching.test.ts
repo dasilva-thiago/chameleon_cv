@@ -6,6 +6,7 @@ import {
 import { describe, expect, it } from 'vitest';
 import {
   analyzeJob,
+  analyzeRequirements,
   extractKeywords,
   extractRequirements,
   looksLikeInstructions,
@@ -148,6 +149,204 @@ describe('extractRequirements', () => {
   });
 });
 
+describe('analyzeJob para quem busca o primeiro emprego na área', () => {
+  const SUPPORT = id(40);
+  const ITEM_GENERIC = id(41);
+  const LAB = id(42);
+  const ITEM_LAB = id(43);
+  const PROJECT = id(44);
+  const SKILL_DOTNET = id(45);
+  const USAGE_DOTNET = id(46);
+  const COURSE_ID = id(47);
+
+  const firstJob = (): ProfileDocument =>
+    parseProfileDocument({
+      schema_version: '2.1.0',
+      profile: {
+        experiences: [
+          {
+            id: SUPPORT,
+            official_title: 'Suporte Técnico',
+            organization_name: 'Empresa A',
+            meta: confirmed,
+            items: [
+              {
+                id: ITEM_GENERIC,
+                kind: 'responsibility',
+                text: 'Integração de backend, APIs e banco de dados, com documentação técnica.',
+                meta: confirmed,
+              },
+            ],
+          },
+          {
+            id: LAB,
+            official_title: 'Jovem Aprendiz',
+            organization_name: 'Indústria B',
+            meta: confirmed,
+            items: [
+              {
+                id: ITEM_LAB,
+                kind: 'responsibility',
+                text: 'Participação em iniciativas de melhoria contínua e padronização de processos.',
+                meta: confirmed,
+              },
+            ],
+          },
+        ],
+        projects: [{ id: PROJECT, name: 'Projeto de estudo', meta: confirmed }],
+        skills: [{ id: SKILL_DOTNET, name: '.NET', meta: confirmed }],
+        skill_usages: [
+          {
+            id: USAGE_DOTNET,
+            skill_id: SKILL_DOTNET,
+            usage_context: 'project_experience',
+            project_id: PROJECT,
+            meta: confirmed,
+          },
+        ],
+      },
+    });
+
+  const run = (job: string) => analyzeJob(job, firstJob());
+
+  it('habilidade usada em projeto vale como prática (direta), com o aviso de projeto recolhido', () => {
+    const result = run('Requisitos\n- Experiência em desenvolvimento backend com .NET.');
+    const { match } = byText(result, '.NET');
+    expect(match.strength).toBe('direct');
+    expect(match.cautions.join(' ')).not.toMatch(/projeto/i);
+    expect(match.experienceNote).toMatch(/projeto, não de emprego/);
+    expect(match.experienceNote).toMatch(/A vaga menciona experiência/);
+  });
+
+  it('o tempo pedido pela vaga não é exigido e aparece só na nota recolhida', () => {
+    const result = run('Requisitos\n- 3 anos de experiência com .NET.');
+    const { match } = byText(result, '.NET');
+    expect(match.strength).toBe('direct');
+    expect(match.cautions.join(' ')).not.toMatch(/ano/);
+    expect(match.experienceNote).toMatch(/3 ano\(s\) de experiência/);
+  });
+
+  it('termo específico sem registro (Node.js e NestJS) aparece como lacuna, mesmo com a outra habilidade coberta', () => {
+    const result = analyzeJob(
+      'Requisitos' + String.fromCharCode(10) + '- Familiaridade com Node.js e NestJS.',
+      profile(),
+    );
+    const { match } = byText(result, 'NestJS');
+    expect(match.gap).toMatch(/NestJS/);
+    expect(match.gap).not.toMatch(/Node/);
+  });
+
+  it('estudo (curso) continua parcial: não é prática', () => {
+    const doc = parseProfileDocument({
+      schema_version: '2.1.0',
+      profile: {
+        courses: [{ id: COURSE_ID, name: 'Curso de Docker', meta: confirmed }],
+        skills: [{ id: SKILL_DOTNET, name: 'Docker', meta: confirmed }],
+        skill_usages: [
+          {
+            id: USAGE_DOTNET,
+            skill_id: SKILL_DOTNET,
+            usage_context: 'coursework',
+            course_id: COURSE_ID,
+            meta: confirmed,
+          },
+        ],
+      },
+    });
+    const result = analyzeJob('Requisitos\n- Conhecimento em Docker.', doc);
+    expect(byText(result, 'Docker').match.strength).toBe('partial');
+  });
+
+  it('uma habilidade usada no emprego não vira direta para uma ferramenta que ela não nomeia (Swagger)', () => {
+    const doc = parseProfileDocument({
+      schema_version: '2.1.0',
+      profile: {
+        experiences: [
+          { id: SUPPORT, official_title: 'Suporte', organization_name: 'X', meta: confirmed },
+        ],
+        skills: [{ id: SKILL_DOTNET, name: 'Documentação técnica', meta: confirmed }],
+        skill_usages: [
+          {
+            id: USAGE_DOTNET,
+            skill_id: SKILL_DOTNET,
+            usage_context: 'professional_experience',
+            experience_id: SUPPORT,
+            meta: confirmed,
+          },
+        ],
+      },
+    });
+    const result = analyzeRequirements({
+      jobText: 'x',
+      document: doc,
+      requirements: [
+        {
+          id: 'r1',
+          importance: 'mandatory',
+          text: 'Documentação de APIs com Swagger.',
+          keywords: ['Swagger', 'documentação de APIs'],
+          yearsRequired: null,
+        },
+      ],
+      hints: new Map([['r1', [SKILL_DOTNET, SUPPORT]]]),
+    });
+    expect(result.matches[0]?.strength).toBe('partial');
+  });
+
+  it('uma única palavra genérica não faz um emprego de outra área virar evidência', () => {
+    const result = run(
+      'Responsabilidades\n- Manutenção e melhoria contínua de sistemas legados em Cobol.',
+    );
+    const { match } = byText(result, 'sistemas legados');
+    expect(match.evidence.map((e) => e.recordId)).not.toContain(ITEM_LAB);
+    expect(match.strength).not.toBe('direct');
+  });
+
+  it('várias palavras genéricas do emprego rendem no máximo evidência parcial, com cautela', () => {
+    const result = analyzeRequirements({
+      jobText: 'Requisitos\n- Integração de backend e banco de dados.',
+      document: firstJob(),
+      requirements: [
+        {
+          id: 'r1',
+          importance: 'mandatory',
+          text: 'Integração de backend e banco de dados.',
+          keywords: ['backend', 'banco de dados'],
+          yearsRequired: null,
+        },
+      ],
+    });
+    const match = result.matches[0]!;
+    expect(match.strength).toBe('partial');
+    expect(match.evidence.map((e) => e.recordId)).toContain(ITEM_GENERIC);
+    expect(match.rationale).toMatch(/sem o termo pedido pela vaga/);
+    expect(match.cautions.join(' ')).toMatch(/mesma atividade/);
+  });
+
+  it('a mesma habilidade registrada como usada no emprego continua direta', () => {
+    const doc = parseProfileDocument({
+      schema_version: '2.1.0',
+      profile: {
+        experiences: [
+          { id: SUPPORT, official_title: 'Desenvolvedor', organization_name: 'X', meta: confirmed },
+        ],
+        skills: [{ id: SKILL_DOTNET, name: '.NET', meta: confirmed }],
+        skill_usages: [
+          {
+            id: USAGE_DOTNET,
+            skill_id: SKILL_DOTNET,
+            usage_context: 'professional_experience',
+            experience_id: SUPPORT,
+            meta: confirmed,
+          },
+        ],
+      },
+    });
+    const result = analyzeJob('Requisitos\n- Conhecimento em .NET.', doc);
+    expect(byText(result, '.NET').match.strength).toBe('direct');
+  });
+});
+
 describe('analyzeJob', () => {
   const result = analyzeJob(JOB, profile());
 
@@ -167,7 +366,8 @@ describe('analyzeJob', () => {
       supportingRecordId: USAGE_NODE,
       status: 'confirmed',
     });
-    expect(match.gap).toBeNull();
+    expect(match.gap).toMatch(/APIs/);
+    expect(match.gap).not.toMatch(/Node/);
   });
 
   it('estudo/curso é parcial e vem com cautela, nunca direta', () => {
@@ -207,7 +407,7 @@ describe('analyzeJob', () => {
   it('exigência de anos gera cautela sobre o tempo confirmado', () => {
     const { requirement, match } = byText(result, '5 anos');
     expect(requirement.yearsRequired).toBe(5);
-    expect(match.cautions.join(' ')).toMatch(/5 ano/);
+    expect(match.experienceNote).toMatch(/5 ano/);
   });
 
   it('plano prioriza só fatos confirmados, pelos requisitos que sustentam, e resume as contagens', () => {

@@ -5,6 +5,7 @@ import { PageHeading, usePageTitle } from '../../components/layout/PageHeading';
 import { Alert } from '../../components/ui/Alert';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
+import { ExpandableText } from '../../components/ui/ExpandableText';
 import { LoadingStatus } from '../../components/ui/LoadingStatus';
 import { SelectField } from '../../components/ui/SelectField';
 import { isApiError, messageForError } from '../../lib/api';
@@ -167,9 +168,7 @@ function JobView({ job }: { job: JobDetail }) {
         <h2 id="job-text" className="text-lg font-semibold">
           Texto original da vaga
         </h2>
-        <pre className="whitespace-pre-wrap break-words rounded-md border border-slate-400 bg-white p-4 font-sans text-base text-slate-900">
-          {job.description}
-        </pre>
+        <ExpandableText text={job.description} />
       </section>
 
       <AnalysisSection jobId={job.id} />

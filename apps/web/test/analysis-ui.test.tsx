@@ -215,6 +215,19 @@ describe('análise da vaga na tela', () => {
     expect(await violations(container)).toEqual([]);
   });
 
+  it('as seções da análise começam recolhidas e abrem com um clique no título', async () => {
+    setup(analysis());
+    const { user } = renderApp(`/vagas/${JOB_ID}`);
+
+    for (const name of ['Resumo', 'Plano de adaptação', /^Requisitos obrigatórios/]) {
+      const heading = await screen.findByRole('heading', { name });
+      const section = heading.closest('details')!;
+      expect(section).not.toHaveAttribute('open');
+      await user.click(heading);
+      expect(section).toHaveAttribute('open');
+    }
+  });
+
   it('mostra o aviso de análise desatualizada com o motivo', async () => {
     setup(analysis(), ['job_text', 'profile']);
     renderApp(`/vagas/${JOB_ID}`);
@@ -238,7 +251,7 @@ describe('análise da vaga na tela', () => {
     const save = await screen.findByRole('button', { name: 'Salvar revisão' });
     expect(save).toBeDisabled();
 
-    const plan = screen.getByRole('heading', { name: 'Plano de adaptação' }).parentElement!;
+    const plan = screen.getByRole('heading', { name: 'Plano de adaptação' }).closest('details')!;
     await user.click(
       within(plan).getByRole('checkbox', { name: /Experiência: Dev Backend — Acme/ }),
     );

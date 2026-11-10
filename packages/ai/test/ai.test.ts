@@ -200,7 +200,7 @@ describe('analysis: the AI proposes, the code decides', () => {
     expect(result.matches[0]?.evidence.map((e) => e.recordId)).toContain(SK_GIT);
   });
 
-  it('the strength comes from the profile, not from the AI: a project-only skill is "partial", never "direct"', () => {
+  it('the strength comes from the profile, not from the AI: a skill used in a project is practice ("direct"), with the project note collapsed', () => {
     const result = build([
       {
         text: 'Git',
@@ -208,8 +208,8 @@ describe('analysis: the AI proposes, the code decides', () => {
         facts: [{ ref: ref('Git'), relation: 'direct' }],
       },
     ]);
-    expect(result.matches[0]?.strength).toBe('partial');
-    expect(result.matches[0]?.cautions.join(' ')).toMatch(/projeto/i);
+    expect(result.matches[0]?.strength).toBe('direct');
+    expect(result.matches[0]?.experienceNote).toMatch(/projeto/i);
   });
 
   it('a professional-experience fact is "direct"', () => {
