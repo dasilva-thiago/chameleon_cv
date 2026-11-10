@@ -271,7 +271,7 @@ describe('editor de currículo: aprovação', () => {
     expect(fake.requestsTo(`PUT ${VERSION_ROUTE(V1)}`)).toHaveLength(0);
     expect(fake.requestsTo(`POST ${VERSION_ROUTE(V1)}/approve`)).toHaveLength(1);
     expect(screen.queryByRole('button', { name: 'Salvar rascunho' })).toBeNull();
-    expect(screen.getByRole('button', { name: /^Baixar DOCX/ })).toBeEnabled();
+    expect(screen.getByRole('button', { name: /^Baixar/ })).toBeEnabled();
   });
 
   it('aprovar com alterações salva primeiro e só então aprova', async () => {
@@ -376,8 +376,7 @@ describe('editor de currículo: versão aprovada', () => {
     expect(
       screen.getByRole('article', { name: 'Pré-visualização do currículo' }),
     ).toHaveTextContent('Construí APIs REST em Node.js.');
-    expect(screen.getByRole('button', { name: /^Baixar DOCX/ })).toBeEnabled();
-    expect(screen.getByRole('button', { name: /^Baixar PDF/ })).toBeEnabled();
+    expect(screen.getByRole('button', { name: /^Baixar/ })).toBeEnabled();
     expect(await violations(container)).toEqual([]);
 
     await user.click(screen.getByRole('button', { name: 'Criar nova versão para editar' }));
@@ -402,7 +401,8 @@ describe('editor de currículo: versão aprovada', () => {
         }),
     );
     const { user } = renderApp(editorUrl(V2));
-    await user.click(await screen.findByRole('button', { name: /^Baixar PDF/ }));
+    await user.click(await screen.findByRole('button', { name: /^Baixar/ }));
+    await user.click(await screen.findByRole('menuitem', { name: 'PDF' }));
     await waitFor(() => {
       expect(downloads).toEqual(['curriculo-v2.pdf']);
     });

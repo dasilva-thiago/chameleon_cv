@@ -182,9 +182,11 @@ test('profile -> job -> analysis -> resume -> edit -> approve -> DOCX and PDF', 
   await expect(page.getByRole('button', { name: 'Criar nova versão para editar' })).toBeVisible();
 
   // --- downloads ------------------------------------------------------------------------------
+  const openDownloadMenu = (): Promise<void> =>
+    page.getByRole('button', { name: /^Baixar/ }).click();
   const [docx] = await Promise.all([
     page.waitForEvent('download'),
-    page.getByRole('button', { name: /Baixar DOCX/ }).click(),
+    openDownloadMenu().then(() => page.getByRole('menuitem', { name: 'DOCX' }).click()),
   ]);
   expect(docx.suggestedFilename()).toMatch(/^Ana-Souza-Teste_Dev-Backend_Acme-Ltda_\d{8}\.docx$/);
   const docxPath = await docx.path();
@@ -197,7 +199,7 @@ test('profile -> job -> analysis -> resume -> edit -> approve -> DOCX and PDF', 
 
   const [pdf] = await Promise.all([
     page.waitForEvent('download'),
-    page.getByRole('button', { name: /Baixar PDF/ }).click(),
+    openDownloadMenu().then(() => page.getByRole('menuitem', { name: 'PDF' }).click()),
   ]);
   expect(pdf.suggestedFilename()).toMatch(/\.pdf$/);
   const pdfBytes = new Uint8Array(readFileSync(await pdf.path()));

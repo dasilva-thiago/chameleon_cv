@@ -22,7 +22,7 @@ import {
   locationLabel,
   warningSignature,
 } from './content';
-import { DownloadButtons } from './DownloadButtons';
+import { DownloadMenu } from './DownloadMenu';
 import { VERSION_STATUS_LABELS, countsText, editorPath, formatDateTime } from './labels';
 import {
   useApproveVersion,
@@ -163,7 +163,7 @@ function EditorView({
           >
             {newVersion.isPending ? 'Criando…' : 'Criar nova versão para editar'}
           </Button>
-          <DownloadButtons
+          <DownloadMenu
             resumeId={version.resumeId}
             versionId={version.id}
             context={`versão ${String(version.versionNumber)}`}
