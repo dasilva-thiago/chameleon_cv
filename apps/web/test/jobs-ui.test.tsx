@@ -4,7 +4,7 @@ import {
   listJobsResponseSchema,
   type JobDetail,
 } from '@chameleon/contracts';
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { violations } from './helpers/axe';
 import { FakeApi, errorResponse, jsonResponse, makeSession } from './helpers/fake-api';
@@ -122,12 +122,29 @@ describe('vagas: painel', () => {
     expect(screen.getByRole('button', { name: 'Tentar novamente' })).toBeInTheDocument();
   });
 
-  it('o menu principal e a Home levam às vagas', async () => {
+  it('a Home mostra as vagas em andamento com a situação e leva ao detalhe', async () => {
+    const fake = loggedIn();
+    fake.on('GET /api/jobs?status=active', listBody([detail()]));
+    fake.on(`GET /api/jobs/${JOB_ID}`, jsonResponse(200, { job: detail() }));
+    const { user } = renderApp('/');
+    const section = (await screen.findByRole('heading', { name: 'Vagas em andamento' })).closest(
+      'section',
+    )!;
+    expect(within(section).getAllByText(/Salva/).length).toBeGreaterThan(0);
+    await user.click(within(section).getByRole('link', { name: /Dev Backend — Acme/ }));
+    expect(await screen.findByRole('heading', { level: 1, name: 'Dev Backend' })).toBeVisible();
+  });
+
+  it('o menu principal leva às vagas', async () => {
     const fake = loggedIn();
     fake.on('GET /api/jobs?status=active', listBody([]));
     const { user } = renderApp('/');
     await screen.findByRole('heading', { level: 1, name: 'Início' });
-    await user.click(screen.getByRole('link', { name: 'Ver minhas vagas' }));
+    await user.click(
+      within(screen.getByRole('navigation', { name: 'Principal' })).getByRole('link', {
+        name: 'Vagas',
+      }),
+    );
     expect(await screen.findByRole('heading', { level: 1, name: 'Vagas' })).toBeInTheDocument();
   });
 });

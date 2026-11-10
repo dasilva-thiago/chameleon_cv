@@ -195,13 +195,13 @@ describe('perfil: visao geral e navegacao', () => {
     expect(screen.getByTestId('location')).toHaveTextContent('/perfil/importar');
   });
 
-  it('a Home liga ao perfil e o menu principal tem Perfil', async () => {
+  it('a Home liga ao perfil (Editar perfil) e o menu principal tem Perfil', async () => {
     loggedIn();
     const { user } = renderApp('/');
     await screen.findByRole('heading', { level: 1, name: 'Início' });
     const main = screen.getByRole('navigation', { name: 'Principal' });
     expect(within(main).getAllByRole('link')).toHaveLength(4);
-    await user.click(screen.getByRole('link', { name: 'Abrir meu perfil' }));
+    await user.click(screen.getByRole('link', { name: 'Editar perfil' }));
     expect(
       await screen.findByRole('heading', { level: 1, name: 'Perfil profissional' }),
     ).toBeVisible();

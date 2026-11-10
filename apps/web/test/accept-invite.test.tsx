@@ -86,7 +86,8 @@ describe('aceite de convite: token no fragmento', () => {
 
     for (const request of fake.requests) {
       expect(request.path).not.toContain(INVITE_TOKEN);
-      expect(request.path).not.toContain('?');
+      // the auth/invite endpoints never take a query string (the home's job list legitimately does)
+      if (request.path.startsWith('/api/auth')) expect(request.path).not.toContain('?');
     }
     expect(JSON.stringify({ ...localStorage })).not.toContain(INVITE_TOKEN);
     expect(JSON.stringify({ ...sessionStorage })).not.toContain(INVITE_TOKEN);

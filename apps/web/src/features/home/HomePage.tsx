@@ -1,10 +1,104 @@
+import { JOB_STATUSES } from '@chameleon/contracts';
 import { Link } from 'react-router';
 import { PageHeading, usePageTitle } from '../../components/layout/PageHeading';
+import { Badge } from '../../components/ui/Badge';
 import { useSession } from '../auth/session';
+import { JOB_STATUS_LABELS, UNTITLED_JOB } from '../jobs/labels';
+import { useJobs } from '../jobs/queries';
+import { useProfileState } from '../profile/queries';
 
-const linkClass =
+const RECENT_JOBS = 5;
+
+const primaryLinkClass =
+  'inline-flex min-h-11 items-center rounded-md border border-transparent bg-blue-700 px-4 py-2 font-medium text-white hover:bg-blue-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700';
+const secondaryLinkClass =
   'inline-flex min-h-11 items-center rounded-md border border-slate-400 bg-white px-4 py-2 font-medium text-slate-900 hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700';
+const textLinkClass =
+  'text-blue-800 underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700';
 
+/** Vagas em andamento: contagem por situação e as mais recentes. Se não carregar, o bloco some (não é crítico). */
+function JobsOverview() {
+  const jobs = useJobs({ status: 'active' });
+  if (!jobs.isSuccess) return null;
+
+  const { counts } = jobs.data;
+  const recent = jobs.data.jobs.slice(0, RECENT_JOBS);
+  const statuses = JOB_STATUSES.filter(
+    (status) => status !== 'archived' && (counts.byStatus[status] ?? 0) > 0,
+  );
+
+  return (
+    <section aria-labelledby="home-jobs" className="flex flex-col gap-3">
+      <h2 id="home-jobs" className="text-lg font-semibold">
+        Vagas em andamento
+      </h2>
+      {recent.length === 0 ? (
+        <p className="text-base text-slate-700">Nenhuma vaga em andamento.</p>
+      ) : (
+        <>
+          <div className="flex flex-wrap gap-2">
+            {statuses.map((status) => (
+              <Badge key={status} tone="info">
+                {JOB_STATUS_LABELS[status]}: {String(counts.byStatus[status] ?? 0)}
+              </Badge>
+            ))}
+          </div>
+          <ul className="flex flex-col divide-y divide-slate-300 rounded-md border border-slate-400 bg-white">
+            {recent.map((job) => (
+              <li key={job.id} className="flex flex-wrap items-center justify-between gap-2 p-3">
+                <Link to={`/vagas/${job.id}`} className={textLinkClass}>
+                  {job.title ?? UNTITLED_JOB}
+                  {job.company !== null ? ` — ${job.company}` : ''}
+                </Link>
+                <Badge>{JOB_STATUS_LABELS[job.status]}</Badge>
+              </li>
+            ))}
+          </ul>
+          <p className="text-sm">
+            <Link to="/vagas" className={textLinkClass}>
+              Ver todas as vagas ({String(counts.active)})
+            </Link>
+          </p>
+        </>
+      )}
+    </section>
+  );
+}
+
+/** Só aparece quando há algo a fazer no perfil. */
+function ProfileAttention() {
+  const state = useProfileState();
+  if (!state.isSuccess) return null;
+  const toReview = state.data.summary.byStatus.needs_review;
+  const openPending = state.data.summary.pending.open;
+  if (toReview === 0 && openPending === 0) return null;
+
+  return (
+    <section aria-labelledby="home-profile" className="flex flex-col gap-2">
+      <h2 id="home-profile" className="text-lg font-semibold">
+        Perfil
+      </h2>
+      <ul className="flex flex-col gap-1 text-base">
+        {toReview > 0 ? (
+          <li>
+            <Link to="/perfil/confirmar" className={textLinkClass}>
+              {String(toReview)} item(ns) aguardando confirmação
+            </Link>
+          </li>
+        ) : null}
+        {openPending > 0 ? (
+          <li>
+            <Link to="/perfil/pendencias" className={textLinkClass}>
+              {String(openPending)} pendência(s) aberta(s)
+            </Link>
+          </li>
+        ) : null}
+      </ul>
+    </section>
+  );
+}
+
+/** Painel de trabalho: o que está em andamento e os atalhos do dia a dia. */
 export function HomePage() {
   usePageTitle('Início');
   const { data } = useSession();
@@ -12,45 +106,21 @@ export function HomePage() {
   const name = user?.displayName ?? user?.email ?? '';
 
   return (
-    <div className="flex flex-col gap-4">
-      <PageHeading>Início</PageHeading>
-      <p className="text-lg text-slate-900">Olá, {name}.</p>
-      <section aria-labelledby="home-profile" className="flex flex-col gap-3">
-        <h2 id="home-profile" className="text-lg font-semibold">
-          Perfil profissional
-        </h2>
-        <p className="text-base text-slate-700">
-          Mantenha sua base de experiências, projetos, formação e habilidades. A análise de vagas e
-          os currículos chegam nas próximas etapas.
-        </p>
+    <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-3">
+        <PageHeading>Início</PageHeading>
+        <p className="text-lg text-slate-900">Olá, {name}.</p>
         <div className="flex flex-wrap gap-3">
-          <Link to="/perfil" className={linkClass}>
-            Abrir meu perfil
-          </Link>
-          <Link to="/perfil/importar" className={linkClass}>
-            Importar arquivo
-          </Link>
-          <Link to="/perfil/pendencias" className={linkClass}>
-            Ver pendências
-          </Link>
-        </div>
-      </section>
-      <section aria-labelledby="home-jobs" className="flex flex-col gap-3">
-        <h2 id="home-jobs" className="text-lg font-semibold">
-          Vagas
-        </h2>
-        <p className="text-base text-slate-700">
-          Guarde as vagas de interesse com o texto original e acompanhe a situação de cada uma.
-        </p>
-        <div className="flex flex-wrap gap-3">
-          <Link to="/vagas/nova" className={linkClass}>
+          <Link to="/vagas/nova" className={primaryLinkClass}>
             Adicionar vaga
           </Link>
-          <Link to="/vagas" className={linkClass}>
-            Ver minhas vagas
+          <Link to="/perfil" className={secondaryLinkClass}>
+            Editar perfil
           </Link>
         </div>
-      </section>
+      </div>
+      <JobsOverview />
+      <ProfileAttention />
     </div>
   );
 }
