@@ -11,17 +11,17 @@ export function ResumePreview({ content }: { content: ResumeContent }) {
     <article
       aria-label="Pré-visualização do currículo"
       lang={content.language}
-      className="flex flex-col gap-5 rounded-md border border-slate-400 bg-white p-6 text-slate-900 print:border-0 print:p-0"
+      className="flex flex-col gap-5 bg-paper p-8 font-sans text-[0.9375rem] leading-relaxed text-paper-ink shadow-md ring-1 ring-paper-line print:p-0 print:shadow-none print:ring-0 sm:p-10"
     >
-      <header className="flex flex-col gap-1 border-b border-slate-300 pb-3">
-        <h2 className="text-2xl font-bold">{header.name}</h2>
-        {header.headline !== null ? <p className="text-lg">{header.headline}</p> : null}
+      <header className="flex flex-col gap-1 border-b border-paper-line pb-3">
+        <h2 className="text-[1.625rem] font-bold leading-tight">{header.name}</h2>
+        {header.headline !== null ? <p className="text-[1.0625rem]">{header.headline}</p> : null}
         {header.location !== null ? <p>{header.location}</p> : null}
         {contactLine.length > 0 ? <p>{contactLine.join(' · ')}</p> : null}
       </header>
       {content.sections.map((section) => (
         <section key={section.id} className="flex flex-col gap-3 break-inside-avoid">
-          <h3 className="border-b border-slate-300 text-lg font-semibold uppercase tracking-wide">
+          <h3 className="border-b border-paper-line pb-0.5 text-[0.9375rem] font-semibold uppercase tracking-wider">
             {section.title}
           </h3>
           {section.entries.map((entry) => (
@@ -36,18 +36,20 @@ export function ResumePreview({ content }: { content: ResumeContent }) {
                       <span className="font-normal"> — {entry.subheading}</span>
                     ) : null}
                   </h4>
-                  {entry.period !== null ? <p className="text-sm">{entry.period}</p> : null}
+                  {entry.period !== null ? (
+                    <p className="text-[0.8125rem] text-paper-muted">{entry.period}</p>
+                  ) : null}
                 </div>
               )}
               {entry.detail !== null && entry.detail !== undefined ? (
-                <p className="text-sm text-slate-600">{entry.detail}</p>
+                <p className="text-[0.8125rem] text-paper-muted">{entry.detail}</p>
               ) : null}
               {section.kind === 'competencies' ? (
                 <ul className="flex flex-wrap gap-2">
                   {entry.bullets.map((bullet) => (
                     <li
                       key={bullet.id}
-                      className="rounded border border-teal-200 bg-teal-50 px-2 py-0.5 text-sm text-teal-900"
+                      className="rounded border border-paper-line bg-paper-chip px-2 py-0.5 text-[0.8125rem]"
                     >
                       {bullet.text}
                     </li>

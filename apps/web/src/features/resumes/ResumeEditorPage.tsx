@@ -3,15 +3,20 @@ import {
   type ResumeSummary,
   type ResumeVersionDetail,
 } from '@chameleon/contracts';
-import { useMemo, useState } from 'react';
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
+import { PageHeader } from '../../components/layout/PageHeader';
 import { PageHeading, usePageTitle } from '../../components/layout/PageHeading';
 import { Alert } from '../../components/ui/Alert';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { CheckboxField } from '../../components/ui/CheckboxField';
-import { LoadingStatus } from '../../components/ui/LoadingStatus';
+import { AlertIcon, CheckCircleIcon, StopIcon } from '../../components/ui/icons';
+import { SkeletonBlock } from '../../components/ui/Skeleton';
+import { buttonClasses, cx, panelClass } from '../../components/ui/styles';
+import { useToast } from '../../components/ui/Toast';
 import { isApiError, messageForError } from '../../lib/api';
+import { useMediaQuery } from '../../lib/use-media-query';
 import {
   bulletsById,
   errorsByPath,
@@ -34,8 +39,142 @@ import { ResumePreview } from './ResumePreview';
 
 type Mode = 'edit' | 'preview';
 
-const backLinkClass =
-  'inline-flex min-h-11 items-center rounded-md border border-slate-400 bg-white px-4 py-2 font-medium text-slate-900 hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700';
+/** From this width the form and the A4 sheet sit side by side (plan §4, "Dividido"). */
+const SPLIT_QUERY = '(min-width: 1280px)';
+
+const backLinkClass = buttonClasses('secondary');
+
+/** Keyword coverage of the job in this version: bar + percent, with the missing keywords listed. */
+function CoverageMeter({ coverage }: { coverage: NonNullable<ResumeVersionDetail['coverage']> }) {
+  const tone = coverage.percent >= 70 ? 'bg-evid' : coverage.percent >= 40 ? 'bg-attn' : 'bg-risk';
+  return (
+    <div className="flex min-w-0 flex-col gap-1">
+      <div className="flex items-center gap-3">
+        <p className="text-meta text-ink-2">
+          <span className="font-semibold text-ink-1">Palavras-chave da vaga cobertas:</span>{' '}
+          <span className="font-mono tabular-nums">{String(coverage.percent)}%</span>
+        </p>
+        <div aria-hidden="true" className="h-1.5 w-24 overflow-hidden rounded-full bg-sunken">
+          <div
+            className={cx('h-full rounded-full', tone)}
+            style={{ width: `${String(coverage.percent)}%` }}
+          />
+        </div>
+      </div>
+      {coverage.missing.length > 0 ? (
+        <p className="text-meta text-ink-3">
+          Ausentes: {coverage.missing.join(', ')}. Inclua só as que a sua base sustenta.
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+function ChecksSummary({
+  counts,
+  dirty,
+}: {
+  counts: { errors: number; warnings: number };
+  dirty: boolean;
+}) {
+  const clean = counts.errors + counts.warnings === 0;
+  const icon =
+    counts.errors > 0 ? <StopIcon /> : counts.warnings > 0 ? <AlertIcon /> : <CheckCircleIcon />;
+  const color =
+    counts.errors > 0
+      ? 'text-risk-text'
+      : counts.warnings > 0
+        ? 'text-attn-text'
+        : 'text-evid-text';
+  return (
+    <div role="status" className={cx('flex items-center gap-1.5 text-meta', color)}>
+      {icon}
+      <span>
+        Checagem contra a base: {clean ? 'nenhum problema encontrado' : countsText(counts)}
+        {dirty ? ' (da última versão salva; salve para atualizar)' : ''}.
+      </span>
+    </div>
+  );
+}
+
+function EditorHeader({
+  resume,
+  version,
+}: {
+  resume: ResumeSummary | undefined;
+  version: ResumeVersionDetail;
+}) {
+  const approved = version.status === 'approved';
+  return (
+    <PageHeader
+      back={
+        resume
+          ? { to: `/vagas/${resume.jobId}`, label: 'Voltar à vaga' }
+          : { to: '/vagas', label: 'Voltar às vagas' }
+      }
+      title={resume?.name ?? 'Currículo'}
+      meta={
+        <div className="flex flex-wrap gap-2">
+          <Badge tone="info">Versão {version.versionNumber}</Badge>
+          <Badge tone={approved ? 'good' : 'warn'} prefix="Situação">
+            {VERSION_STATUS_LABELS[version.status]}
+          </Badge>
+          {version.approvedAt !== null ? (
+            <Badge prefix="Aprovada em">{formatDateTime(version.approvedAt)}</Badge>
+          ) : null}
+        </div>
+      }
+    />
+  );
+}
+
+/** The A4 sheet in a frame: always white (it is the exported file), with zoom to fit or 100%. */
+function PreviewFrame({
+  content,
+  note,
+}: {
+  content: ResumeVersionDetail['content'];
+  note?: string | undefined;
+}) {
+  const [fit, setFit] = useState(true);
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-overline font-semibold uppercase tracking-wider text-ink-3">
+          Pré-visualização (A4)
+        </p>
+        <div role="group" aria-label="Zoom da pré-visualização" className="flex gap-1">
+          <Button
+            variant={fit ? 'secondary' : 'ghost'}
+            size="sm"
+            aria-pressed={fit}
+            onClick={() => {
+              setFit(true);
+            }}
+          >
+            Ajustar
+          </Button>
+          <Button
+            variant={!fit ? 'secondary' : 'ghost'}
+            size="sm"
+            aria-pressed={!fit}
+            onClick={() => {
+              setFit(false);
+            }}
+          >
+            100%
+          </Button>
+        </div>
+      </div>
+      {note !== undefined ? <p className="text-meta text-ink-3">{note}</p> : null}
+      <div className="overflow-auto rounded-panel bg-sunken p-4 ring-1 ring-line sm:p-6">
+        <div className={cx('mx-auto', fit ? 'w-full max-w-[52rem]' : 'w-[52rem]')}>
+          <ResumePreview content={content} />
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function EditorView({
   resume,
@@ -45,10 +184,13 @@ function EditorView({
   version: ResumeVersionDetail;
 }) {
   const navigate = useNavigate();
+  const toast = useToast();
   const save = useSaveVersion();
   const approve = useApproveVersion();
   const newVersion = useNewVersion();
+  const split = useMediaQuery(SPLIT_QUERY);
   const [content, setContent] = useState(version.content);
+  const previewContent = useDeferredValue(content);
   const [mode, setMode] = useState<Mode>('edit');
   const [attempted, setAttempted] = useState(false);
   const [reviewed, setReviewed] = useState(false);
@@ -83,6 +225,38 @@ function EditorView({
     return response.version;
   };
 
+  // Ctrl/Cmd+S saves the draft from anywhere on the page.
+  const saveRef = useRef<() => void>(() => undefined);
+  useEffect(() => {
+    saveRef.current = () => {
+      if (!approved && dirty && !busy) void saveContent().catch(() => undefined);
+    };
+  });
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent): void => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
+        event.preventDefault();
+        saveRef.current();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+    };
+  }, []);
+
+  // Leaving the page with unsaved changes asks first (browser dialog).
+  useEffect(() => {
+    if (!dirty) return undefined;
+    const onBeforeUnload = (event: BeforeUnloadEvent): void => {
+      event.preventDefault();
+    };
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', onBeforeUnload);
+    };
+  }, [dirty]);
+
   const approveVersion = async (): Promise<void> => {
     setNotice(null);
     try {
@@ -102,47 +276,29 @@ function EditorView({
         }
       }
       await approve.mutateAsync({ resumeId: version.resumeId, versionId: version.id });
+      toast.show({ tone: 'success', message: 'Versão aprovada.' });
     } catch {
       // O motivo fica em save.error / approve.error e e mostrado abaixo.
     }
   };
 
-  const backLink = (
-    <Link to={resume ? `/vagas/${resume.jobId}` : '/vagas'} className={backLinkClass}>
-      {resume ? 'Voltar à vaga' : 'Voltar às vagas'}
-    </Link>
-  );
-
-  const header = (
-    <div className="flex flex-col gap-2">
-      <PageHeading>{resume?.name ?? 'Currículo'}</PageHeading>
-      <div className="flex flex-wrap gap-2">
-        <Badge tone="info">Versão {version.versionNumber}</Badge>
-        <Badge tone={approved ? 'good' : 'warn'} prefix="Situação">
-          {VERSION_STATUS_LABELS[version.status]}
-        </Badge>
-        {version.approvedAt !== null ? (
-          <Badge prefix="Aprovada em">{formatDateTime(version.approvedAt)}</Badge>
-        ) : null}
-      </div>
-    </div>
-  );
-
   if (approved) {
     return (
-      <div className="flex flex-col gap-5">
-        {header}
-        <div>{backLink}</div>
-        <Alert tone="info" title="Versão aprovada">
+      <div className="flex flex-col gap-6">
+        <EditorHeader resume={resume} version={version} />
+        <Alert tone="success" title="Versão aprovada">
           Esta versão foi aprovada e não pode ser alterada. Para fazer mudanças, crie uma nova
           versão (um rascunho copiado desta). Os arquivos DOCX e PDF são gerados desta versão.
         </Alert>
-        <p role="status" className="text-sm text-slate-800">
-          Checagem contra a base: {countsText(counts)}.
-        </p>
-        <div className="flex flex-wrap items-start gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <DownloadMenu
+            resumeId={version.resumeId}
+            versionId={version.id}
+            context={`versão ${String(version.versionNumber)}`}
+          />
           <Button
-            disabled={newVersion.isPending}
+            variant="secondary"
+            loading={newVersion.isPending}
             onClick={() => {
               newVersion.mutate(
                 { resumeId: version.resumeId, fromVersionId: version.id },
@@ -156,52 +312,88 @@ function EditorView({
           >
             {newVersion.isPending ? 'Criando…' : 'Criar nova versão para editar'}
           </Button>
-          <DownloadMenu
-            resumeId={version.resumeId}
-            versionId={version.id}
-            context={`versão ${String(version.versionNumber)}`}
-          />
+          <p role="status" className="text-meta text-ink-3">
+            Checagem contra a base: {countsText(counts)}.
+          </p>
         </div>
         {newVersion.isError ? (
           <Alert tone="error" title="Não foi possível criar a nova versão">
             {messageForError(newVersion.error)}
           </Alert>
         ) : null}
-        <ResumePreview content={version.content} />
+        <PreviewFrame content={version.content} />
       </div>
     );
   }
 
+  const sectionIssues = issues.get('sections') ?? [];
+  const unsavedNote = dirty
+    ? 'A prévia inclui alterações ainda não salvas. O arquivo só pode ser gerado depois de salvar e aprovar.'
+    : undefined;
+
+  const form = (
+    <ResumeForm
+      content={content}
+      change={(next, announce) => {
+        setContent(next);
+        setNotice(null);
+        if (announce !== undefined) setAnnouncement(announce);
+      }}
+      errors={errors}
+      issues={issues}
+      saved={saved}
+    />
+  );
+
   return (
     <div className="flex flex-col gap-5">
-      {header}
-      <div>{backLink}</div>
+      <EditorHeader resume={resume} version={version} />
 
-      {version.coverage !== null ? (
-        <div className="flex flex-col gap-1 text-sm text-slate-800">
-          <p>
-            <span className="font-semibold">Palavras-chave da vaga cobertas:</span>{' '}
-            {String(version.coverage.percent)}%
-          </p>
-          {version.coverage.missing.length > 0 ? (
-            <p className="text-slate-700">
-              Ausentes: {version.coverage.missing.join(', ')}. Inclua só as que a sua base sustenta.
-            </p>
-          ) : null}
+      {/* Fixed toolbar: what the checks say, keyword coverage and the two actions. */}
+      <div
+        className={cx(
+          panelClass,
+          'sticky top-[3.75rem] z-20 flex flex-col gap-3 p-4 shadow-md lg:flex-row lg:items-center lg:justify-between',
+        )}
+      >
+        <div className="flex min-w-0 flex-col gap-2">
+          {version.coverage !== null ? <CoverageMeter coverage={version.coverage} /> : null}
+          <ChecksSummary counts={counts} dirty={dirty} />
         </div>
-      ) : null}
-
-      <div role="status" className="text-sm text-slate-800">
-        Checagem contra a base:{' '}
-        {counts.errors + counts.warnings === 0 ? 'nenhum problema encontrado' : countsText(counts)}
-        {dirty ? ' (da última versão salva; salve para atualizar)' : ''}.
+        <div className="flex flex-wrap items-center gap-2">
+          <span role="status" className="text-meta text-ink-3">
+            {dirty ? 'Há alterações não salvas.' : save.isSuccess ? 'Rascunho salvo.' : ''}
+          </span>
+          <Button
+            variant={dirty ? 'primary' : 'secondary'}
+            disabled={!dirty || busy}
+            loading={save.isPending && !approve.isPending}
+            title="Ctrl+S"
+            onClick={() => {
+              void saveContent().catch(() => undefined);
+            }}
+          >
+            {save.isPending && !approve.isPending ? 'Salvando…' : 'Salvar rascunho'}
+          </Button>
+          <Button
+            variant={dirty ? 'secondary' : 'primary'}
+            disabled={busy || (counts.warnings > 0 && !reviewed)}
+            loading={approve.isPending}
+            onClick={() => {
+              void approveVersion();
+            }}
+          >
+            {approve.isPending ? 'Aprovando…' : 'Aprovar versão'}
+          </Button>
+        </div>
       </div>
-      {(issues.get('sections') ?? []).length > 0 ? (
-        <ul className="flex flex-col gap-1 text-sm">
-          {(issues.get('sections') ?? []).map((issue) => (
+
+      {sectionIssues.length > 0 ? (
+        <ul className="flex flex-col gap-1 text-body">
+          {sectionIssues.map((issue) => (
             <li
               key={issue.message}
-              className={issue.severity === 'error' ? 'text-red-800' : 'text-amber-900'}
+              className={issue.severity === 'error' ? 'text-risk-text' : 'text-attn-text'}
             >
               <span className="font-semibold">
                 {issue.severity === 'error' ? 'Erro:' : 'Aviso:'}
@@ -211,27 +403,6 @@ function EditorView({
           ))}
         </ul>
       ) : null}
-
-      <div role="group" aria-label="Modo de exibição" className="flex flex-wrap gap-2">
-        <Button
-          variant={mode === 'edit' ? 'primary' : 'secondary'}
-          aria-pressed={mode === 'edit'}
-          onClick={() => {
-            setMode('edit');
-          }}
-        >
-          Editar
-        </Button>
-        <Button
-          variant={mode === 'preview' ? 'primary' : 'secondary'}
-          aria-pressed={mode === 'preview'}
-          onClick={() => {
-            setMode('preview');
-          }}
-        >
-          Pré-visualizar
-        </Button>
-      </div>
 
       {counts.warnings > 0 ? (
         <CheckboxField
@@ -243,35 +414,13 @@ function EditorView({
           }}
         />
       ) : null}
-      <div className="flex flex-wrap items-center gap-3">
-        <Button
-          disabled={!dirty || busy}
-          onClick={() => {
-            void saveContent().catch(() => undefined);
-          }}
-        >
-          {save.isPending && !approve.isPending ? 'Salvando…' : 'Salvar rascunho'}
-        </Button>
-        <Button
-          variant="secondary"
-          disabled={busy || (counts.warnings > 0 && !reviewed)}
-          onClick={() => {
-            void approveVersion();
-          }}
-        >
-          {approve.isPending ? 'Aprovando…' : 'Aprovar versão'}
-        </Button>
-        <span role="status" className="text-sm text-slate-700">
-          {dirty ? 'Há alterações não salvas.' : save.isSuccess ? 'Rascunho salvo.' : ''}
-        </span>
-      </div>
 
       {hasErrors ? (
         <Alert tone="error" title="Corrija os campos antes de salvar">
-          Há campos inválidos no currículo. Eles estão indicados no modo Editar.
+          Há campos inválidos no currículo. Eles estão indicados no formulário.
         </Alert>
       ) : null}
-      {notice !== null ? <Alert tone="info">{notice}</Alert> : null}
+      {notice !== null ? <Alert tone="attention">{notice}</Alert> : null}
       {save.isError ? (
         <Alert tone="error" title="Não foi possível salvar">
           {messageForError(save.error)}
@@ -299,28 +448,37 @@ function EditorView({
         {announcement}
       </div>
 
-      {mode === 'edit' ? (
-        <ResumeForm
-          content={content}
-          change={(next, announce) => {
-            setContent(next);
-            setNotice(null);
-            if (announce !== undefined) setAnnouncement(announce);
-          }}
-          errors={errors}
-          issues={issues}
-          saved={saved}
-        />
-      ) : (
-        <div className="flex flex-col gap-3">
-          {dirty ? (
-            <p className="text-sm text-slate-800">
-              A prévia inclui alterações ainda não salvas. O arquivo só pode ser gerado depois de
-              salvar e aprovar.
-            </p>
-          ) : null}
-          <ResumePreview content={content} />
+      {split ? (
+        <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] items-start gap-6">
+          <div className="min-w-0">{form}</div>
+          <div className="sticky top-[12rem] max-h-[calc(100vh-13rem)] min-w-0 overflow-y-auto">
+            <PreviewFrame content={previewContent} note={unsavedNote} />
+          </div>
         </div>
+      ) : (
+        <>
+          <div role="group" aria-label="Modo de exibição" className="flex flex-wrap gap-1">
+            <Button
+              variant={mode === 'edit' ? 'secondary' : 'ghost'}
+              aria-pressed={mode === 'edit'}
+              onClick={() => {
+                setMode('edit');
+              }}
+            >
+              Editar
+            </Button>
+            <Button
+              variant={mode === 'preview' ? 'secondary' : 'ghost'}
+              aria-pressed={mode === 'preview'}
+              onClick={() => {
+                setMode('preview');
+              }}
+            >
+              Pré-visualizar
+            </Button>
+          </div>
+          {mode === 'edit' ? form : <PreviewFrame content={content} note={unsavedNote} />}
+        </>
       )}
     </div>
   );
@@ -333,7 +491,7 @@ export function ResumeEditorPage() {
   const resumeQuery = useResume(resumeId);
   usePageTitle(resumeQuery.data?.resume.name ?? 'Currículo');
 
-  if (versionQuery.isPending) return <LoadingStatus label="Carregando o currículo…" />;
+  if (versionQuery.isPending) return <SkeletonBlock label="Carregando o currículo…" lines={8} />;
   if (versionQuery.isError) {
     return (
       <div className="flex flex-col items-start gap-4">

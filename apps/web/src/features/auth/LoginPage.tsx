@@ -63,7 +63,7 @@ function LoginForm() {
     <div className="mx-auto flex w-full max-w-md flex-col gap-6">
       <div className="flex flex-col gap-2">
         <PageHeading>Entrar</PageHeading>
-        <p className="text-base text-slate-700">Acesse sua conta para continuar.</p>
+        <p className="text-body text-ink-2">Acesse sua conta para continuar.</p>
       </div>
 
       {notice ? <AuthNoticeBanner notice={notice} /> : null}
@@ -112,7 +112,7 @@ function LoginForm() {
         </Button>
       </form>
 
-      <p className="text-sm text-slate-700">
+      <p className="text-body text-ink-2">
         O cadastro é feito por convite. Se você recebeu um, abra o link enviado a você para criar
         sua conta.
       </p>

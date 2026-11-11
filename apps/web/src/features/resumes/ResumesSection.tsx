@@ -12,6 +12,7 @@ import { Button } from '../../components/ui/Button';
 import { MoreIcon } from '../../components/ui/icons';
 import { LoadingStatus } from '../../components/ui/LoadingStatus';
 import { MenuButton, type MenuEntry } from '../../components/ui/MenuButton';
+import { buttonClasses, linkClass } from '../../components/ui/styles';
 import { TextField } from '../../components/ui/TextField';
 import { isApiError, messageForError } from '../../lib/api';
 import { DownloadMenu } from './DownloadMenu';
@@ -24,12 +25,9 @@ import {
   useRenameResume,
 } from './queries';
 
-const primaryLinkClass =
-  'inline-flex min-h-11 items-center rounded-md border border-transparent bg-blue-700 px-4 py-2 font-medium text-white hover:bg-blue-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700';
-const secondaryLinkClass =
-  'inline-flex min-h-11 items-center rounded-md border border-slate-400 bg-white px-4 py-2 font-medium text-slate-900 hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700';
-const inlineLinkClass =
-  'text-blue-800 underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700';
+const primaryLinkClass = buttonClasses('primary', 'sm');
+const secondaryLinkClass = buttonClasses('secondary', 'sm');
+const inlineLinkClass = linkClass;
 
 const latestOf = (resume: ResumeSummary): ResumeVersionSummary =>
   resume.versions.reduce((best, version) =>
@@ -84,9 +82,9 @@ function OlderVersionRow({
   return (
     <li className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 py-2">
       <div className="flex flex-wrap items-center gap-2">
-        <span className="font-medium text-slate-900">Versão {version.versionNumber}</span>
+        <span className="font-medium text-ink-1">Versão {version.versionNumber}</span>
         <VersionStatus version={version} />
-        <span className="text-sm text-slate-700">{formatDateTime(version.updatedAt)}</span>
+        <span className="text-body text-ink-2">{formatDateTime(version.updatedAt)}</span>
       </div>
       <div className="flex items-start gap-2">
         <Link to={editorPath(resume.id, version.id)} className={secondaryLinkClass}>
@@ -175,13 +173,13 @@ function ResumeCard({ resume }: { resume: ResumeSummary }) {
   ];
 
   return (
-    <li className="flex flex-col gap-3 rounded-md border border-slate-400 bg-white p-4">
+    <li className="flex flex-col gap-3 rounded-control border border-line-strong bg-surface p-4">
       <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
         <div className="flex min-w-0 flex-col gap-1.5">
-          <h3 className="text-base font-semibold text-slate-900">{resume.name}</h3>
+          <h3 className="text-body font-semibold text-ink-1">{resume.name}</h3>
           <div className="flex flex-wrap items-center gap-2">
             <VersionStatus version={latest} />
-            <span className="text-sm text-slate-700">
+            <span className="text-body text-ink-2">
               Versão {latest.versionNumber} · {formatDateTime(latest.updatedAt)}
             </span>
           </div>
@@ -248,12 +246,12 @@ function ResumeCard({ resume }: { resume: ResumeSummary }) {
         <div
           role="alertdialog"
           aria-labelledby={`${nameId}-confirm`}
-          className="flex flex-col gap-3 rounded-md border border-red-700 bg-red-50 p-4"
+          className="flex flex-col gap-3 rounded-control border border-risk bg-risk-soft p-4"
         >
-          <p id={`${nameId}-confirm`} className="font-semibold text-red-900">
+          <p id={`${nameId}-confirm`} className="font-semibold text-risk-text">
             Excluir este currículo e todas as suas versões?
           </p>
-          <p className="text-sm text-red-900">
+          <p className="text-body text-risk-text">
             O conteúdo editado e os arquivos que seriam gerados deixam de existir e não poderão ser
             recuperados. O seu perfil e a vaga não são alterados.
           </p>
@@ -292,13 +290,13 @@ function ResumeCard({ resume }: { resume: ResumeSummary }) {
       ) : null}
 
       {older.length > 0 ? (
-        <details className="border-t border-slate-300 pt-2">
-          <summary className="w-fit cursor-pointer text-sm font-medium text-slate-800 underline decoration-dotted">
+        <details className="border-t border-line pt-2">
+          <summary className="w-fit cursor-pointer text-body font-medium text-ink-2 underline decoration-dotted">
             Versões anteriores ({String(older.length)})
           </summary>
           <ul
             aria-label={`Versões anteriores de ${resume.name}`}
-            className="mt-1 flex flex-col divide-y divide-slate-300"
+            className="mt-1 flex flex-col divide-y divide-line"
           >
             {older.map((version) => (
               <OlderVersionRow
@@ -387,7 +385,7 @@ export function ResumesSection({ jobId }: { jobId: string }) {
         </Alert>
       ) : null}
       {query.isSuccess && query.data.resumes.length === 0 ? (
-        <p className="rounded-md border border-dashed border-slate-400 bg-white p-4 text-sm">
+        <p className="rounded-control border border-dashed border-line-strong bg-surface p-4 text-body">
           Nenhum currículo gerado para esta vaga ainda.
         </p>
       ) : null}

@@ -41,6 +41,13 @@
   --on-risk: #ffffff;
   --scrim: rgb(15 23 42 / 0.4);
 
+  /* The A4 preview is the exported document: same paper in both themes (never overridden in dark). */
+  --paper: #ffffff;
+  --paper-ink: #111827;
+  --paper-muted: #4b5563;
+  --paper-line: #d1d5db;
+  --paper-chip: #f3f4f6;
+
   --shadow-color: 15 23 42;
   --elev-xs: 0 1px 2px rgb(var(--shadow-color) / 0.06);
   --elev-md: 0 4px 12px rgb(var(--shadow-color) / 0.1), 0 1px 3px rgb(var(--shadow-color) / 0.08);
@@ -115,6 +122,11 @@
   --color-risk-text: var(--risk-text);
   --color-on-risk: var(--on-risk);
   --color-scrim: var(--scrim);
+  --color-paper: var(--paper);
+  --color-paper-ink: var(--paper-ink);
+  --color-paper-muted: var(--paper-muted);
+  --color-paper-line: var(--paper-line);
+  --color-paper-chip: var(--paper-chip);
 
   --shadow-xs: var(--elev-xs);
   --shadow-md: var(--elev-md);

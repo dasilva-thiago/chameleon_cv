@@ -61,7 +61,7 @@ export function AiPanel() {
   return (
     <div
       role="status"
-      className="flex flex-col gap-2 rounded-md border border-slate-300 bg-slate-50 p-3 text-sm"
+      className="flex flex-col gap-2 rounded-control border border-line bg-sunken p-3 text-body"
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p>
@@ -83,7 +83,7 @@ export function AiPanel() {
         </Button>
       </div>
       <details>
-        <summary className="w-fit cursor-pointer text-slate-800 underline decoration-dotted">
+        <summary className="w-fit cursor-pointer text-ink-2 underline decoration-dotted">
           Como funciona
         </summary>
         <p className="mt-1">

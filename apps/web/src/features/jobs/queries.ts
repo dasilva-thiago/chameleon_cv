@@ -1,5 +1,5 @@
 import type { CreateJobRequest, ListJobsQuery, PatchJobRequest } from '@chameleon/contracts';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { jobsApi } from '../../lib/api';
 
 export const JOBS_KEY = ['jobs'] as const;
@@ -8,6 +8,8 @@ export function useJobs(query: ListJobsQuery) {
   return useQuery({
     queryKey: [...JOBS_KEY, 'list', query.status ?? 'active', query.q ?? ''],
     queryFn: ({ signal }) => jobsApi.list(query, signal),
+    // Changing the filter or the search keeps the previous list on screen until the new one arrives (no flash).
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -51,3 +53,21 @@ export const useRunAnalysis = () =>
   useJobMutation((vars: { id: string; force?: boolean }) =>
     jobsApi.runAnalysis(vars.id, vars.force ?? false),
   );
+
+/**
+ * Prefetch a job's detail and evaluation when its link is hovered or focused, so opening it shows no loading screen.
+ * Data already in the cache (fresh for the default stale time) is not fetched again.
+ */
+export function usePrefetchJob(): (id: string) => void {
+  const client = useQueryClient();
+  return (id: string) => {
+    void client.prefetchQuery({
+      queryKey: [...JOBS_KEY, 'detail', id],
+      queryFn: ({ signal }) => jobsApi.get(id, signal),
+    });
+    void client.prefetchQuery({
+      queryKey: [...JOBS_KEY, 'analysis', id],
+      queryFn: ({ signal }) => jobsApi.getAnalysis(id, signal),
+    });
+  };
+}
