@@ -1,3 +1,4 @@
+import { Disclosure } from '../../components/ui/Disclosure';
 import type {
   CreateResumeResponse,
   ResumeSummary,
@@ -290,10 +291,7 @@ function ResumeCard({ resume }: { resume: ResumeSummary }) {
       ) : null}
 
       {older.length > 0 ? (
-        <details className="border-t border-line pt-2">
-          <summary className="w-fit cursor-pointer text-body font-medium text-ink-2 underline decoration-dotted">
-            Versões anteriores ({String(older.length)})
-          </summary>
+        <Disclosure summary={<>Versões anteriores ({String(older.length)})</>}>
           <ul
             aria-label={`Versões anteriores de ${resume.name}`}
             className="mt-1 flex flex-col divide-y divide-line"
@@ -308,7 +306,7 @@ function ResumeCard({ resume }: { resume: ResumeSummary }) {
               />
             ))}
           </ul>
-        </details>
+        </Disclosure>
       ) : null}
     </li>
   );
@@ -325,16 +323,18 @@ function Generated({ result }: { result: CreateResumeResponse }) {
         </Link>
       </p>
       {result.notes.length > 0 ? (
-        <details className="mt-2">
-          <summary className="w-fit cursor-pointer font-medium underline decoration-dotted">
-            O que ficou de fora e por quê ({String(result.notes.length)})
-          </summary>
-          <ul className="mt-1 list-disc pl-5">
-            {result.notes.map((note) => (
-              <li key={note}>{note}</li>
-            ))}
-          </ul>
-        </details>
+        <div className="mt-2">
+          <Disclosure
+            variant="inline"
+            summary={<>O que ficou de fora e por quê ({String(result.notes.length)})</>}
+          >
+            <ul className="mt-1 list-disc pl-5">
+              {result.notes.map((note) => (
+                <li key={note}>{note}</li>
+              ))}
+            </ul>
+          </Disclosure>
+        </div>
       ) : null}
     </Alert>
   );

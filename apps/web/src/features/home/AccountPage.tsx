@@ -1,9 +1,11 @@
+import { Disclosure } from '../../components/ui/Disclosure';
 import { useState } from 'react';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { usePageTitle } from '../../components/layout/PageHeading';
 import { Section } from '../../components/layout/Section';
 import { Alert } from '../../components/ui/Alert';
 import { Button } from '../../components/ui/Button';
+import { ThemeToggle } from '../../components/ui/ThemeToggle';
 import { messageForError } from '../../lib/api';
 import { useLogoutAll, useSession } from '../auth/session';
 
@@ -37,23 +39,32 @@ export function AccountPage() {
         </dl>
       </Section>
 
+      <Section
+        id="aparencia"
+        title="Aparência"
+        description="Claro, escuro ou igual ao sistema. Atalho: Ctrl+Shift+L."
+      >
+        <div>
+          <ThemeToggle />
+        </div>
+      </Section>
+
       <Section id="seguranca" title="Segurança da sessão">
         <dl className={listClass}>
           <dt className="text-ink-2">Sessão válida até</dt>
           <dd className="font-medium">{formatDate(session.expiresAt)}</dd>
         </dl>
-        <details className="text-body text-ink-2">
-          <summary className="w-fit cursor-pointer underline decoration-dotted">
-            Detalhes da validade
-          </summary>
-          <dl className={`${listClass} mt-2`}>
-            <dt>Limite máximo</dt>
-            <dd>{formatDate(session.absoluteExpiresAt)}</dd>
-          </dl>
-          <p className="mt-1">
-            A validade é renovada enquanto você usa o serviço, até o limite máximo.
-          </p>
-        </details>
+        <div className="text-body text-ink-2">
+          <Disclosure variant="inline" summary="Detalhes da validade">
+            <dl className={`${listClass} mt-2`}>
+              <dt>Limite máximo</dt>
+              <dd>{formatDate(session.absoluteExpiresAt)}</dd>
+            </dl>
+            <p className="mt-1">
+              A validade é renovada enquanto você usa o serviço, até o limite máximo.
+            </p>
+          </Disclosure>
+        </div>
 
         {logoutAll.isError ? (
           <Alert tone="error" title="Não foi possível encerrar as sessões">

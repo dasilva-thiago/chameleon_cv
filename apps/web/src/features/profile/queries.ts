@@ -1,5 +1,6 @@
 import type { SaveProfileBaseRequest } from '@chameleon/contracts';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useEffect, useState } from 'react';
 import { profileApi } from '../../lib/api';
 
 export const PROFILE_KEY = ['profile'] as const;
@@ -36,3 +37,27 @@ export const useSaveProfileBase = () =>
 
 export const useRestoreRevision = () =>
   useProfileMutation((id: string) => profileApi.restoreRevision(id));
+
+/**
+ * How the program reads the text being edited, refreshed a moment after typing stops (the request is cheap: no AI,
+ * nothing stored). The previous reading stays on screen while the next one loads.
+ */
+export function useBaseReading(cvMarkdown: string, profileMarkdown: string, delayMs = 600) {
+  const [input, setInput] = useState({ cvMarkdown, profileMarkdown });
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setInput({ cvMarkdown, profileMarkdown });
+    }, delayMs);
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [cvMarkdown, profileMarkdown, delayMs]);
+  return useQuery({
+    queryKey: [...PROFILE_KEY, 'reading', input.cvMarkdown, input.profileMarkdown],
+    queryFn: ({ signal }) => profileApi.read(input, signal),
+    enabled: input.cvMarkdown.trim() !== '' || input.profileMarkdown.trim() !== '',
+    placeholderData: keepPreviousData,
+    retry: false,
+    staleTime: Infinity,
+  });
+}

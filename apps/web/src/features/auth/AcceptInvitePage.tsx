@@ -10,6 +10,7 @@ import {
 import { useQuery } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
+import { linkClass } from '../../components/ui/styles';
 import { Link, useLocation, useNavigate } from 'react-router';
 import { PageHeading, usePageTitle } from '../../components/layout/PageHeading';
 import { Alert } from '../../components/ui/Alert';
@@ -46,7 +47,7 @@ export function AcceptInvitePage() {
   }, [hash, pathname, search, navigate]);
 
   return (
-    <div className="mx-auto flex w-full max-w-md flex-col gap-6">
+    <div className="mx-auto mt-[4vh] flex w-full max-w-md flex-col gap-6 rounded-panel border border-line bg-surface p-6 shadow-md sm:p-8">
       <div className="flex flex-col gap-2">
         <PageHeading>Criar conta</PageHeading>
         <p className="text-body text-ink-2">
@@ -72,7 +73,7 @@ function InvalidInvite({ reason }: { reason: 'missing' | 'invalid' }) {
       </Alert>
       <p className="text-body text-ink-2">
         Já tem uma conta?{' '}
-        <Link to="/login" className="font-medium text-brand underline">
+        <Link to="/login" className={linkClass}>
           Entrar
         </Link>
       </p>

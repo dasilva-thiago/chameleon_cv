@@ -1,3 +1,4 @@
+import { Disclosure } from '../../components/ui/Disclosure';
 import { Alert } from '../../components/ui/Alert';
 import { Button } from '../../components/ui/Button';
 import { messageForError } from '../../lib/api';
@@ -33,10 +34,7 @@ export function AiPanel() {
               {consent.isPending ? 'Salvando…' : 'Permitir uso de IA'}
             </Button>
           </div>
-          <details>
-            <summary className="w-fit cursor-pointer font-medium underline decoration-dotted">
-              O que é enviado e quais os limites
-            </summary>
+          <Disclosure variant="inline" summary="O que é enviado e quais os limites">
             <div className="mt-2 flex flex-col gap-2">
               <p>
                 Serão enviados o texto da vaga, o seu CV e o seu perfil e regras (inclusive faixas
@@ -51,7 +49,7 @@ export function AiPanel() {
                 ))}
               </ul>
             </div>
-          </details>
+          </Disclosure>
           {consent.isError ? <p role="alert">{messageForError(consent.error)}</p> : null}
         </div>
       </Alert>
@@ -82,15 +80,12 @@ export function AiPanel() {
           {consent.isPending ? 'Salvando…' : 'Desligar IA'}
         </Button>
       </div>
-      <details>
-        <summary className="w-fit cursor-pointer text-ink-2 underline decoration-dotted">
-          Como funciona
-        </summary>
+      <Disclosure variant="inline" summary="Como funciona">
         <p className="mt-1">
           Se um provedor atingir o limite, o próximo assume; se nenhum responder, o resultado local
           é usado.
         </p>
-      </details>
+      </Disclosure>
       {consent.isError ? <p role="alert">{messageForError(consent.error)}</p> : null}
     </div>
   );
