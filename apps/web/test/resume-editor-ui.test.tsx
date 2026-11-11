@@ -11,7 +11,6 @@ import { violations } from './helpers/axe';
 import { FakeApi, errorResponse, jsonResponse, makeSession } from './helpers/fake-api';
 import { renderApp } from './helpers/render-app';
 import {
-  EXPERIENCE_ID,
   GAP_ISSUE,
   JOB_ID,
   RESUME_ID,
@@ -91,7 +90,7 @@ function savedContent(fake: FakeApi): ResumeContent {
 }
 
 describe('editor de currículo: rascunho', () => {
-  it('mostra cabeçalho, seções, origem, fontes resolvidas e problemas ao lado do item', async () => {
+  it('mostra cabeçalho, seções, origem e problemas da checagem ao lado do item', async () => {
     setup(makeVersion({ issues: [GAP_ISSUE], content: contentWithGap() }));
     const { container } = await openEditor();
 
@@ -108,25 +107,14 @@ describe('editor de currículo: rascunho', () => {
     );
 
     // resumo de problemas
-    expect(screen.getByText(/Verificação de fontes:/)).toHaveTextContent('1 erro e 0 avisos');
+    expect(screen.getByText(/Checagem contra a base:/)).toHaveTextContent('1 erro e 0 avisos');
 
     const entry = entryOf('Dev Backend — Acme');
     expect(within(entry).getByLabelText('Título da entrada')).toHaveValue('Dev Backend — Acme');
     expect(within(entry).getByLabelText('Período')).toHaveValue('2020-01 – atual');
-    // fontes resolvidas com link para a seção do perfil
-    expect(
-      await within(entry).findByRole('link', { name: 'Experiência: Dev Backend — Acme' }),
-    ).toHaveAttribute('href', '/perfil/experiencias');
-    expect(
-      within(entry).getByRole('link', {
-        name: 'Item de experiência: Construí APIs REST em Node.js.',
-      }),
-    ).toHaveAttribute('href', '/perfil/experiencias');
-
-    // o item sem fonte resolvida mostra o problema do servidor ao lado
+    // o item com número que a base não tem mostra o problema do servidor ao lado
     const gapItem = itemRow(entry, 'Item 2');
-    expect(within(gapItem).getByText('registro não encontrado')).toBeVisible();
-    expect(gapItem).toHaveTextContent('Erro: O item cita um registro que não existe no perfil.');
+    expect(gapItem).toHaveTextContent('Erro: O número "40" não aparece na base profissional.');
     expect(within(gapItem).getByText('Editado')).toBeVisible();
     expect(itemRow(entry, 'Item 1')).not.toHaveTextContent('Erro:');
     expect(within(region('Competências')).getAllByText('Gerado')).toHaveLength(2);
@@ -170,7 +158,7 @@ describe('editor de currículo: rascunho', () => {
     expect(within(entry).getByLabelText('Período')).toHaveValue('');
   });
 
-  it('adicionar item cria um item vazio "Adicionado", bloqueia o salvamento até preencher e herda as fontes da entrada', async () => {
+  it('adicionar item cria um item vazio "Adicionado" e bloqueia o salvamento até preencher', async () => {
     const fake = setup();
     const { user } = await openEditor();
     const entry = entryOf('Dev Backend — Acme');
@@ -194,7 +182,6 @@ describe('editor de currículo: rascunho', () => {
     expect(bullets[1]).toEqual({
       id: expect.stringMatching(/^[a-z0-9][a-z0-9-]{0,39}$/) as string,
       text: 'Reduzi o tempo de resposta das APIs.',
-      sourceIds: [EXPERIENCE_ID],
       origin: 'added',
     });
   });
@@ -226,7 +213,7 @@ describe('editor de currículo: rascunho', () => {
     ]);
   });
 
-  it('pré-visualizar mostra o documento (sem fontes), inclui alterações não salvas e passa no axe', async () => {
+  it('pré-visualizar mostra o documento (sem avisos), inclui alterações não salvas e passa no axe', async () => {
     setup();
     const { user, container } = await openEditor();
     const edit = screen.getByRole('button', { name: 'Editar' });
@@ -300,9 +287,11 @@ describe('editor de currículo: aprovação', () => {
     await user.click(screen.getByRole('button', { name: 'Aprovar versão' }));
 
     const alert = await screen.findByRole('alert');
-    expect(alert).toHaveTextContent('O currículo tem itens sem fonte confirmada');
     expect(alert).toHaveTextContent(
-      'Seção "Experiência", entrada "Dev Backend — Acme", item 2: O item cita um registro que não existe no perfil.',
+      'O currículo tem itens que a sua base profissional não sustenta',
+    );
+    expect(alert).toHaveTextContent(
+      'Seção "Experiência", entrada "Dev Backend — Acme", item 2: O número "40" não aparece na base profissional.',
     );
     // continua em modo de edição para corrigir
     expect(screen.getByRole('button', { name: 'Salvar rascunho' })).toBeVisible();
@@ -317,7 +306,7 @@ describe('editor de currículo: aprovação', () => {
     const { user } = await openEditor();
 
     expect(itemRow(entryOf('Dev Backend — Acme'), 'Item 1')).toHaveTextContent(
-      'Aviso: O texto menciona termos que não aparecem',
+      'Aviso: "REST" não aparece na base profissional',
     );
     const approve = screen.getByRole('button', { name: 'Aprovar versão' });
     expect(approve).toBeDisabled();

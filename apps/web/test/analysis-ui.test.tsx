@@ -3,9 +3,10 @@ import {
   jobAnalysisSchema,
   jobResponseSchema,
   runAnalysisResponseSchema,
+  type AnalysisResult,
   type JobAnalysis,
 } from '@chameleon/contracts';
-import { screen, waitFor, within } from '@testing-library/react';
+import { screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { violations } from './helpers/axe';
 import { FakeApi, errorResponse, jsonResponse, makeSession } from './helpers/fake-api';
@@ -13,9 +14,6 @@ import { renderApp } from './helpers/render-app';
 
 const JOB_ID = '0190a8f0-0000-7000-8000-000000000b01';
 const ANALYSIS_ID = '0190a8f0-0000-7000-8000-000000000b02';
-const SKILL_ID = '0190a8f0-0000-7000-8000-000000000b03';
-const EXPERIENCE_ID = '0190a8f0-0000-7000-8000-000000000b04';
-const PENDING_ID = '0190a8f0-0000-7000-8000-000000000b05';
 const HASH_A = 'a'.repeat(64);
 const HASH_B = 'b'.repeat(64);
 
@@ -33,135 +31,104 @@ const job = jobResponseSchema.parse({
     descriptionLength: 10,
     createdAt: '2026-11-05T10:00:00.000Z',
     updatedAt: '2026-11-05T10:00:00.000Z',
-    description: 'Requisitos\n- Node.js\n- Kubernetes\n- Terraform',
+    description: 'Requisitos\n- Node.js é obrigatório\n- Kubernetes',
     descriptionHash: HASH_A,
     notes: null,
   },
 });
 
-function analysis(overrides: Partial<JobAnalysis> = {}): JobAnalysis {
+function result(overrides: Partial<AnalysisResult> = {}): AnalysisResult {
+  return {
+    schemaVersion: 2,
+    extraction: {
+      promptVersion: 'co-extract-1',
+      role: {
+        title: 'Dev Backend Júnior',
+        company: 'Acme',
+        seniority: 'Júnior',
+        workMode: 'remote',
+        location: null,
+        contract: 'clt',
+        salary: null,
+        tldr: 'Vaga backend júnior remota.',
+      },
+      requirements: [
+        {
+          id: 'r1',
+          text: 'Node.js',
+          importance: 'critical',
+          tier: 'stated',
+          jdSignal: 'Node.js é obrigatório',
+        },
+        {
+          id: 'r2',
+          text: 'Kubernetes em produção',
+          importance: 'high',
+          tier: 'structural',
+          jdSignal: 'Requisitos',
+        },
+      ],
+      keywords: ['Node.js', 'Kubernetes'],
+    },
+    archetype: { label: 'Desenvolvedor Backend Júnior', fit: 'primary', note: null },
+    dealbreakers: [],
+    matches: [
+      {
+        requirementId: 'r1',
+        match: 'strong',
+        evidence: 'APIs REST com Node.js',
+        evidenceVerified: true,
+        gap: null,
+      },
+      {
+        requirementId: 'r2',
+        match: 'missing',
+        evidence: null,
+        evidenceVerified: false,
+        gap: 'Sem Kubernetes na base',
+      },
+    ],
+    gaps: [
+      {
+        requirementId: 'r2',
+        blocker: false,
+        risk: 'Perguntas sobre containers',
+        mitigation: 'Estudar o básico de Kubernetes',
+      },
+    ],
+    scores: { cvMatch: 4, northStar: 5, comp: null, conditions: 5, redFlags: 5 },
+    score: 4.2,
+    verdict: {
+      recommendation: 'apply',
+      headline: 'Boa vaga para o seu alvo principal.',
+      reasons: ['Node.js forte'],
+    },
+    salary: {
+      min: 3000,
+      max: 3500,
+      currency: 'BRL',
+      period: 'monthly',
+      contract: 'clt',
+      text: 'Informe R$ 3.000 a R$ 3.500.',
+      sources: ['faixa do perfil'],
+      warning: 'A empresa não informou salário.',
+    },
+    customization: ['Abrir com o projeto de APIs'],
+    order: ['r1', 'r2'],
+    ai: { provider: 'gemini', model: 'm', promptVersion: 'co-extract-1+co-eval-1' },
+    warnings: ['1 evidência citada pela IA não foi encontrada na sua base.'],
+    ...overrides,
+  };
+}
+
+function analysis(overrides: Partial<AnalysisResult> = {}): JobAnalysis {
   return jobAnalysisSchema.parse({
     id: ANALYSIS_ID,
     jobId: JOB_ID,
     descriptionHash: HASH_A,
     profileHash: HASH_B,
-    reviewedAt: null,
     createdAt: '2026-11-05T11:00:00.000Z',
-    review: { excludedRecordIds: [], pinnedRecordIds: [], notes: {} },
-    result: {
-      engine: 'deterministic',
-      engineVersion: 'req-1.match-1',
-      requirements: [
-        {
-          id: 'r1',
-          importance: 'mandatory',
-          text: 'Node.js',
-          keywords: ['Node.js'],
-          yearsRequired: 3,
-        },
-        {
-          id: 'r2',
-          importance: 'mandatory',
-          text: 'Kubernetes em produção',
-          keywords: [],
-          yearsRequired: null,
-        },
-        {
-          id: 'r3',
-          importance: 'desirable',
-          text: 'Terraform',
-          keywords: ['Terraform'],
-          yearsRequired: null,
-        },
-      ],
-      matches: [
-        {
-          requirementId: 'r1',
-          strength: 'direct',
-          evidence: [
-            {
-              recordId: SKILL_ID,
-              kind: 'skill',
-              label: 'Node.js',
-              via: 'skill',
-              context: 'professional_experience',
-              supportingRecordId: null,
-              status: 'confirmed',
-              matchedTerms: ['Node.js'],
-            },
-            {
-              recordId: EXPERIENCE_ID,
-              kind: 'experience',
-              label: 'Dev Backend — Acme',
-              via: 'skill',
-              context: 'professional_experience',
-              supportingRecordId: null,
-              status: 'confirmed',
-              matchedTerms: ['Node.js'],
-            },
-          ],
-          rationale: 'Sustentado por experiência profissional confirmada: Dev Backend — Acme.',
-          gap: null,
-          cautions: [
-            'A vaga pede 3 ano(s): confira se o tempo confirmado no seu perfil cobre isso.',
-          ],
-        },
-        {
-          requirementId: 'r2',
-          strength: 'absent',
-          evidence: [],
-          rationale: 'Nenhum registro do perfil sustenta este requisito.',
-          gap: 'Nada no perfil sustenta: "Kubernetes em produção". Se você tem essa experiência, registre-a no perfil.',
-          cautions: [],
-        },
-        {
-          requirementId: 'r3',
-          strength: 'pending',
-          evidence: [
-            {
-              recordId: PENDING_ID,
-              kind: 'skill',
-              label: 'Terraform',
-              via: 'skill',
-              context: null,
-              supportingRecordId: null,
-              status: 'needs_review',
-              matchedTerms: ['Terraform'],
-            },
-          ],
-          rationale: 'Há registros relacionados, mas nenhum está confirmado ainda.',
-          gap: 'Confirme (ou corrija) os itens indicados para que possam sustentar o currículo.',
-          cautions: ['A habilidade ainda aguarda a sua confirmação.'],
-        },
-      ],
-      summary: {
-        requirements: 3,
-        byStrength: { direct: 1, partial: 0, transferable: 0, pending: 1, absent: 1 },
-        mandatoryByStrength: { direct: 1, partial: 0, transferable: 0, pending: 0, absent: 1 },
-      },
-      prioritized: [
-        {
-          recordId: SKILL_ID,
-          kind: 'skill',
-          label: 'Node.js',
-          strength: 'direct',
-          score: 3,
-          requirementIds: ['r1'],
-        },
-        {
-          recordId: EXPERIENCE_ID,
-          kind: 'experience',
-          label: 'Dev Backend — Acme',
-          strength: 'direct',
-          score: 3,
-          requirementIds: ['r1'],
-        },
-      ],
-      warnings: [
-        'O texto da vaga contém trechos que parecem instruções para um sistema; eles foram tratados apenas como texto.',
-      ],
-    },
-    ...overrides,
+    result: result(overrides),
   });
 }
 
@@ -181,11 +148,10 @@ function setup(initial: JobAnalysis | null, stale: string[] = []): FakeApi {
   return fake;
 }
 
-describe('análise da vaga na tela', () => {
-  it('sem análise oferece "Analisar vaga"; ao analisar mostra resumo, evidências, lacunas e plano', async () => {
+describe('avaliação da vaga na tela', () => {
+  it('sem avaliação oferece "Avaliar vaga"; ao avaliar mostra nota, veredito, requisitos, lacunas e salário', async () => {
     const fake = setup(null);
     let stored: JobAnalysis | null = null;
-    // after the POST the query is refetched and must see the stored analysis
     fake.on(`GET /api/jobs/${JOB_ID}/analysis`, () => jsonResponse(200, state(stored)));
     fake.on(`POST /api/jobs/${JOB_ID}/analysis`, () => {
       stored = analysis();
@@ -195,110 +161,87 @@ describe('análise da vaga na tela', () => {
       );
     });
     const { user, container } = renderApp(`/vagas/${JOB_ID}`);
-    await user.click(await screen.findByRole('button', { name: 'Analisar vaga' }));
+    await user.click(await screen.findByRole('button', { name: 'Avaliar vaga' }));
 
-    expect(await screen.findByRole('heading', { name: 'Resumo' })).toBeVisible();
+    expect(await screen.findByText('Boa vaga para o seu alvo principal.')).toBeVisible();
     expect(fake.requestsTo(`POST /api/jobs/${JOB_ID}/analysis`)[0]?.body).toEqual({ force: false });
-    expect(
-      screen.getByText('Requisitos obrigatórios com alguma sustentação confirmada: 1 de 2.'),
-    ).toBeInTheDocument();
-    expect(screen.getByText(/parecem instruções/)).toBeInTheDocument();
+    expect(screen.getByText('4.2')).toBeVisible();
+    expect(screen.getByText('Vale se candidatar')).toBeVisible();
+    expect(screen.getByText(/Desenvolvedor Backend Júnior · alvo principal/)).toBeVisible();
 
-    const nodeLinks = screen.getAllByRole('link', { name: 'Competência: Node.js' });
-    expect(nodeLinks[0]).toHaveAttribute('href', '/perfil/competencias');
-    expect(
-      screen.getByText(/Nada no perfil sustenta: "Kubernetes em produção"/),
-    ).toBeInTheDocument();
-    expect(screen.getByText(/A vaga pede 3 ano/)).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Competência: Terraform' })).toBeInTheDocument();
-    expect(screen.getByText(/aguardando confirmação\)/)).toBeInTheDocument();
+    const requirements = screen.getByRole('region', { name: 'Requisitos × sua base' });
+    const items = within(requirements).getAllByRole('listitem');
+    expect(items[0]).toHaveTextContent('Forte');
+    expect(items[0]).toHaveTextContent('Crítico (dito na vaga)');
+    expect(items[0]).toHaveTextContent('Na sua base: “APIs REST com Node.js”');
+    expect(items[1]).toHaveTextContent('Faltando');
+    expect(items[1]).toHaveTextContent('Falta: Sem Kubernetes na base');
+
+    expect(screen.getByRole('region', { name: 'Lacunas e como contornar' })).toHaveTextContent(
+      'Como contornar: Estudar o básico de Kubernetes',
+    );
+    const salary = screen.getByRole('region', { name: 'Pretensão salarial sugerida' });
+    expect(salary).toHaveTextContent('A empresa não informou salário.');
+    expect(screen.getByText(/não foi encontrada na sua base/)).toBeInTheDocument();
     expect(await violations(container)).toEqual([]);
   });
 
-  it('as seções da análise começam recolhidas e abrem com um clique no título', async () => {
-    setup(analysis());
-    const { user } = renderApp(`/vagas/${JOB_ID}`);
-
-    for (const name of ['Resumo', 'Plano de adaptação', /^Requisitos obrigatórios/]) {
-      const heading = await screen.findByRole('heading', { name });
-      const section = heading.closest('details')!;
-      expect(section).not.toHaveAttribute('open');
-      await user.click(heading);
-      expect(section).toHaveAttribute('open');
-    }
-  });
-
-  it('mostra o aviso de análise desatualizada com o motivo', async () => {
-    setup(analysis(), ['job_text', 'profile']);
+  it('uma regra que barra a vaga aparece no topo, com a frase da vaga', async () => {
+    setup(
+      analysis({
+        dealbreakers: [{ rule: 'Vagas com Java estão fora do alvo', jdQuote: 'Java obrigatório' }],
+        score: 2.5,
+        verdict: { recommendation: 'skip', headline: 'Fora do alvo.', reasons: [] },
+      }),
+    );
     renderApp(`/vagas/${JOB_ID}`);
-    const alert = await screen.findByText('Análise desatualizada');
-    expect(alert.parentElement).toHaveTextContent(/o texto da vaga mudou e o seu perfil mudou/);
-    expect(screen.getByRole('button', { name: 'Analisar de novo' })).toBeInTheDocument();
+    expect(await screen.findByText('Esta vaga quebra uma regra sua')).toBeVisible();
+    expect(screen.getByText(/a vaga diz: “Java obrigatório”/)).toBeVisible();
+    expect(screen.getByText('Não recomendado')).toBeVisible();
   });
 
-  it('revisão: desmarcar item e anotar só habilita salvar depois da mudança e envia o corpo certo', async () => {
-    const fake = setup(analysis());
-    const saved = analysis({
-      reviewedAt: '2026-11-05T12:00:00.000Z',
-      review: {
-        excludedRecordIds: [EXPERIENCE_ID],
-        pinnedRecordIds: [],
-        notes: { r2: 'Tenho, falta registrar' },
-      },
-    });
-    fake.on(`PATCH /api/jobs/${JOB_ID}/analysis/review`, jsonResponse(200, state(saved)));
+  it('mostra o aviso de avaliação desatualizada com o motivo e reavalia sem forçar', async () => {
+    const fake = setup(analysis(), ['job_text', 'profile']);
+    fake.on(`POST /api/jobs/${JOB_ID}/analysis`, () =>
+      jsonResponse(201, runAnalysisResponseSchema.parse({ ...state(analysis()), reused: false })),
+    );
     const { user } = renderApp(`/vagas/${JOB_ID}`);
-    const save = await screen.findByRole('button', { name: 'Salvar revisão' });
-    expect(save).toBeDisabled();
-
-    const plan = screen.getByRole('heading', { name: 'Plano de adaptação' }).closest('details')!;
-    await user.click(
-      within(plan).getByRole('checkbox', { name: /Experiência: Dev Backend — Acme/ }),
+    const alert = await screen.findByText('Avaliação desatualizada');
+    expect(alert.parentElement).toHaveTextContent(
+      /o texto da vaga mudou e a sua base profissional mudou/,
     );
-    await user.type(
-      screen.getByLabelText('Sua anotação sobre este requisito (r2)'),
-      'Tenho, falta registrar',
-    );
-    expect(save).toBeEnabled();
-    fake.on(`GET /api/jobs/${JOB_ID}/analysis`, jsonResponse(200, state(saved)));
-    await user.click(save);
-
-    await waitFor(() => {
-      expect(fake.requestsTo(`PATCH /api/jobs/${JOB_ID}/analysis/review`)).toHaveLength(1);
-    });
-    expect(fake.requestsTo(`PATCH /api/jobs/${JOB_ID}/analysis/review`)[0]?.body).toEqual({
-      review: {
-        excludedRecordIds: [EXPERIENCE_ID],
-        pinnedRecordIds: [],
-        notes: { r2: 'Tenho, falta registrar' },
-      },
-    });
-    expect(await screen.findByText(/Revisada em/)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Avaliar de novo' }));
+    expect(fake.requestsTo(`POST /api/jobs/${JOB_ID}/analysis`)[0]?.body).toEqual({ force: false });
   });
 
-  it('sem perfil, o erro explica o próximo passo e liga à importação', async () => {
+  it('com a avaliação em dia, "Avaliar de novo" força uma nova chamada', async () => {
+    const fake = setup(analysis());
+    fake.on(`POST /api/jobs/${JOB_ID}/analysis`, () =>
+      jsonResponse(200, runAnalysisResponseSchema.parse({ ...state(analysis()), reused: false })),
+    );
+    const { user } = renderApp(`/vagas/${JOB_ID}`);
+    await user.click(await screen.findByRole('button', { name: 'Avaliar de novo' }));
+    expect(fake.requestsTo(`POST /api/jobs/${JOB_ID}/analysis`)[0]?.body).toEqual({ force: true });
+  });
+
+  it('sem base, o erro explica o próximo passo e liga à base', async () => {
     const fake = setup(null);
     fake.on(`POST /api/jobs/${JOB_ID}/analysis`, errorResponse(409, 'PROFILE_REQUIRED'));
     const { user } = renderApp(`/vagas/${JOB_ID}`);
-    await user.click(await screen.findByRole('button', { name: 'Analisar vaga' }));
+    await user.click(await screen.findByRole('button', { name: 'Avaliar vaga' }));
     const alert = await screen.findByRole('alert');
-    expect(alert).toHaveTextContent(/Cadastre ou importe o seu perfil/);
-    expect(within(alert).getByRole('link', { name: 'Importar perfil' })).toHaveAttribute(
+    expect(alert).toHaveTextContent(/Preencha a sua base profissional/);
+    expect(within(alert).getByRole('link', { name: 'Preencher a base' })).toHaveAttribute(
       'href',
-      '/perfil/importar',
+      '/perfil',
     );
   });
 
-  it('avisa quando nada mudou e a análise anterior foi mantida', async () => {
-    const fake = setup(analysis());
-    fake.on(
-      `POST /api/jobs/${JOB_ID}/analysis`,
-      jsonResponse(200, runAnalysisResponseSchema.parse({ ...state(analysis()), reused: true })),
-    );
+  it('sem IA disponível, explica o motivo', async () => {
+    const fake = setup(null);
+    fake.on(`POST /api/jobs/${JOB_ID}/analysis`, errorResponse(503, 'AI_UNAVAILABLE'));
     const { user } = renderApp(`/vagas/${JOB_ID}`);
-    await user.click(await screen.findByRole('button', { name: 'Analisar de novo' }));
-    expect(
-      await screen.findByText('Nada mudou desde a última análise: ela foi mantida.'),
-    ).toBeInTheDocument();
+    await user.click(await screen.findByRole('button', { name: 'Avaliar vaga' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(/Nenhum provedor de IA respondeu/);
   });
 });

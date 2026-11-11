@@ -1,6 +1,4 @@
 import {
-  profileDocumentSchema,
-  profileStateResponseSchema,
   resumeContentSchema,
   resumeResponseSchema,
   resumeSummarySchema,
@@ -30,16 +28,16 @@ export const MISSING_ID = ID(399);
 
 export const NOW = '2026-11-05T12:00:00.000Z';
 
-/** Conteudo limpo: todas as fontes existem no perfil de `profileState()`. */
+/** Conteudo limpo (sem problemas de checagem). */
 export function makeContent(): ResumeContent {
   return resumeContentSchema.parse({
-    schemaVersion: 1,
+    schemaVersion: 2,
     language: 'pt-BR',
     header: {
       name: 'Ana Teste',
       headline: 'Desenvolvedora Backend',
       location: 'São Paulo, SP',
-      contacts: [{ kind: 'email', value: 'ana@example.com', label: null, sourceId: CONTACT_ID }],
+      contacts: [{ kind: 'email', value: 'ana@example.com', label: null }],
     },
     sections: [
       {
@@ -52,12 +50,10 @@ export function makeContent(): ResumeContent {
             heading: 'Resumo',
             subheading: null,
             period: null,
-            sourceIds: [STATEMENT_ID],
             bullets: [
               {
                 id: 'summary-1-b1',
                 text: 'Desenvolvedora backend com foco em APIs.',
-                sourceIds: [STATEMENT_ID],
                 origin: 'generated',
               },
             ],
@@ -74,18 +70,15 @@ export function makeContent(): ResumeContent {
             heading: 'Tecnologias e competências',
             subheading: null,
             period: null,
-            sourceIds: [SKILL_TS_ID, SKILL_NODE_ID],
             bullets: [
               {
                 id: 'skills-1-b1',
                 text: 'TypeScript',
-                sourceIds: [SKILL_TS_ID],
                 origin: 'generated',
               },
               {
                 id: 'skills-1-b2',
                 text: 'Node.js',
-                sourceIds: [SKILL_NODE_ID],
                 origin: 'generated',
               },
             ],
@@ -102,12 +95,10 @@ export function makeContent(): ResumeContent {
             heading: 'Dev Backend — Acme',
             subheading: null,
             period: '2020-01 – atual',
-            sourceIds: [EXPERIENCE_ID],
             bullets: [
               {
                 id: 'experience-1-b1',
                 text: 'Construí APIs REST em Node.js.',
-                sourceIds: [EXP_ITEM_ID],
                 origin: 'generated',
               },
             ],
@@ -118,14 +109,13 @@ export function makeContent(): ResumeContent {
   });
 }
 
-/** Conteudo com um item apontando para um registro que nao existe no perfil. */
+/** Conteudo com um item que cita um numero que nao existe na base. */
 export function contentWithGap(): ResumeContent {
   const content = makeContent();
   const entry = content.sections[2]?.entries[0];
   entry?.bullets.push({
     id: 'experience-1-b2',
-    text: 'Liderei a migração de serviços.',
-    sourceIds: [MISSING_ID],
+    text: 'Migração de 40 serviços.',
     origin: 'edited',
   });
   return content;
@@ -133,16 +123,16 @@ export function contentWithGap(): ResumeContent {
 
 export const GAP_ISSUE: ResumeIssue = {
   severity: 'error',
-  code: 'UNKNOWN_SOURCE',
+  code: 'UNSUPPORTED_NUMBER',
   path: 'sections.2.entries.0.bullets.1',
-  message: 'O item cita um registro que não existe no perfil.',
+  message: 'O número "40" não aparece na base profissional.',
 };
 
 export const WARNING_ISSUE: ResumeIssue = {
   severity: 'warning',
   code: 'UNSUPPORTED_TERM',
   path: 'sections.2.entries.0.bullets.0',
-  message: 'O texto menciona termos que não aparecem nos registros de origem: REST.',
+  message: '"REST" não aparece na base profissional: confira se você tem essa experiência.',
 };
 
 export function makeVersion(
@@ -174,6 +164,7 @@ export function makeVersion(
     approvedAt: status === 'approved' ? NOW : null,
     content: options.content ?? makeContent(),
     issues,
+    coverage: null,
     profileRevisionId: null,
     analysisId: null,
   });
@@ -195,6 +186,7 @@ export function makeResume(
         ({
           content: _content,
           issues: _issues,
+          coverage: _coverage,
           profileRevisionId: _revision,
           analysisId: _analysis,
           ...summary
@@ -211,67 +203,9 @@ export const resumeBody = (resume: ResumeSummary) =>
 
 export const listBody = (resumes: ResumeSummary[]) => jsonResponse(200, { resumes });
 
-const ZERO_SUMMARY = {
-  recordCount: 0,
-  byStatus: { confirmed: 0, needs_review: 0, conflicting: 0, archived: 0 },
-  pending: { open: 0, resolved: 0, dismissed: 0 },
-  evidenceCount: 0,
-  byKind: {},
-};
-
-/** Perfil que contem as fontes citadas por `makeContent()`. */
-export function profileState() {
-  const confirmed = { status: 'confirmed' };
-  return profileStateResponseSchema.parse({
-    exists: true,
-    profile: {
-      id: ID(9),
-      storedSchemaVersion: '2.1.0',
-      createdAt: NOW,
-      updatedAt: NOW,
-    },
-    document: profileDocumentSchema.parse({
-      schema_version: '2.1.0',
-      profile: {
-        contact_points: [
-          { id: CONTACT_ID, kind: 'email', value: 'ana@example.com', visibility: 'public' },
-        ],
-        statements: [
-          {
-            id: STATEMENT_ID,
-            kind: 'short_summary',
-            text: 'Desenvolvedora backend com foco em APIs.',
-            meta: confirmed,
-          },
-        ],
-        skills: [
-          { id: SKILL_TS_ID, name: 'TypeScript', meta: confirmed },
-          { id: SKILL_NODE_ID, name: 'Node.js', meta: confirmed },
-        ],
-        experiences: [
-          {
-            id: EXPERIENCE_ID,
-            display_title: 'Dev Backend',
-            organization_name: 'Acme',
-            meta: confirmed,
-            items: [
-              {
-                id: EXP_ITEM_ID,
-                kind: 'responsibility',
-                text: 'Construí APIs REST em Node.js.',
-                meta: confirmed,
-              },
-            ],
-          },
-        ],
-      },
-    }),
-    summary: { ...ZERO_SUMMARY, recordCount: 6 },
-  });
-}
-
+/** A base profissional (o editor nao depende dela; mantido para telas que a leem). */
 export function installProfile(fake: FakeApi): void {
-  fake.on('GET /api/profile', jsonResponse(200, profileState()));
+  fake.on('GET /api/profile', jsonResponse(200, { base: null }));
 }
 
 export function fileResponse(filename: string, contentType: string): Response {

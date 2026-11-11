@@ -20,8 +20,8 @@ export function AiPanel() {
       <Alert tone="info" title="IA disponível, mas desligada">
         <div className="flex flex-col gap-3">
           <p>
-            Permita para a análise e o currículo usarem IA ({names}). Só o texto da vaga e os itens
-            confirmados escolhidos são enviados.
+            A avaliação das vagas e os currículos usam IA ({names}). São enviados o texto da vaga e
+            a sua base profissional, sem telefone e e-mail.
           </p>
           <div>
             <Button
@@ -39,9 +39,9 @@ export function AiPanel() {
             </summary>
             <div className="mt-2 flex flex-col gap-2">
               <p>
-                Serão enviados apenas o texto da vaga e os itens confirmados do seu perfil
-                escolhidos para ela, sem telefone, e-mail ou itens privados. Planos gratuitos podem
-                usar o conteúdo enviado segundo os termos de cada provedor.
+                Serão enviados o texto da vaga, o seu CV e o seu perfil e regras (inclusive faixas
+                salariais), sem telefone e e-mail. Planos gratuitos podem usar o conteúdo enviado
+                segundo os termos de cada provedor.
               </p>
               <ul className="list-disc pl-5">
                 {data.providers.map((provider) => (

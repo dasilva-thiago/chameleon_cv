@@ -219,17 +219,17 @@ describe('currículos na página da vaga', () => {
     ).toBeVisible();
   });
 
-  it('sem perfil, gerar explica o próximo passo e liga à importação', async () => {
+  it('sem base, gerar explica o próximo passo e liga à base', async () => {
     const fake = setup([]);
     fake.on(`POST /api/jobs/${JOB_ID}/resumes`, errorResponse(409, 'PROFILE_REQUIRED'));
     const { user } = renderApp(`/vagas/${JOB_ID}`);
     const section = await findSection();
     await user.click(await within(section).findByRole('button', { name: 'Gerar currículo' }));
     const alert = await within(section).findByRole('alert');
-    expect(alert).toHaveTextContent(/Cadastre ou importe o seu perfil/);
-    expect(within(alert).getByRole('link', { name: 'Importar perfil' })).toHaveAttribute(
+    expect(alert).toHaveTextContent(/Preencha a sua base profissional/);
+    expect(within(alert).getByRole('link', { name: 'Preencher a base' })).toHaveAttribute(
       'href',
-      '/perfil/importar',
+      '/perfil',
     );
   });
 

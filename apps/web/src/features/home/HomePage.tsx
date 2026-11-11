@@ -5,7 +5,7 @@ import { Badge } from '../../components/ui/Badge';
 import { useSession } from '../auth/session';
 import { JOB_STATUS_LABELS, UNTITLED_JOB } from '../jobs/labels';
 import { useJobs } from '../jobs/queries';
-import { useProfileState } from '../profile/queries';
+import { useProfileBase } from '../profile/queries';
 
 const RECENT_JOBS = 5;
 
@@ -65,35 +65,21 @@ function JobsOverview() {
   );
 }
 
-/** Só aparece quando há algo a fazer no perfil. */
+/** Só aparece enquanto a base profissional não foi preenchida. */
 function ProfileAttention() {
-  const state = useProfileState();
-  if (!state.isSuccess) return null;
-  const toReview = state.data.summary.byStatus.needs_review;
-  const openPending = state.data.summary.pending.open;
-  if (toReview === 0 && openPending === 0) return null;
-
+  const state = useProfileBase();
+  if (!state.isSuccess || state.data.base !== null) return null;
   return (
     <section aria-labelledby="home-profile" className="flex flex-col gap-2">
       <h2 id="home-profile" className="text-lg font-semibold">
-        Perfil
+        Base profissional
       </h2>
-      <ul className="flex flex-col gap-1 text-base">
-        {toReview > 0 ? (
-          <li>
-            <Link to="/perfil/confirmar" className={textLinkClass}>
-              {String(toReview)} item(ns) aguardando confirmação
-            </Link>
-          </li>
-        ) : null}
-        {openPending > 0 ? (
-          <li>
-            <Link to="/perfil/pendencias" className={textLinkClass}>
-              {String(openPending)} pendência(s) aberta(s)
-            </Link>
-          </li>
-        ) : null}
-      </ul>
+      <p className="text-base">
+        <Link to="/perfil" className={textLinkClass}>
+          Preencha o seu CV e o seu perfil
+        </Link>{' '}
+        para avaliar vagas e gerar currículos.
+      </p>
     </section>
   );
 }
@@ -115,7 +101,7 @@ export function HomePage() {
             Adicionar vaga
           </Link>
           <Link to="/perfil" className={secondaryLinkClass}>
-            Editar perfil
+            Editar base
           </Link>
         </div>
       </div>

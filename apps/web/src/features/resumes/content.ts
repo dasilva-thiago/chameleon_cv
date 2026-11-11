@@ -104,15 +104,12 @@ export function newBulletId(): string {
   return `n-${Date.now().toString(36)}${Math.floor(Math.random() * 1296).toString(36)}`;
 }
 
-/** Novo item vazio: origem `added`, com as mesmas fontes da entrada (a pessoa pode conferir e ajustar). */
+/** Novo item vazio: origem `added` (o texto é conferido contra a base ao salvar). */
 export function addBullet(content: ResumeContent, s: number, e: number): ResumeContent {
   return changeEntries(content, s, (entries) =>
     replaceAt(entries, e, (entry) => ({
       ...entry,
-      bullets: [
-        ...entry.bullets,
-        { id: newBulletId(), text: '', sourceIds: [...entry.sourceIds], origin: 'added' as const },
-      ],
+      bullets: [...entry.bullets, { id: newBulletId(), text: '', origin: 'added' as const }],
     })),
   );
 }

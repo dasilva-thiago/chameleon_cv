@@ -60,11 +60,11 @@ function setup(initial: ReturnType<typeof status>): FakeApi {
 }
 
 describe('painel de IA na análise da vaga', () => {
-  it('sem chaves configuradas não mostra nada e a análise segue local', async () => {
+  it('sem chaves configuradas o painel não aparece', async () => {
     const fake = setup(status({ configured: false, providers: [] }));
     expect(fake.requestsTo('GET /api/ai')).toHaveLength(0);
     renderApp(`/vagas/${JOB_ID}`);
-    await screen.findByText(/Análise da vaga/);
+    await screen.findByText(/Avaliação da vaga/);
     await waitFor(() => {
       expect(fake.requestsTo('GET /api/ai')).toHaveLength(1);
     });
@@ -89,7 +89,7 @@ describe('painel de IA na análise da vaga', () => {
 
     const alert = await screen.findByText(/IA disponível, mas desligada/);
     expect(alert).toBeInTheDocument();
-    expect(screen.getByText(/sem telefone, e-mail ou itens privados/)).toBeInTheDocument();
+    expect(screen.getAllByText(/sem telefone e e-mail/).length).toBeGreaterThan(0);
     expect(screen.getByText(/Plano gratuito/)).toBeInTheDocument();
     expect(await violations(document.body)).toEqual([]);
 

@@ -320,8 +320,8 @@ function Generated({ result }: { result: CreateResumeResponse }) {
   return (
     <Alert tone="info" title={`Currículo "${result.resume.name}" gerado`}>
       <p>
-        A versão 1 é um rascunho montado só com itens confirmados do seu perfil. Revise antes de
-        aprovar.{' '}
+        A versão 1 é um rascunho escrito pela IA a partir da sua base e conferido pelo programa.
+        Revise antes de aprovar.{' '}
         <Link to={editorPath(result.resume.id, result.version.id)} className={inlineLinkClass}>
           Abrir a versão 1 no editor
         </Link>
@@ -352,7 +352,7 @@ export function ResumesSection({ jobId }: { jobId: string }) {
     <Section
       id="job-resumes"
       title="Currículos desta vaga"
-      description="Montados só com itens confirmados do perfil. Só uma versão aprovada pode ser baixada."
+      description="Escritos pela IA a partir da sua base e da avaliação da vaga. Só uma versão aprovada pode ser baixada."
       actions={
         <Button
           variant={hasResumes ? 'secondary' : 'primary'}
@@ -371,8 +371,8 @@ export function ResumesSection({ jobId }: { jobId: string }) {
           {isApiError(create.error, 'PROFILE_REQUIRED') ? (
             <>
               {' '}
-              <Link to="/perfil/importar" className="font-medium underline">
-                Importar perfil
+              <Link to="/perfil" className="font-medium underline">
+                Preencher a base
               </Link>
             </>
           ) : null}
