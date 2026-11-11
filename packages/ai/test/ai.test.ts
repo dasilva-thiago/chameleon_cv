@@ -59,7 +59,7 @@ const CV = [
   '',
   '## Education',
   '',
-  '### UNIVESP — São Paulo',
+  '### UFPR — São Paulo',
   '',
   '**Engenharia da Computação**',
   'Em andamento',

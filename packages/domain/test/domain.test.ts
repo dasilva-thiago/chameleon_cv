@@ -58,7 +58,7 @@ const CV = [
   '',
   '## Education',
   '',
-  '### UNIVESP — São Paulo',
+  '### UFPR — São Paulo',
   '',
   '**Engenharia da Computação**',
   'Em andamento',
@@ -139,7 +139,7 @@ describe('parseBaseCv', () => {
       tech: 'TypeScript, Node.js, PostgreSQL',
     });
     expect(base.education[0]).toMatchObject({
-      institution: 'UNIVESP',
+      institution: 'UFPR',
       course: 'Engenharia da Computação',
       period: 'Em andamento',
       details: ['Base acadêmica: Banco de Dados.'],
