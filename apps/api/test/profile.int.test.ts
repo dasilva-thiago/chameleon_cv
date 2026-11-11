@@ -85,7 +85,7 @@ describe('professional base', () => {
   });
 
   it('reads a base without saving it: experiences with their exact titles, and the avoided expressions', async () => {
-    const before = (await a.client.get('/api/profile/revisions')).body;
+    const before: unknown = (await a.client.get('/api/profile/revisions')).body;
     const response = await a.client.post('/api/profile/reading', {
       cvMarkdown: BASE_CV,
       profileMarkdown: BASE_PROFILE,
