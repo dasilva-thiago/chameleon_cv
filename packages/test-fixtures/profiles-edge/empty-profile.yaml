@@ -1,3 +1,0 @@
-# Edge case sintetico: perfil vazio. Deve ser ACEITO (perfil parcial valido; gera 0 registros).
-schema_version: '2.1.0'
-profile: {}

@@ -1,6 +1,6 @@
 # ADR-0010 — Camada de IA agnóstica, saída estruturada, minimização e prompt injection
 
-**Status:** Aceita (não implementada) · 2026-11-04
+**Status:** Aceita · 2026-11-04 · Atualizada pela [ADR-0015](ADR-0015-fluxo-career-ops-base-markdown.md): o provedor `deterministic` deixou de existir para a avaliação; as tarefas de IA são as do fluxo do career-ops.
 
 ## Contexto
 - O Adendo §8 e o plano §11, §13 e §15 pedem: provedor intercambiável; saída estruturada validada; tarefas pequenas; contexto seletivo; chaves só no backend; logs redigidos; vaga como dado não confiável.

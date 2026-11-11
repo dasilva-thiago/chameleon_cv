@@ -2,7 +2,7 @@
   "name": "chameleon-cv",
   "version": "0.0.0",
   "private": true,
-  "description": "Plataforma universal de adaptacao de curriculos a vagas, baseada em um perfil profissional estruturado.",
+  "description": "Avalia vagas e adapta curriculos com IA a partir de uma base profissional em Markdown (fluxo do career-ops).",
   "type": "module",
   "packageManager": "pnpm@12.16.1",
   "engines": {
@@ -21,8 +21,6 @@
     "test:integration": "vitest run --project integration",
     "test:e2e": "playwright test",
     "test:all": "pnpm test && pnpm test:integration && pnpm test:e2e",
-    "contracts:generate": "pnpm --filter @chameleon/contracts generate",
-    "contracts:check": "pnpm --filter @chameleon/contracts check",
     "ai:check": "pnpm --filter @chameleon/api ai:check",
     "db:local:init": "node scripts/dev-db.mjs init",
     "db:local:start": "node scripts/dev-db.mjs start",
@@ -32,9 +30,7 @@
     "db:migrate": "pnpm --filter @chameleon/db exec prisma migrate dev",
     "db:migrate:deploy": "pnpm --filter @chameleon/db exec prisma migrate deploy",
     "db:reset": "node scripts/assert-local-db.mjs && pnpm --filter @chameleon/db exec prisma migrate reset --force",
-    "db:seed": "pnpm --filter @chameleon/db seed",
-    "db:seed:pilot": "pnpm --filter @chameleon/db seed:pilot",
-    "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm contracts:check && pnpm test"
+    "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test"
   },
   "devDependencies": {
     "@eslint/js": "9.39.5",

@@ -1,6 +1,0 @@
-# Edge case sintetico: ids duplicados no mesmo documento (EXP-001 repetido). REJEITADO por integridade (superRefine).
-schema_version: '2.1.0'
-profile:
-  experiences:
-    - { id: EXP-001, organization_name: Empresa Fictícia Delta, official_title: Analista }
-    - { id: EXP-001, organization_name: Empresa Fictícia Épsilon, official_title: Coordenador }

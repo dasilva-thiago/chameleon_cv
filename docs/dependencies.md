@@ -27,15 +27,10 @@ Versões fixadas (exatas) nos `package.json`; licenças conforme o registro npm 
 | Pacote | Versão | Licença | Uso |
 | ------ | ------ | ------- | --- |
 | zod    | 4.6.7  | MIT     | contrato canônico |
-| ajv (dev) | 8.20.0 | MIT  | validar o JSON Schema gerado (S0.2) |
-| tsx (dev) | 4.23.15 | MIT | scripts `generate`/`check` |
 
-## `@chameleon/domain`, `@chameleon/profile-io`
+## `@chameleon/domain`
 
-| Pacote | Versão | Licença | Pacote do workspace |
-| ------ | ------ | ------- | ------------------- |
-| uuid   | 14.0.3 | MIT     | domain (ids v7)     |
-| yaml   | 2.9.1  | ISC     | profile-io          |
+Sem dependências externas (só `@chameleon/contracts`).
 
 ## `@chameleon/db`
 
@@ -73,7 +68,6 @@ Versões fixadas (exatas) nos `package.json`; licenças conforme o registro npm 
 | react-router                   | 8.5.1     | MIT     |
 | @tanstack/react-query          | 5.105.3   | MIT     |
 | react-hook-form                | 7.91.0    | MIT     |
-| @hookform/resolvers            | 6.0.2     | MIT     |
 | vite (dev)                     | 8.3.5     | MIT     |
 | @vitejs/plugin-react (dev)     | 6.2.1     | MIT     |
 | tailwindcss / @tailwindcss/vite (dev) | 4.3.4 | MIT |
@@ -85,7 +79,6 @@ Versões fixadas (exatas) nos `package.json`; licenças conforme o registro npm 
 
 ## Divergências em relação ao ADR-0001 e ao plano §6
 
-- **@hookform/resolvers 6.0.2** em vez da 7.0.2 (a mais recente): a 7.0.2 foi publicada em 2026-11-03, abaixo da janela mínima de idade de release do pnpm 12. Escolhida a 6.0.2 (2026-10-28), compatível com `react-hook-form` 7.x e Zod 4. Reavaliar a 7.x depois.
 - **tsup 9.0.0**, **react-router 8.5.1**, **@tanstack/react-query 5.105.3**, **react-hook-form 7.91.0**, **@testing-library/\*** e **jsdom 30.1.3**: o plano não fixa versão; foram usadas as mais recentes estáveis em 2026-11-04.
 - **eslint 9.39.5**: o pnpm emite o aviso "deprecated" porque existe a 10.14; mantida a linha 9 conforme o ADR-0001 (o `eslint-plugin-jsx-a11y` 6.10.2 só aceita ESLint ^9).
 - **@testing-library/dom** (peer obrigatório do `@testing-library/react`) e **vite** na raiz (peer do vitest e do plugin React) foram adicionados; não constam no §6.

@@ -2,10 +2,9 @@
 
 Before planning, implementing, reviewing, or resuming work in this repository:
 
-1. Read and follow `docs/REDEFINICAO_PRODUTO_PESSOAL.md` as the current product source of truth.
+1. Read and follow `docs/REDEFINICAO_PRODUTO_PESSOAL.md` (product) and `docs/decisions/ADR-0015-fluxo-career-ops-base-markdown.md` (the current flow).
 2. Apply `.claude/skills/personal-resume-workbench/SKILL.md` (invoke `/personal-resume-workbench` when appropriate).
-3. Treat older SaaS, universal-platform, commercial, and multi-user roadmaps/prompts as historical references wherever they conflict with the personal-use scope.
-4. Preserve existing working code, security controls, data, and tests. Do not start a broad rewrite or destructive database migration to simplify the architecture.
-5. On session resumption, inspect Git state, worktrees, and any in-progress agents before changing files. Do not duplicate work or overwrite another agent's changes.
+3. Preserve existing working code, security controls, data, and tests. A destructive database migration needs the owner's explicit approval and a backup first.
+4. On session resumption, inspect Git state, worktrees, and any in-progress agents before changing files. Do not duplicate work or overwrite another agent's changes.
 
-The current goal is a private personal workflow: maintain Thiago's professional profile, save job postings, analyze job-to-profile evidence, generate/edit/store tailored resumes, and export DOCX/PDF. Do not plan SaaS or multi-user expansion now.
+The goal: work like career-ops. The owner keeps a professional base (CV + profile/rules in Markdown), pastes a job, gets an AI evaluation (score, verdict, requirements × evidence, gaps, salary) and a tailored resume checked against the base, edits, approves and exports DOCX/PDF. Used by one person today; it may be published for others later, so keep auth and owner isolation, but do not build new multi-user features now.
