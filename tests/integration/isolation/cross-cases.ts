@@ -693,6 +693,7 @@ export const CROSS_CASES: Record<string, CrossCase> = {
     routes: [
       'GET /api/profile',
       'PUT /api/profile',
+      'POST /api/profile/reading',
       'GET /api/profile/revisions',
       'GET /api/profile/revisions/:revisionId',
       'POST /api/profile/revisions/:revisionId/restore',
@@ -751,6 +752,23 @@ export const CROSS_CASES: Record<string, CrossCase> = {
       });
       ctx.observe(pair.b, forged);
       expect(forged.status).toBe(400);
+
+      // a leitura da base so devolve o texto enviado (nada e lido do banco nem gravado)
+      const reading = await b.post('/api/profile/reading', {
+        cvMarkdown:
+          '# B Leitura\n\n## Experiência\n\n### Empresa B — Cidade\n\n**Cargo B**\n2024 – Atual\n',
+        profileMarkdown: '',
+      });
+      ctx.observe(pair.b, reading);
+      expect(reading.status).toBe(200);
+      expect(JSON.stringify(reading.body)).toContain('Empresa B');
+      const forgedReading = await b.post('/api/profile/reading', {
+        cvMarkdown: 'x',
+        profileMarkdown: '',
+        ownerId: pair.a.ownerId,
+      });
+      ctx.observe(pair.b, forgedReading);
+      expect(forgedReading.status).toBe(400);
 
       expect(await stableState(world, pair.a)).toEqual(before);
       expectNoLeaks('rotas da base como B', ctx.observedBy(pair.b), secrets);

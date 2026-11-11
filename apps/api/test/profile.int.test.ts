@@ -1,4 +1,5 @@
 import {
+  baseReadingResponseSchema,
   listProfileRevisionsResponseSchema,
   profileBaseResponseSchema,
   profileRevisionResponseSchema,
@@ -81,6 +82,28 @@ describe('professional base', () => {
     const tooBig = await save('x'.repeat(40_001), BASE_PROFILE);
     expect(tooBig.status).toBe(400);
     await save(BASE_CV, BASE_PROFILE);
+  });
+
+  it('reads a base without saving it: experiences with their exact titles, and the avoided expressions', async () => {
+    const before = (await a.client.get('/api/profile/revisions')).body;
+    const response = await a.client.post('/api/profile/reading', {
+      cvMarkdown: BASE_CV,
+      profileMarkdown: BASE_PROFILE,
+    });
+    expect(response.status).toBe(200);
+    const { reading } = baseReadingResponseSchema.parse(response.body);
+    expect(reading.cv.experiences.length).toBeGreaterThan(0);
+    expect(reading.cv.experiences.every((experience) => experience.company !== '')).toBe(true);
+    expect(reading.profile.language).toMatch(/^[a-z]{2}/);
+    expect((await a.client.get('/api/profile/revisions')).body).toEqual(before);
+    expect(
+      (
+        await a.client.post('/api/profile/reading', {
+          cvMarkdown: 'x'.repeat(40_001),
+          profileMarkdown: '',
+        })
+      ).status,
+    ).toBe(400);
   });
 
   it('another account sees only its own base and gets 404 for foreign revisions', async () => {

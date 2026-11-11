@@ -2,6 +2,7 @@ import {
   aiStatusResponseSchema,
   analysisStateResponseSchema,
   jobResponseSchema,
+  listJobsResponseSchema,
   runAnalysisResponseSchema,
 } from '@chameleon/contracts';
 import { createTestDb, type TestDb } from '@chameleon/db/testing';
@@ -107,6 +108,27 @@ describe('evaluation (career-ops flow)', () => {
     const forced = runAnalysisResponseSchema.parse((await evaluate(jobId, true)).body);
     expect(forced.reused).toBe(false);
     expect(provider.requests.length).toBe(calls + 2);
+  });
+
+  it('the job list carries the latest evaluation (score, recommendation, evidence rail) and its staleness', async () => {
+    const jobId = await newJob();
+    const before = listJobsResponseSchema.parse((await a.client.get('/api/jobs?status=all')).body);
+    expect(before.jobs.find((job) => job.id === jobId)?.evaluation).toBeNull();
+    const run = runAnalysisResponseSchema.parse((await evaluate(jobId)).body);
+    const result = run.analysis?.result;
+    expect(result).toBeDefined();
+    const listed = listJobsResponseSchema.parse((await a.client.get('/api/jobs?status=all')).body);
+    const summary = listed.jobs.find((job) => job.id === jobId)?.evaluation;
+    expect(summary).toMatchObject({
+      score: result?.score,
+      recommendation: result?.verdict.recommendation,
+      stale: false,
+    });
+    const total = Object.values(summary?.rail ?? {}).reduce((sum, n) => sum + n, 0);
+    expect(total).toBe(result?.matches.length);
+    // Another account never sees it.
+    const foreign = listJobsResponseSchema.parse((await b.client.get('/api/jobs?status=all')).body);
+    expect(foreign.jobs.some((job) => job.id === jobId)).toBe(false);
   });
 
   it('when only the base changes, the evaluation is stale and re-running skips the posting call', async () => {

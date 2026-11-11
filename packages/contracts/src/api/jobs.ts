@@ -150,6 +150,27 @@ export type ListJobsQuery = z.input<typeof listJobsQuerySchema>;
 
 const countSchema = z.number().int().nonnegative();
 
+/**
+ * Resumo da avaliacao mais recente da vaga, para listas (nota, recomendacao e composicao do Trilho de evidencia).
+ * Os matches ja vem conferidos pelo programa: um "strong" sem evidencia na base ja caiu para "partial".
+ */
+export const jobEvaluationSummarySchema = z.strictObject({
+  score: z.number().min(1).max(5),
+  recommendation: z.enum(['apply', 'consider', 'skip']),
+  /** A vaga quebra uma regra do perfil. */
+  dealbreaker: z.boolean(),
+  rail: z.strictObject({
+    strong: z.number().int().nonnegative(),
+    partial: z.number().int().nonnegative(),
+    missing: z.number().int().nonnegative(),
+    na: z.number().int().nonnegative(),
+  }),
+  /** O texto da vaga ou a base mudou desde a avaliacao. */
+  stale: z.boolean(),
+  evaluatedAt: z.iso.datetime(),
+});
+export type JobEvaluationSummary = z.infer<typeof jobEvaluationSummarySchema>;
+
 export const jobSummarySchema = z.strictObject({
   id: z.uuid(),
   title: z.string().nullable(),
@@ -164,6 +185,8 @@ export const jobSummarySchema = z.strictObject({
   descriptionLength: countSchema,
   createdAt: z.iso.datetime(),
   updatedAt: z.iso.datetime(),
+  /** Avaliacao mais recente (so na listagem; ausente ou null quando a vaga nao foi avaliada). */
+  evaluation: jobEvaluationSummarySchema.nullable().optional(),
 });
 export type JobSummary = z.infer<typeof jobSummarySchema>;
 

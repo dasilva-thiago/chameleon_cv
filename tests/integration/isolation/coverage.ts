@@ -75,6 +75,7 @@ export const ROUTE_COVERAGE: CoverageMap = {
   },
   'GET /api/profile': { kind: 'cross-case', caseId: PROFILE_CASE },
   'PUT /api/profile': { kind: 'cross-case', caseId: PROFILE_CASE },
+  'POST /api/profile/reading': { kind: 'cross-case', caseId: PROFILE_CASE },
   'GET /api/profile/revisions': { kind: 'cross-case', caseId: PROFILE_CASE },
   'GET /api/profile/revisions/:revisionId': { kind: 'cross-case', caseId: PROFILE_CASE },
   'POST /api/profile/revisions/:revisionId/restore': { kind: 'cross-case', caseId: PROFILE_CASE },
