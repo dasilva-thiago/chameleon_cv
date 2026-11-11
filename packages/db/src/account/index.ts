@@ -18,10 +18,9 @@ export type {
   ExportedAuditEvent,
   ExportedConsent,
   ExportedCredential,
-  ExportedImportRecord,
   ExportedInvitation,
-  ExportedProfile,
-  ExportedRevision,
+  ExportedProfileBase,
+  ExportedProfileRevision,
   ExportedSession,
 } from './export';
 export { ACCOUNT_EXPORT_REGISTRY, EXPORT_SECTIONS, unclassifiedModels } from './registry';

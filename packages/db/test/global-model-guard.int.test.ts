@@ -301,7 +301,7 @@ describe('F2: nested writes through db.global cannot reach private models', () =
     ],
     ['sessions deleteMany', { sessions: { deleteMany: {} } }],
     ['auditEvents set', { auditEvents: { set: [] } }],
-    ['profiles connect', { profiles: { connect: { id: randomUUID() } } }],
+    ['profileBases connect', { profileBases: { connect: { id: randomUUID() } } }],
   ])('user.update with %s is rejected and changes nothing', async (_name, data) => {
     await expect(
       GLOBAL().user.update({ where: { id: b.id }, data: data as never }),

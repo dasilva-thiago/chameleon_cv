@@ -59,8 +59,6 @@ describe('campos de relacao do forOwner x schema Prisma', () => {
     for (const model of PRIVATE_MODELS) {
       expect(fromClient.get(model)?.size, model).toBeGreaterThan(0);
     }
-    expect(fromClient.get('ContactPoint')).toEqual(
-      new Set(['profile', 'pendingTargets', 'restrictionTargets']),
-    );
+    expect(fromClient.get('Resume')).toEqual(new Set(['job', 'versions']));
   });
 });

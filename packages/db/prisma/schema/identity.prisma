@@ -23,13 +23,14 @@ model User {
   updatedAt   DateTime   @updatedAt @db.Timestamptz(3)
   deletedAt   DateTime?  @db.Timestamptz(3)
 
-  credentials    Credential[]
-  sessions       Session[]
-  consentRecords ConsentRecord[]
-  auditEvents    AuditEvent[]
-  invitesUsed    Invite[]
-  profiles       ProfessionalProfile[]
-  jobPostings    JobPosting[]
+  credentials      Credential[]
+  sessions         Session[]
+  consentRecords   ConsentRecord[]
+  auditEvents      AuditEvent[]
+  invitesUsed      Invite[]
+  profileBases     ProfileBase[]
+  profileRevisions ProfileBaseRevision[]
+  jobPostings      JobPosting[]
 }
 
 /// Credencial de login. Somente o hash argon2id (string PHC) e armazenado.

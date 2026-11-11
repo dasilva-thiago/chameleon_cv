@@ -1,15 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { createDb, OwnerScopeViolationError, PurgeIncompleteError } from '../src';
-import type { ProfileStore } from '../src/profile-store';
 import { createTestDb, type TestDb } from '../src/testing';
-import {
-  makeStore,
-  ownerDump,
-  ownerRowCounts,
-  seedOwner,
-  type SeededOwner,
-} from './support/account-seed';
+import { ownerDump, ownerRowCounts, seedOwner, type SeededOwner } from './support/account-seed';
 
 /**
  * Account deletion (S2.3a, ADR-0014): `db.purgeAccount(ownerId)` deletes everything of one owner in one
@@ -17,11 +10,9 @@ import {
  * touches nobody else. Revisions are immutable for every other path.
  */
 let testDb: TestDb;
-let store: ProfileStore;
 
 beforeAll(async () => {
   testDb = await createTestDb();
-  store = makeStore(testDb);
 }, 120_000);
 afterAll(async () => {
   await testDb.drop();
@@ -32,11 +23,11 @@ beforeEach(async () => {
 
 const total = (counts: Record<string, number>): number =>
   Object.values(counts).reduce((sum, n) => sum + n, 0);
-const IMMUTABLE = 'ProfileRevision_immutable';
+const IMMUTABLE = 'ProfileBaseRevision_immutable';
 
 async function twoOwners(): Promise<{ a: SeededOwner; b: SeededOwner }> {
-  const a = await seedOwner(testDb, store, 'purge-a', 'private-heavy');
-  const b = await seedOwner(testDb, store, 'purge-b', 'freelancer-confidential-clients');
+  const a = await seedOwner(testDb, 'purge-a');
+  const b = await seedOwner(testDb, 'purge-b');
   return { a, b };
 }
 
@@ -53,8 +44,8 @@ describe('purgeAccount: removes everything of one owner and nothing of the other
     const beforeA = await ownerRowCounts(testDb, a.ownerId);
     const beforeB = await ownerRowCounts(testDb, b.ownerId);
     const dumpB = await ownerDump(testDb, b.ownerId);
-    expect(beforeA.ProfileRevision).toBe(2);
-    expect(beforeA.ImportRecord).toBe(1);
+    expect(beforeA.ProfileBaseRevision).toBe(2);
+    expect(beforeA.ProfileBase).toBe(1);
     expect(beforeA.Credential).toBe(1);
     expect(beforeA.Session).toBe(1);
     expect(beforeA.ConsentRecord).toBe(1);
@@ -90,9 +81,9 @@ describe('purgeAccount: removes everything of one owner and nothing of the other
       [b.inviteIds.used, b.inviteIds.open],
     ]);
     expect(bInvites.rowCount).toBe(2);
-    const loadedB = await store.loadProfileDocument(b.ownerId);
+    const loadedB = await testDb.db.forOwner(b.ownerId).profileBase.findFirst();
     for (const canary of b.canaries) expect(JSON.stringify(loadedB), canary).toContain(canary);
-    expect(await store.loadProfileDocument(a.ownerId)).toBeNull();
+    expect(await testDb.db.forOwner(a.ownerId).profileBase.findFirst()).toBeNull();
   });
 
   it('A canaries are gone from every column of every table (full-database sweep)', async () => {
@@ -180,10 +171,10 @@ describe('purge flag handling (chameleon.allow_purge)', () => {
   it('revisions are immutable on every other path, with or without the purge having run', async () => {
     const { a, b } = await twoOwners();
     const scoped = testDb.db.forOwner(a.ownerId);
-    await expect(scoped.profileRevision.deleteMany({})).rejects.toThrow(IMMUTABLE);
+    await expect(scoped.profileBaseRevision.deleteMany({})).rejects.toThrow(IMMUTABLE);
     await expect(
       testDb.db.unsafeRaw
-        .$executeRaw`DELETE FROM "ProfileRevision" WHERE "ownerId" = ${a.ownerId}::uuid`,
+        .$executeRaw`DELETE FROM "ProfileBaseRevision" WHERE "ownerId" = ${a.ownerId}::uuid`,
     ).rejects.toThrow(IMMUTABLE);
     await expect(
       testDb.db.unsafeRaw.$executeRaw`DELETE FROM "User" WHERE id = ${a.ownerId}::uuid`,
@@ -191,19 +182,19 @@ describe('purge flag handling (chameleon.allow_purge)', () => {
     await expect(testDb.db.global.user.delete({ where: { id: a.ownerId } })).rejects.toThrow(
       IMMUTABLE,
     );
-    expect((await ownerRowCounts(testDb, a.ownerId)).ProfileRevision).toBe(2);
+    expect((await ownerRowCounts(testDb, a.ownerId)).ProfileBaseRevision).toBe(2);
 
     await testDb.db.purgeAccount(a.ownerId);
 
     // After a purge, B's revisions are still protected on the same client/pool.
     await expect(
       testDb.db.unsafeRaw
-        .$executeRaw`DELETE FROM "ProfileRevision" WHERE "ownerId" = ${b.ownerId}::uuid`,
+        .$executeRaw`DELETE FROM "ProfileBaseRevision" WHERE "ownerId" = ${b.ownerId}::uuid`,
     ).rejects.toThrow(IMMUTABLE);
-    await expect(testDb.db.forOwner(b.ownerId).profileRevision.deleteMany({})).rejects.toThrow(
+    await expect(testDb.db.forOwner(b.ownerId).profileBaseRevision.deleteMany({})).rejects.toThrow(
       IMMUTABLE,
     );
-    expect((await ownerRowCounts(testDb, b.ownerId)).ProfileRevision).toBe(2);
+    expect((await ownerRowCounts(testDb, b.ownerId)).ProfileBaseRevision).toBe(2);
   });
 
   it('the flag is transaction-local: not visible on the same pooled connection afterwards', async () => {
@@ -226,9 +217,9 @@ describe('purge flag handling (chameleon.allow_purge)', () => {
       // Same connection: an immutable-revision delete of B must still fail.
       await expect(
         single.unsafeRaw
-          .$executeRaw`DELETE FROM "ProfileRevision" WHERE "ownerId" = ${b.ownerId}::uuid`,
+          .$executeRaw`DELETE FROM "ProfileBaseRevision" WHERE "ownerId" = ${b.ownerId}::uuid`,
       ).rejects.toThrow(IMMUTABLE);
-      await expect(single.forOwner(b.ownerId).profileRevision.deleteMany({})).rejects.toThrow(
+      await expect(single.forOwner(b.ownerId).profileBaseRevision.deleteMany({})).rejects.toThrow(
         IMMUTABLE,
       );
       // ... and also after a purge that found nothing / failed validation.
@@ -286,7 +277,7 @@ describe('purge verification is catalog-driven and atomic', () => {
       const user = await testDb.sql(`SELECT 1 FROM "User" WHERE id = $1`, [a.ownerId]);
       expect(user.rowCount).toBe(1);
       await expect(
-        testDb.sql(`DELETE FROM "ProfileRevision" WHERE "ownerId" = $1`, [a.ownerId]),
+        testDb.sql(`DELETE FROM "ProfileBaseRevision" WHERE "ownerId" = $1`, [a.ownerId]),
       ).rejects.toThrow(IMMUTABLE);
 
       // Once the stray row is gone the same purge succeeds.
@@ -297,21 +288,20 @@ describe('purge verification is catalog-driven and atomic', () => {
     }
   });
 
-  it('FK/trigger interplay: a revision referenced by an ImportRecord goes away only with its owner', async () => {
+  it('FK/trigger interplay: a revision referenced by the base and by a resume goes away with its owner', async () => {
     const { a } = await twoOwners();
-    // ImportRecord.revisionId -> ProfileRevision is NO ACTION: deleting the revision alone is refused,
-    // even with the flag; the purge deletes both in the same cascade statement.
+    // Without the flag a revision can never be deleted (immutable), referenced or not.
     const alone = await testDb
-      .sql(
-        `SET LOCAL chameleon.allow_purge = 'on'; DELETE FROM "ProfileRevision" WHERE id = '${a.revisionIds[0]}'`,
-      )
+      .sql(`DELETE FROM "ProfileBaseRevision" WHERE id = '${a.revisionIds[1]}'`)
       .then(
         () => null,
-        (error: { code?: string }) => error,
+        (error: Error) => error,
       );
-    expect(alone?.code).toBe('23503');
+    expect(String(alone?.message)).toMatch(/ProfileBaseRevision_immutable/);
+    // The purge removes the revisions together with the base and the resume versions that point to them.
     const result = await testDb.db.purgeAccount(a.ownerId);
-    expect(result.tables.ProfileRevision).toBe(2);
-    expect(result.tables.ImportRecord).toBe(1);
+    expect(result.tables.ProfileBaseRevision).toBe(2);
+    expect(result.tables.ProfileBase).toBe(1);
+    expect(result.tables.ResumeVersion).toBe(1);
   });
 });

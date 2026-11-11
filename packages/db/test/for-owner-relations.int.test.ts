@@ -1,26 +1,23 @@
-import { randomUUID } from 'node:crypto';
+import { randomUUID, createHash } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { NestedRelationWriteError } from '../src/errors';
 import { relationFieldsOfClient } from '../src/for-owner';
 import { PRIVATE_MODELS } from '../src/private-models';
-import { createProfileStore, type ProfileStore } from '../src/profile-store';
 import { createTestDb, type TestDb } from '../src/testing';
-import { fixtureDocument } from './support/profile-docs';
-import { testSnapshot } from './support/snapshot';
 
 /**
- * Escritas por relacao em forOwner no banco REAL (defeito da S1.4): o `connect` para o perfil de A
- * trocava `(profileId, ownerId)` da linha de B. Camada de aplicacao: rejeitar. Camada de banco:
+ * Escritas por relacao em forOwner no banco REAL (defeito da S1.4): um `connect` para uma linha de A
+ * trocava `(xId, ownerId)` da linha de B. Camada de aplicacao: rejeitar. Camada de banco:
  * `owner-immutable.int.test.ts`.
  */
 let testDb: TestDb;
-let store: ProfileStore;
 interface Owner {
   id: string;
-  profileId: string;
-  contactId: string;
-  importId: string;
-  factId: string;
+  revisionId: string;
+  baseId: string;
+  jobId: string;
+  resumeId: string;
+  analysisId: string;
 }
 let a: Owner;
 let b: Owner;
@@ -29,43 +26,49 @@ type Delegate = Record<string, (args: unknown) => Promise<unknown>>;
 const delegates = (ownerId: string): Record<string, Delegate> =>
   testDb.db.forOwner(ownerId) as unknown as Record<string, Delegate>;
 const lowerFirst = (value: string): string => value.charAt(0).toLowerCase() + value.slice(1);
+const sha = (value: string): string => createHash('sha256').update(value).digest('hex');
 
 async function makeOwner(label: string): Promise<Owner> {
   const user = await testDb.db.global.user.create({
     data: { email: `${label}-${randomUUID().slice(0, 8)}@example.test`, displayName: label },
   });
-  const saved = await store.saveProfileDocument(
-    user.id,
-    fixtureDocument('experienced-promotions-same-employer'),
-  );
-  const scoped = testDb.db.forOwner(user.id);
+  const ownerId = user.id;
+  const scoped = testDb.db.forOwner(ownerId);
   // Escalares `xId` (formato unchecked): o caminho permitido.
-  const contact = await scoped.contactPoint.create({
+  const revision = await scoped.profileBaseRevision.create({
+    data: { ownerId, cvMarkdown: `# CV -- ${label}`, profileMarkdown: '', contentHash: sha(label) },
+  });
+  const base = await scoped.profileBase.create({
     data: {
-      ownerId: user.id,
-      profileId: saved.profileId,
-      kind: 'email',
-      value: `${label}@example.test`,
+      ownerId,
+      cvMarkdown: `# CV -- ${label}`,
+      profileMarkdown: '',
+      contentHash: sha(label),
+      revisionId: revision.id,
     },
   });
-  const imp = await scoped.importRecord.create({
+  const job = await scoped.jobPosting.create({
+    data: { ownerId, description: `vaga ${label}`, descriptionHash: sha(`vaga ${label}`) },
+  });
+  const resume = await scoped.resume.create({ data: { ownerId, jobId: job.id, name: label } });
+  const analysis = await scoped.jobAnalysis.create({
     data: {
-      ownerId: user.id,
-      profileId: saved.profileId,
-      sourceFormat: 'object',
-      targetSchemaVersion: '2.1.0',
+      ownerId,
+      jobId: job.id,
+      descriptionHash: sha(`vaga ${label}`),
+      profileHash: sha(label),
+      engine: 'ai',
+      engineVersion: 't',
+      result: {},
     },
   });
-  const fact = await testDb.sql<{ id: string }>(
-    `SELECT id::text FROM "ProfileFact" WHERE "ownerId" = $1::uuid LIMIT 1`,
-    [user.id],
-  );
   return {
-    id: user.id,
-    profileId: saved.profileId,
-    contactId: contact.id,
-    importId: imp.id,
-    factId: fact.rows[0]!.id,
+    id: ownerId,
+    revisionId: revision.id,
+    baseId: base.id,
+    jobId: job.id,
+    resumeId: resume.id,
+    analysisId: analysis.id,
   };
 }
 
@@ -81,15 +84,15 @@ const totalRows = async (): Promise<number> =>
   Number(
     (
       await testDb.sql<{ n: string }>(
-        `SELECT (SELECT count(*) FROM "ContactPoint") + (SELECT count(*) FROM "ImportRecord")
-              + (SELECT count(*) FROM "ProfileFact") + (SELECT count(*) FROM "ProfessionalProfile") AS n`,
+        `SELECT (SELECT count(*) FROM "ProfileBase") + (SELECT count(*) FROM "ProfileBaseRevision")
+              + (SELECT count(*) FROM "JobPosting") + (SELECT count(*) FROM "Resume")
+              + (SELECT count(*) FROM "JobAnalysis") AS n`,
       )
     ).rows[0]!.n,
   );
 
 beforeAll(async () => {
   testDb = await createTestDb();
-  store = createProfileStore(testDb.db, { snapshot: testSnapshot });
   a = await makeOwner('a');
   b = await makeOwner('b');
 }, 120_000);
@@ -97,22 +100,23 @@ afterAll(async () => {
   await testDb.drop();
 });
 
-describe('caso reportado: forOwner(B) nao transfere linha de B para o perfil de A', () => {
-  const cases: [string, () => string, () => string][] = [
-    ['ContactPoint', () => b.contactId, () => 'contactPoint'],
-    ['ImportRecord', () => b.importId, () => 'importRecord'],
-    ['ProfileFact', () => b.factId, () => 'profileFact'],
+describe('caso reportado: forOwner(B) nao transfere linha de B para uma linha de A', () => {
+  // [tabela, id da linha de B, delegate, relacao, id do alvo de A]
+  const cases: [string, () => string, string, string, () => string][] = [
+    ['ProfileBase', () => b.baseId, 'profileBase', 'revision', () => a.revisionId],
+    ['Resume', () => b.resumeId, 'resume', 'job', () => a.jobId],
+    ['JobAnalysis', () => b.analysisId, 'jobAnalysis', 'job', () => a.jobId],
   ];
 
   it.each(cases)(
-    '%s: update com profile.connect lanca e a linha continua de B',
-    async (table, rowId, key) => {
-      const delegate = delegates(b.id)[key()]!;
+    '%s: update com connect lanca e a linha continua de B',
+    async (table, rowId, key, relation, target) => {
+      const delegate = delegates(b.id)[key]!;
       const before = await totalRows();
       await expect(
         delegate.update!({
           where: { id: rowId() },
-          data: { profile: { connect: { id: a.profileId } } },
+          data: { [relation]: { connect: { id: target() } } },
         }),
       ).rejects.toBeInstanceOf(NestedRelationWriteError);
       expect(await ownerOf(table, rowId())).toBe(b.id);
@@ -121,10 +125,10 @@ describe('caso reportado: forOwner(B) nao transfere linha de B para o perfil de 
   );
 
   it.each(cases)(
-    '%s: upsert (update e create) com profile.connect lanca',
-    async (table, rowId, key) => {
-      const delegate = delegates(b.id)[key()]!;
-      const connect = { profile: { connect: { id: a.profileId } } };
+    '%s: upsert (update e create) com connect lanca',
+    async (table, rowId, key, relation, target) => {
+      const delegate = delegates(b.id)[key]!;
+      const connect = { [relation]: { connect: { id: target() } } };
       await expect(
         delegate.upsert!({ where: { id: rowId() }, create: { ownerId: b.id }, update: connect }),
       ).rejects.toBeInstanceOf(NestedRelationWriteError);
@@ -139,33 +143,31 @@ describe('caso reportado: forOwner(B) nao transfere linha de B para o perfil de 
     },
   );
 
-  it.each(cases)('%s: updateMany com profile.connect lanca', async (table, rowId, key) => {
-    await expect(
-      delegates(b.id)[key()]!.updateMany!({
-        where: {},
-        data: { profile: { connect: { id: a.profileId } } },
-      }),
-    ).rejects.toBeInstanceOf(NestedRelationWriteError);
-    expect(await ownerOf(table, rowId())).toBe(b.id);
-  });
+  it.each(cases)(
+    '%s: updateMany com connect lanca',
+    async (table, rowId, key, relation, target) => {
+      await expect(
+        delegates(b.id)[key]!.updateMany!({
+          where: {},
+          data: { [relation]: { connect: { id: target() } } },
+        }),
+      ).rejects.toBeInstanceOf(NestedRelationWriteError);
+      expect(await ownerOf(table, rowId())).toBe(b.id);
+    },
+  );
 
   it('create com connect: lanca na aplicacao e o Prisma tambem recusa por validacao (sem forOwner)', async () => {
-    const data = {
-      ownerId: b.id,
-      kind: 'email',
-      value: 'x@example.test',
-      profile: { connect: { id: a.profileId } },
-    };
+    const data = { ownerId: b.id, name: 'x', job: { connect: { id: a.jobId } } };
     const before = await totalRows();
-    await expect(delegates(b.id).contactPoint!.create!({ data })).rejects.toBeInstanceOf(
+    await expect(delegates(b.id).resume!.create!({ data })).rejects.toBeInstanceOf(
       NestedRelationWriteError,
     );
-    await expect(
-      delegates(b.id).contactPoint!.createMany!({ data: [data] }),
-    ).rejects.toBeInstanceOf(NestedRelationWriteError);
+    await expect(delegates(b.id).resume!.createMany!({ data: [data] })).rejects.toBeInstanceOf(
+      NestedRelationWriteError,
+    );
     // Rede do Prisma (nao e a defesa principal): mistura de ownerId escalar e relacao e invalida.
     await expect(
-      (testDb.db.unsafeRaw.contactPoint.create as unknown as (args: unknown) => Promise<unknown>)({
+      (testDb.db.unsafeRaw.resume.create as unknown as (args: unknown) => Promise<unknown>)({
         data,
       }),
     ).rejects.toMatchObject({ name: 'PrismaClientValidationError' });
@@ -184,7 +186,7 @@ describe('matriz: todo modelo privado x toda relacao x toda escrita', () => {
       if (!delegate) throw new Error(`delegate ausente: ${model}`);
       for (const relation of relations.get(model)!) {
         if (relation === 'owner') continue; // `owner` tem erro proprio (ownerId e injetado)
-        const nested = { [relation]: { connect: { id: a.profileId } } };
+        const nested = { [relation]: { connect: { id: a.jobId } } };
         const calls: [string, Promise<unknown>][] = [
           ['create', delegate.create!({ data: { ownerId: b.id, ...nested } })],
           ['createMany', delegate.createMany!({ data: [{ ownerId: b.id, ...nested }] })],
@@ -215,82 +217,55 @@ describe('matriz: todo modelo privado x toda relacao x toda escrita', () => {
         }
       }
     }
-    expect(attempts).toBeGreaterThan(100);
+    expect(attempts).toBeGreaterThan(50);
     expect(await totalRows()).toBe(before);
   });
 
   it('relacao to-many (set/disconnect/delete...) em modelo pai tambem lanca', async () => {
-    const profile = delegates(b.id).professionalProfile!;
+    const jobs = delegates(b.id).jobPosting!;
     for (const op of [
       { set: [{ id: randomUUID() }] },
       { disconnect: [{ id: randomUUID() }] },
       { deleteMany: {} },
-      { create: [{ ownerId: b.id }] },
+      { create: [{ ownerId: b.id, name: 'x' }] },
     ]) {
       await expect(
-        profile.update!({ where: { id: b.profileId }, data: { contactPoints: op } }),
+        jobs.update!({ where: { id: b.jobId }, data: { resumes: op } }),
       ).rejects.toBeInstanceOf(NestedRelationWriteError);
     }
-    expect(await ownerOf('ContactPoint', b.contactId)).toBe(b.id);
+    expect(await ownerOf('Resume', b.resumeId)).toBe(b.id);
   });
 });
 
 describe('escalares xId (formato unchecked) continuam permitidos', () => {
   it('update/upsert do proprio dono funcionam', async () => {
-    const contacts = delegates(b.id).contactPoint!;
-    await contacts.update!({
-      where: { id: b.contactId },
-      data: { profileId: b.profileId, label: 'x' },
+    const resumes = delegates(b.id).resume!;
+    await resumes.update!({ where: { id: b.resumeId }, data: { jobId: b.jobId, name: 'x' } });
+    await resumes.upsert!({
+      where: { id: b.resumeId },
+      create: { ownerId: b.id, jobId: b.jobId, name: 'y' },
+      update: { name: 'y', jobId: b.jobId },
     });
-    await contacts.upsert!({
-      where: { id: b.contactId },
-      create: { ownerId: b.id, profileId: b.profileId, kind: 'email', value: 'y@example.test' },
-      update: { label: 'y', profileId: b.profileId },
-    });
-    const created = (await contacts.upsert!({
+    const created = (await resumes.upsert!({
       where: { id: randomUUID() },
-      create: { ownerId: b.id, profileId: b.profileId, kind: 'phone', value: '+5511999990000' },
+      create: { ownerId: b.id, jobId: b.jobId, name: 'novo' },
       update: {},
     })) as { id: string };
-    expect(await ownerOf('ContactPoint', created.id)).toBe(b.id);
-    await contacts.updateMany!({ where: { id: created.id }, data: { label: 'z' } });
+    expect(await ownerOf('Resume', created.id)).toBe(b.id);
+    await resumes.updateMany!({ where: { id: created.id }, data: { name: 'z' } });
   });
 
-  it('escalar apontando para o perfil de A e recusado pela FK composta (P2003) e nada muda', async () => {
+  it('escalar apontando para a vaga de A e recusado pela FK composta (P2003) e nada muda', async () => {
     await expect(
-      delegates(b.id).contactPoint!.update!({
-        where: { id: b.contactId },
-        data: { profileId: a.profileId },
-      }),
+      delegates(b.id).resume!.update!({ where: { id: b.resumeId }, data: { jobId: a.jobId } }),
     ).rejects.toMatchObject({ code: 'P2003' });
-    expect(await ownerOf('ContactPoint', b.contactId)).toBe(b.id);
+    expect(await ownerOf('Resume', b.resumeId)).toBe(b.id);
   });
 
   it('forOwner(B) nao alcanca a linha de A (where escopado)', async () => {
     await expect(
-      delegates(b.id).contactPoint!.update!({
-        where: { id: a.contactId },
-        data: { label: 'invasao' },
-      }),
+      delegates(b.id).resume!.update!({ where: { id: a.resumeId }, data: { name: 'invasao' } }),
     ).rejects.toMatchObject({ code: 'P2025' });
-    expect(await ownerOf('ContactPoint', a.contactId)).toBe(a.id);
-  });
-});
-
-describe('regressao: o ProfileStore nao usa escrita aninhada', () => {
-  it('save, reload, reimport e revisao continuam funcionando', async () => {
-    const owner = await makeOwner('c');
-    const document = fixtureDocument('career-changer-teacher-to-data');
-    const saved = await store.saveProfileDocument(owner.id, document, {
-      onMissing: 'archive',
-      revision: 'manual_save',
-    });
-    const loaded = await store.loadProfileDocument(owner.id);
-    expect(loaded?.profileId).toBe(saved.profileId);
-    const again = await store.saveProfileDocument(owner.id, document, { onMissing: 'delete' });
-    expect(again.profileId).toBe(saved.profileId);
-    const revision = await store.createRevision(owner.id, { reason: 'pre_generation' });
-    expect(revision.revision.id).toBeTruthy();
-    expect((await store.listImportRecords(owner.id)).length).toBeGreaterThan(0);
+    expect(await ownerOf('Resume', a.resumeId)).toBe(a.id);
   });
 });

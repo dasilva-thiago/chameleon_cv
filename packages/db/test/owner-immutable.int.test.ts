@@ -1,10 +1,7 @@
-import { randomBytes, randomUUID } from 'node:crypto';
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { PRIVATE_MODELS } from '../src/private-models';
-import { createProfileStore } from '../src/profile-store';
 import { createTestDb, type TestDb } from '../src/testing';
-import { fixtureDocument } from './support/profile-docs';
-import { testSnapshot } from './support/snapshot';
 
 /**
  * Trigger `<Tabela>_owner_immutable` (migracao `owner_immutable`): NENHUM UPDATE muda "ownerId", nem
@@ -18,17 +15,52 @@ const q = (name: string): string => `"${name.replaceAll('"', '""')}"`;
 
 beforeAll(async () => {
   testDb = await createTestDb();
-  const store = createProfileStore(testDb.db, { snapshot: testSnapshot });
   const mk = async (label: string): Promise<string> => {
     const user = await testDb.db.global.user.create({
       data: { email: `${label}-${randomUUID().slice(0, 8)}@example.test`, displayName: label },
     });
-    await store.saveProfileDocument(
-      user.id,
-      fixtureDocument('experienced-promotions-same-employer'),
-    );
-    // Linhas das tabelas de identidade/historico que o perfil nao cria sozinho.
+    // Uma linha em cada tabela privada: base, revisao, vaga, avaliacao, curriculo e versao, e identidade.
     const scoped = testDb.db.forOwner(user.id);
+    const hash = createHash('sha256').update(label).digest('hex');
+    const revision = await scoped.profileBaseRevision.create({
+      data: { ownerId: user.id, cvMarkdown: '# CV', profileMarkdown: '', contentHash: hash },
+    });
+    await scoped.profileBase.create({
+      data: {
+        ownerId: user.id,
+        cvMarkdown: '# CV',
+        profileMarkdown: '',
+        contentHash: hash,
+        revisionId: revision.id,
+      },
+    });
+    const job = await scoped.jobPosting.create({
+      data: { ownerId: user.id, description: 'vaga', descriptionHash: hash },
+    });
+    await scoped.jobAnalysis.create({
+      data: {
+        ownerId: user.id,
+        jobId: job.id,
+        descriptionHash: hash,
+        profileHash: hash,
+        engine: 'ai',
+        engineVersion: 't',
+        result: {},
+      },
+    });
+    const resume = await scoped.resume.create({
+      data: { ownerId: user.id, jobId: job.id, name: 'cv' },
+    });
+    await scoped.resumeVersion.create({
+      data: {
+        ownerId: user.id,
+        resumeId: resume.id,
+        versionNumber: 1,
+        language: 'pt-BR',
+        content: {},
+        contentHash: hash,
+      },
+    });
     await scoped.consentRecord.create({
       data: { ownerId: user.id, purpose: 'profile_processing', granted: true, policyVersion: '1' },
     });
@@ -114,7 +146,7 @@ describe('catalogo: toda tabela com "ownerId" tem o trigger de imutabilidade', (
     await testDb.sql(`INSERT INTO ${q(table)} VALUES ($1, $2)`, [id, a]);
     await expect(
       testDb.sql(`UPDATE ${q(table)} SET "ownerId" = $1 WHERE id = $2`, [b, id]),
-    ).rejects.toThrow(/owner_immutable/);
+    ).rejects.toThrow(/owner_immutable|ProfileBaseRevision_immutable/);
     await testDb.sql(`DROP TABLE ${q(table)}`);
   });
 });
@@ -139,7 +171,7 @@ describe('UPDATE de "ownerId" por SQL cru e rejeitado em TODAS as tabelas privad
       await expect(
         testDb.sql(`UPDATE ${q(table)} SET "ownerId" = $1::uuid WHERE id = $2::uuid`, [b, row.id]),
         table,
-      ).rejects.toThrow(/owner_immutable/);
+      ).rejects.toThrow(/owner_immutable|ProfileBaseRevision_immutable/);
       const after = await testDb.sql<{ owner: string }>(
         `SELECT "ownerId"::text AS owner FROM ${q(table)} WHERE id = $1::uuid`,
         [row.id],
@@ -147,7 +179,7 @@ describe('UPDATE de "ownerId" por SQL cru e rejeitado em TODAS as tabelas privad
       expect(after.rows[0]!.owner, table).toBe(a);
     }
     // Nenhuma tabela pode ficar sem exercicio por falta de dado: o fixture precisa cobrir as que importam.
-    expect(exercised.length).toBeGreaterThanOrEqual(20);
+    expect(exercised.length).toBe(tables.length);
     // Tabelas sem linha ficam cobertas pelo teste de catalogo (trigger presente e BEFORE UPDATE ROW).
     expect(empty.length).toBeLessThan(tables.length);
   });
@@ -158,7 +190,9 @@ describe('UPDATE de "ownerId" por SQL cru e rejeitado em TODAS as tabelas privad
       'Session',
       'ConsentRecord',
       'AuditEvent',
-      'ProfessionalProfile',
+      'ProfileBase',
+      'ProfileBaseRevision',
+      'JobPosting',
     ]) {
       const row = (
         await testDb.sql<{ id: string }>(
@@ -171,7 +205,7 @@ describe('UPDATE de "ownerId" por SQL cru e rejeitado em TODAS as tabelas privad
       await expect(
         testDb.sql(`UPDATE ${q(table)} SET "ownerId" = $1::uuid WHERE id = $2::uuid`, [b, row.id]),
         table,
-      ).rejects.toThrow(/owner_immutable/);
+      ).rejects.toThrow(/owner_immutable|ProfileBaseRevision_immutable/);
     }
   });
 
@@ -180,12 +214,12 @@ describe('UPDATE de "ownerId" por SQL cru e rejeitado em TODAS as tabelas privad
       JSON.stringify(
         (
           await testDb.sql(
-            'SELECT "ownerId"::text AS owner, count(*) AS n FROM "ContactPoint" GROUP BY 1 ORDER BY 1',
+            'SELECT "ownerId"::text AS owner, count(*) AS n FROM "Resume" GROUP BY 1 ORDER BY 1',
           )
         ).rows,
       );
     const before = await countByOwner();
-    await expect(testDb.sql('UPDATE "ContactPoint" SET "ownerId" = $1::uuid', [b])).rejects.toThrow(
+    await expect(testDb.sql('UPDATE "Resume" SET "ownerId" = $1::uuid', [b])).rejects.toThrow(
       /owner_immutable/,
     );
     expect(await countByOwner()).toBe(before);
@@ -195,10 +229,9 @@ describe('UPDATE de "ownerId" por SQL cru e rejeitado em TODAS as tabelas privad
     await testDb.sql(`UPDATE "AuditEvent" SET "ownerId" = "ownerId" WHERE "ownerId" = $1::uuid`, [
       a,
     ]);
-    await testDb.sql(
-      `UPDATE "ProfessionalProfile" SET "updatedAt" = now() WHERE "ownerId" = $1::uuid`,
-      [a],
-    );
+    await testDb.sql(`UPDATE "ProfileBase" SET "updatedAt" = now() WHERE "ownerId" = $1::uuid`, [
+      a,
+    ]);
   });
 });
 

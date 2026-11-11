@@ -72,7 +72,7 @@ describe('invariantes do schema (rede de seguranca do isolamento, ADR-0008, R3)'
     expect(offenders, 'FK para tabela privada sem ownerId (use FK composta)').toEqual([]);
   });
 
-  it('as tabelas privadas raiz (identidade, ProfessionalProfile e JobPosting) apontam para User(id) por ownerId com cascade', async () => {
+  it('as tabelas privadas raiz (identidade, base profissional e JobPosting) apontam para User(id) por ownerId com cascade', async () => {
     const { rows } = await testDb.sql<{ child: string; ondelete: string }>(
       `SELECT cl.relname AS child, c.confdeltype AS ondelete
          FROM pg_constraint c JOIN pg_class cl ON cl.oid = c.conrelid
@@ -84,7 +84,8 @@ describe('invariantes do schema (rede de seguranca do isolamento, ADR-0008, R3)'
       'ConsentRecord',
       'Credential',
       'JobPosting',
-      'ProfessionalProfile',
+      'ProfileBase',
+      'ProfileBaseRevision',
       'Session',
     ]);
     expect(rows.every((r) => r.ondelete === 'c')).toBe(true); // 'c' = CASCADE

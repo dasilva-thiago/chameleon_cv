@@ -164,7 +164,7 @@ describe('relationFieldsOfClient', () => {
     const map = relationFieldsOfClient(
       clientWith(
         allPrivate({
-          ContactPoint: {
+          Resume: {
             fields: [
               { name: 'id', kind: 'scalar' },
               { name: 'visibility', kind: 'enum' },
@@ -175,7 +175,7 @@ describe('relationFieldsOfClient', () => {
         }),
       ),
     );
-    expect([...map.get('ContactPoint')!]).toEqual(['profile']);
+    expect([...map.get('Resume')!]).toEqual(['profile']);
   });
 
   it.each([undefined, null, {}, { _runtimeDataModel: {} }, { _runtimeDataModel: { models: [] } }])(
@@ -187,10 +187,10 @@ describe('relationFieldsOfClient', () => {
 
   it('falha se um modelo tem formato invalido ou se falta um modelo privado', () => {
     expect(() =>
-      relationFieldsOfClient(clientWith(allPrivate({ Skill: { fields: 'x' } }))),
+      relationFieldsOfClient(clientWith(allPrivate({ Resume: { fields: 'x' } }))),
     ).toThrow(/invalido/);
     const missing = allPrivate();
-    delete missing.Skill;
+    delete missing.Resume;
     expect(() => relationFieldsOfClient(clientWith(missing))).toThrow(/ausente/);
     const missingGlobal = allPrivate();
     delete missingGlobal.Invite;

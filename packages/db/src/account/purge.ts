@@ -3,14 +3,14 @@ import { assertOwnerId } from '../for-owner';
 import { DbScopeError } from '../errors';
 
 /**
- * Account deletion (ADR-0014, ADR-0006 item 5). The ONLY code path that deletes `ProfileRevision`
+ * Account deletion (ADR-0014). The ONLY code path that deletes `ProfileBaseRevision`
  * rows: the immutability trigger lets a DELETE through only while `chameleon.allow_purge = 'on'`, and
  * this routine sets it with `set_config(..., true)` (transaction-local, equivalent to `SET LOCAL`) inside
  * its own interactive transaction, so the flag is reverted at COMMIT/ROLLBACK and can never survive on a
  * pooled connection.
  */
 
-/** Setting read by the `ProfileRevision_immutable` trigger. */
+/** Setting read by the `ProfileBaseRevision_immutable` trigger. */
 export const ALLOW_PURGE_SETTING = 'chameleon.allow_purge';
 
 export interface PurgeAccountResult {

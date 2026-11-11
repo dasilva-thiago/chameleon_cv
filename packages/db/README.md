@@ -13,8 +13,6 @@ para testes. Única fronteira onde `@prisma/*` e SQL cru são permitidos (ADR-00
 | `src/generated/prisma/`             | Client gerado (`pnpm db:generate`). **Não editar.** Ignorado por prettier/eslint               |
 | `src/client.ts`, `src/for-owner.ts` | `createDb()`, `forOwner()`                                                                     |
 | `src/private-models.ts`             | Registro central: modelos privados x globais                                                   |
-| `src/mappers/`                      | Mapeamento PURO documento <-> linhas (specs, codec, to/from-rows, plano de diff)               |
-| `src/profile-store/`                | `createProfileStore(db, { snapshot })` (S1.1b)                                                 |
 | `src/account/`                      | `db.purgeAccount`, `exportAccountData`, registro de exportacao (S2.3a)                         |
 | `src/testing/`                      | Harness de teste (`@chameleon/db/testing`)                                                     |
 
@@ -45,7 +43,7 @@ pnpm db:reset                               # recusa host não local; migrate re
   policy in `scopeGlobalModelArgs`; without one `forOwner()` rejects it (fail closed).
 - **`ownerId` imutável (migração `owner_immutable`):** todo UPDATE que mude `"ownerId"` falha (`owner_immutable`,
   SQLSTATE 23000) em **toda** tabela com a coluna, inclusive as de FK só para `User` (`Credential`, `Session`,
-  `ConsentRecord`, `AuditEvent`, `ProfessionalProfile`). Sem exceção de purge: a exclusão de conta é DELETE
+  `ConsentRecord`, `AuditEvent`, `ProfileBase`, `ProfileBaseRevision`, `JobPosting`). Sem exceção de purge: a exclusão de conta é DELETE
   (cascata a partir de `User`), que o trigger não toca. **Tabela nova com `ownerId`:** termine a migração com
   `SELECT chameleon_install_owner_immutable_triggers();` (idempotente; lê o catálogo). O teste
   `test/owner-immutable.int.test.ts` falha se alguma tabela com `ownerId` ficar sem o trigger.
@@ -58,105 +56,32 @@ pnpm db:reset                               # recusa host não local; migrate re
 
 ## Identidade (S1.1a)
 
-| Modelo            | Escopo | Observações                                                                                                                                                         |
-| ----------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `User`            | global | e-mail `citext` único; `User.id` é o `ownerId` dos demais                                                                                                           |
-| `Credential`      | dono   | só hash argon2id (CHECK `$argon2id$%`); uma por `(ownerId, kind)`                                                                                                   |
-| `Session`         | dono   | só `tokenHash` (SHA-256 hex, CHECK de formato); expiração deslizante + absoluta; sem IP                                                                             |
-| `Invite`          | global | `tokenHash` único; um convite **em aberto** por e-mail (índice parcial `usedAt IS NULL`)                                                                            |
-| `ConsentRecord`   | dono   | `purpose` (CHECK de formato), `granted`, `policyVersion`, `recordedAt`; append-only                                                                                 |
-| `AuditEvent`      | dono   | sem PII em `metadata`                                                                                                                                               |
-| `JobPosting`      | dono   | vaga salva (P1): texto original, `descriptionHash` SHA-256, situação, metadados; CHECKs de tamanho/hash/URL                                                         |
-| `JobAnalysis`     | dono   | análise derivada de uma vaga (P2): `result`/`review` JSON validados pelo contrato; chave de reaproveitamento (vaga, hash do texto, hash do perfil, versão do motor) |
-| `Resume`          | dono   | currículo de uma vaga (nome, datas); cascata da vaga                                                                                                                |
-| `ResumeVersion`   | dono   | versão (rascunho/aprovada): conteúdo JSON com fontes por item, hash, revisão do perfil e análise usadas; aprovada é imutável por trigger                            |
-| `AccountDeletion` | global | registro minimo SEM PII de uma exclusao (id, instante, total agregado de linhas); append-only                                                                       |
+| Modelo            | Escopo | Observações                                                                                                                                                       |
+| ----------------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `User`            | global | e-mail `citext` único; `User.id` é o `ownerId` dos demais                                                                                                         |
+| `Credential`      | dono   | só hash argon2id (CHECK `$argon2id$%`); uma por `(ownerId, kind)`                                                                                                 |
+| `Session`         | dono   | só `tokenHash` (SHA-256 hex, CHECK de formato); expiração deslizante + absoluta; sem IP                                                                           |
+| `Invite`          | global | `tokenHash` único; um convite **em aberto** por e-mail (índice parcial `usedAt IS NULL`)                                                                          |
+| `ConsentRecord`   | dono   | `purpose` (CHECK de formato), `granted`, `policyVersion`, `recordedAt`; append-only                                                                               |
+| `AuditEvent`      | dono   | sem PII em `metadata`                                                                                                                                             |
+| `JobPosting`      | dono   | vaga salva (P1): texto original, `descriptionHash` SHA-256, situação, metadados; CHECKs de tamanho/hash/URL                                                       |
+| `JobAnalysis`     | dono   | avaliacao de uma vaga (fluxo career-ops): `result` JSON validado pelo contrato; chave de reaproveitamento (vaga, hash do texto, hash da base, versao dos prompts) |
+| `Resume`          | dono   | currículo de uma vaga (nome, datas); cascata da vaga                                                                                                              |
+| `ResumeVersion`   | dono   | versao (rascunho/aprovada): conteudo JSON, hash, revisao da base e avaliacao usadas; aprovada e imutavel por trigger                                              |
+| `AccountDeletion` | global | registro minimo SEM PII de uma exclusao (id, instante, total agregado de linhas); append-only                                                                     |
 
-## Agregado de perfil (S1.1b)
+## Base profissional
 
-26 modelos privados (todos com `ownerId`, `@@unique([id, ownerId])` e FKs compostas). O desenho esta em
-`docs/domain-model.md` §3.2; abaixo, o que foi realmente implementado.
+| Modelo                | Conteudo                                                                                                           |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `ProfileBase`         | uma por dono (`@@unique([ownerId])`): `cvMarkdown`, `profileMarkdown`, `contentHash`, `revisionId` (revisao atual) |
+| `ProfileBaseRevision` | foto imutavel (trigger `ProfileBaseRevision_immutable`: UPDATE/DELETE falham, salvo `chameleon.allow_purge`)       |
 
-| Grupo                 | Modelos                                                                                                                                                                                                                                                      |
-| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Raiz                  | `ProfessionalProfile` (blocos singleton em JSONB; FK para `User` com cascade), `ProfileFact` (governanca, PK compartilhada)                                                                                                                                  |
-| Fatos (tabela tipada) | `ProfileStatement`, `CompetencyExample` (+ `CompetencyExampleSkill`), `Experience`, `ExperienceItem`, `Project`, `ProjectItem`, `Education`, `Course`, `Skill`, `SkillUsage`, `LanguageProficiency`, `Certification`, `Award`, `Publication`, `Volunteering` |
-| Nao citaveis          | `ContactPoint`, `Evidence` (+ `EvidenceLink`), `PendingItem`, `UsageRestriction`, `ProjectCollaborator`                                                                                                                                                      |
-| Historico             | `ProfileRevision` (snapshot imutavel + `contentHash`), `ImportRecord` (versoes, passos, avisos, `idMap`, `unmapped`)                                                                                                                                         |
-
-Decisoes de mapeamento (o que o contrato 2.1.0 pede ao banco):
-
-- **Colunas x `details`:** o que se filtra, ordena, junta ou valida e coluna tipada (enums Prisma = enums do
-  contrato; um teste confere a igualdade). O resto dos atributos descritivos vai para `details` JSONB com as
-  chaves do contrato (snake_case); campo novo do contrato sem spec cai em `details` e nao se perde. Tabelas
-  sem `details` (`ProfileStatement`, `Certification`, `ContactPoint`, `UsageRestriction`...) lancam
-  `UNMAPPED_FIELD` se o contrato crescer. Listas de texto (`aliases`, `topics`...) ficam em `details`
-  (JSONB distingue `[]` de ausente; o `String[]` do Prisma nao).
-- **Ausencia (ADR-0005):** NULL/omitido = nao informado; `[]` = nenhum item (`emptyCollections` no perfil
-  para colecoes de topo; marcador `[]` em `details` para listas internas; bloco `{}` difere de bloco ausente).
-- **`ProfileFact`:** `status`, `visibility`, `resumeUse` e `source` sao sempre concretos; sem `meta`, o efetivo
-  e o mais restritivo (`needs_review`, `private`, `requires_approval`, `other`). `metaPresent`/`metaKeys`
-  lembram o que o documento declarou, para a leitura devolver exatamente o `meta` original.
-  `confirmedAt`/`archivedAt`/`resolvedAt` sao gerenciados pelo store. `archived` e preservado (CHECK:
-  `archivedAt` existe se e somente se o status e `archived`).
-- **`field_states`:** JSONB com CHECK por funcao (`chameleon_field_states_valid`): chave = campo ou caminho
-  aninhado de ate 3 niveis (`metric.value`), valor = um dos 5 estados. Vale tambem para os blocos singleton.
-- **Telefone:** gravado na forma canonica (`+` opcional + 7 a 15 digitos; o store normaliza) e CHECK no banco.
-- **Versao do contrato:** `schemaVersion` `2.x` (CHECK); a leitura sempre emite 2.1.0; `ProfileRevision` guarda
-  a versao do snapshot (CHECK: igual a `snapshot.schema_version`).
-- **`self_described_level`:** coluna `selfDescribedLevel` (CHECK ate 200), independente de `overallLevel`.
-- **Datas parciais:** `date` (1o dia do periodo, UTC) + `...Precision` (`year|month|day`); `isCurrent` = `present`.
-  CHECKs: data e precisao andam juntas; precisao coerente com o dia armazenado.
-- **Vinculos:** `evidence.supports` e `meta.evidence_ids` sao a mesma relacao declarada dos dois lados:
-  `EvidenceLink.supportsPosition`/`evidenceIdsPosition` registram de que lado veio (ao menos um). Alvos de
-  `pending_items`/`restrictions` viram `targetFactId | targetContactPointId | targetEvidenceId` (no maximo
-  um; contato e evidencia nao sao fatos) mais `targetField`/`term`.
-- **Contexto de uso (ADR-0007):** CHECKs `SkillUsage_single_source_chk` e `SkillUsage_context_source_chk`.
-- **Coerencia `ProfileFact.kind` x tabela tipada (gap da S1.1a):** triggers `<Tabela>_fact_kind` (kind e
-  perfil coerentes), `ProfileFact_typed_row` (deferivel: todo fato tem a linha tipada ao fim da transacao),
-  `<Tabela>_fact_orphan` (nao apagar so a linha tipada) e `ProfileFact_kind_immutable`.
-- **`ProfileRevision` imutavel:** trigger `ProfileRevision_immutable` (UPDATE/DELETE falham). Excecao:
-  `SET LOCAL chameleon.allow_purge = 'on'` em DELETE (exclusao de conta; sem a flag a cascata de
-  `DELETE FROM "User"` tambem falha). Unico chamador: `db.purgeAccount` (secao "Exclusao e exportacao de conta").
-- **`ImportSourceFormat`:** `yaml | json | object | markdown` (migracao `import_source_markdown`; o teste
-  `contract-alignment` confere com `IMPORT_SOURCE_FORMATS` do contrato).
-
-### ProfileStore
-
-```ts
-import { createDb, createProfileStore } from '@chameleon/db';
-import { buildProfileSnapshot } from '@chameleon/domain'; // db NAO importa domain: a funcao e injetada
-
-const store = createProfileStore(createDb(), { snapshot: buildProfileSnapshot });
-
-await store.saveProfileDocument(ownerId, document, {
-  onMissing: 'archive',
-  revision: 'manual_save',
-});
-const loaded = await store.loadProfileDocument(ownerId); // { profileId, document (2.1.0 canonico), ... } | null
-await store.createRevision(ownerId, { reason: 'pre_generation' }); // { revision, reused }
-await store.applyImport(ownerId, {
-  document: result.document,
-  report: result.report,
-  mode: 'merge',
-});
-const existingIdMap = await store.getImportIdMap(ownerId); // alimenta importProfile({ existingIdMap })
-```
-
-- Usa **somente** `db.forOwner(ownerId)` (transacao interativa `RepeatableRead`, 60 s); os mapeadores puros
-  ficam em `src/mappers` (testados sem banco). Todo id de registro precisa ser **UUID** (rode o importador
-  antes); ids ausentes sao gerados; UUID em maiusculas vira minusculo.
-- `onMissing` (registros que existem no banco e nao estao no documento): `archive` (padrao: fatos viram
-  `archived` + `resume_use: never`; contatos, evidencias, pendencias e restricoes sao removidos), `keep`
-  (merge) ou `delete` (definitivo). `applyImport`: `merge` = `keep`, `replace` = `archive`.
-- Ids de um arquivo exportado por **outro dono** colidem na PK: `ID_CONFLICT` sem revelar de quem; com
-  `regenerateConflictingIds` a gravacao e repetida com ids novos (`idRemap` no resultado).
-- Reimportacao idempotente: mesmos ids -> `summary.totals.created === 0` e `updated === 0`; a revisao e
-  reutilizada quando o hash nao muda.
-- Limitacoes: referencias repetidas numa lista (`[A, A]`) sao colapsadas; as escritas sao por tabela
-  (`createMany`/`update`), nao aninhadas, entao o `forOwner` injeta e confere `ownerId` em todas; a coerencia
-  de perfil entre linhas do mesmo dono so e verificada onde ha `profileId` (`Skill`, fato); `ImportRecord`
-  ainda nao tem `uploadedFileId` (S2.x).
+- CHECKs: `contentHash` hex de 64 e limites de tamanho (CV 40.000, perfil 30.000 caracteres).
+- `ProfileBase.revisionId` e `ResumeVersion.profileRevisionId` apontam para a revisao por FK composta com
+  `ON DELETE CASCADE`: uma revisao so some na exclusao de conta, e ai leva junto o que aponta para ela (com
+  `NO ACTION` a cascata do dono falhava antes de remover as versoes). O mesmo vale para `ResumeVersion.analysisId`.
+- Sem store dedicado: a API grava pela `apps/api/src/modules/profile` usando `req.auth.db` (escopado ao dono).
 
 ### Fuso (UTC)
 
@@ -198,7 +123,7 @@ updateMany | deleteMany }`, inclusive relações to-many do pai) lança `NestedR
 gerado (`relationFieldsOfClient`; o Prisma 7 não exporta `Prisma.dmmf`, então lê-se `_runtimeDataModel`, e
 `test/relation-fields.test.ts` o confere contra `prisma/schema/*.prisma`; se o formato mudar, `createDb`
 falha). Motivo: o `connect` do Prisma troca `(xId, ownerId)` **juntos**, o que satisfaz a FK composta e
-movia a linha de B para o dono A (confirmado em `ContactPoint`, `ImportRecord` e `ProfileFact`). Use o escalar
+movia a linha de B para o dono A (confirmado no perfil estruturado antigo). Use o escalar
 (`profileId`, formato _unchecked_): o `ownerId` continua injetado e conferido, e a FK composta rejeita pai de
 outro dono (`P2003`). `where`, `select` e `include` com relações (leituras) continuam permitidos. Leituras e
 `delete`/`deleteMany` não carregam `data`.
@@ -266,7 +191,7 @@ const data = await exportAccountData(db, ownerId, { store }); // AccountExport (
 - **`db.purgeAccount(ownerId)`** (`src/account/purge.ts`): uma transacao interativa que (1) liga a flag com
   `set_config('chameleon.allow_purge', 'on', true)` (local a transacao: revertida no COMMIT/ROLLBACK, nunca fica
   numa conexao do pool), (2) trava a linha de `User`, (3) apaga convites ligados a conta (guardam e-mail),
-  (4) `DELETE FROM "User"` (cascata em todas as tabelas do dono, inclusive `ProfileRevision` imutavel), (5) confere
+  (4) `DELETE FROM "User"` (cascata em todas as tabelas do dono, inclusive `ProfileBaseRevision` imutavel), (5) confere
   **pelo catalogo** (toda tabela com coluna `"ownerId"`, nao uma lista a mao) que sobraram 0 linhas e, se sobrou
   alguma, desfaz tudo (`PurgeIncompleteError`), (6) grava um `AccountDeletion` (sem referencia ao dono). Dono
   inexistente: `{ purged: false }`, nada gravado. `ownerId` precisa ser UUID. Tabela nova com `ownerId` e FK
@@ -317,14 +242,7 @@ it('...', async () => {
   workers e arquivos nunca compartilham estado. `drop()` usa `DROP DATABASE ... WITH (FORCE)`.
 - Bancos órfãos (execução interrompida) carregam um carimbo no `COMMENT` e são varridos
   automaticamente: clones com mais de 6 h, templates antigos com mais de 7 dias.
-- `truncateAll()` não dispara triggers de linha (as de imutabilidade da S1.1b não atrapalham).
+- `truncateAll()` não dispara triggers de linha (as de imutabilidade não atrapalham).
 - Nenhum `globalSetup` é necessário (a criação do template é preguiçosa e idempotente entre workers).
 - `process.env.CHAMELEON_TEST_RUN_ID` (opcional) fixa o identificador da execução nos nomes.
 - No CI, o `services: postgres` em `localhost` funciona com o mesmo `TEST_DATABASE_ADMIN_URL`.
-
-## Spike dos padrões Prisma 7 (ADR-0006, adendo)
-
-Resultado completo no adendo do ADR-0006. Resumo: PK compartilhada, FK composta `(id, ownerId)`
-(obrigatória e opcional), schema multi-arquivo com adapter-pg, CHECK e trigger manuais **funcionam**; o
-fallback do R2 **não** foi necessário. O DDL do spike é mantido como fixture em
-`test/fixtures/adr0006-patterns.sql` e exercitado por `test/adr0006-patterns.int.test.ts`.

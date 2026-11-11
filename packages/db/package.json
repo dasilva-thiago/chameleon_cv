@@ -18,7 +18,6 @@
     "pg": "8.23.1"
   },
   "devDependencies": {
-    "@chameleon/test-fixtures": "workspace:*",
     "@types/pg": "8.23.1",
     "prisma": "7.10.1"
   }
