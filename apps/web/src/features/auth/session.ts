@@ -40,6 +40,9 @@ export function createAppQueryClient(): QueryClient {
     defaultOptions: {
       queries: {
         refetchOnWindowFocus: false,
+        // Data already fetched is reused for 15 s (navigation and prefetch without a loading screen); writes still
+        // invalidate it immediately.
+        staleTime: 15_000,
         retry: (failureCount, error) => !isApiError(error) && failureCount < 2,
       },
       mutations: { retry: false },

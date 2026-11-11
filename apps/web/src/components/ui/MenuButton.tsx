@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { Button } from './Button';
-import { ChevronDownIcon } from './icons';
+import { CheckIcon, ChevronDownIcon } from './icons';
+import { cx, transition } from './styles';
 
 export type MenuEntry =
   | { kind: 'item'; label: string; onSelect: () => void; disabled?: boolean; danger?: boolean }
@@ -9,8 +10,11 @@ export type MenuEntry =
   | { kind: 'separator' };
 
 const ITEM_SELECTOR = '[role="menuitem"]:not([disabled]), [role="menuitemradio"]';
-const itemClass =
-  'flex min-h-10 w-full items-center gap-2 rounded px-3 py-2 text-left text-sm hover:bg-slate-100 focus:bg-slate-100 focus:outline-none disabled:cursor-not-allowed disabled:opacity-60';
+const itemClass = cx(
+  'flex h-9 w-full cursor-pointer items-center gap-2 rounded-[0.3rem] px-2.5 text-left text-body pointer-coarse:h-11',
+  'hover:bg-sunken focus:bg-sunken focus:outline-none active:bg-line disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent',
+  transition,
+);
 
 /**
  * Botão que abre um menu de opções (ícone com texto opcional). Teclado: Enter/Espaço/↓ abrem; ↑ ↓ Home End movem;
@@ -30,7 +34,7 @@ export function MenuButton({
   icon: ReactNode;
   text?: string;
   entries: readonly MenuEntry[];
-  variant?: 'primary' | 'secondary';
+  variant?: 'primary' | 'secondary' | 'ghost';
   disabled?: boolean;
 }) {
   const [open, setOpen] = useState(false);
@@ -89,7 +93,7 @@ export function MenuButton({
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={open ? menuId : undefined}
-        className={text === undefined ? 'min-w-11 px-2' : 'gap-2'}
+        className={text === undefined ? 'w-9 px-0 pointer-coarse:w-11' : undefined}
         onClick={() => {
           setOpen((value) => !value);
         }}
@@ -116,18 +120,18 @@ export function MenuButton({
           tabIndex={-1}
           aria-label={label}
           onKeyDown={onMenuKeyDown}
-          className="absolute right-0 z-20 mt-1 flex min-w-56 flex-col rounded-md border border-slate-400 bg-white p-1 shadow-lg"
+          className="absolute right-0 z-30 mt-1.5 flex min-w-56 animate-enter flex-col rounded-panel border border-line bg-raised p-1 text-ink-1 shadow-md"
         >
           {entries.map((entry, index) => {
             if (entry.kind === 'separator') {
-              return <hr key={`sep-${String(index)}`} className="my-1 border-slate-300" />;
+              return <hr key={`sep-${String(index)}`} className="my-1 border-line" />;
             }
             if (entry.kind === 'heading') {
               return (
                 <p
                   key={entry.label}
                   role="presentation"
-                  className="px-3 pb-1 pt-2 text-xs font-semibold uppercase tracking-wide text-slate-700"
+                  className="px-2.5 pb-1 pt-2 text-overline font-semibold uppercase tracking-wider text-ink-3"
                 >
                   {entry.label}
                 </p>
@@ -146,8 +150,8 @@ export function MenuButton({
                     close(true);
                   }}
                 >
-                  <span aria-hidden="true" className="w-4 text-blue-800">
-                    {entry.checked ? '✓' : ''}
+                  <span aria-hidden="true" className="flex w-4 text-brand">
+                    {entry.checked ? <CheckIcon /> : null}
                   </span>
                   {entry.label}
                 </button>
@@ -159,7 +163,7 @@ export function MenuButton({
                 type="button"
                 role="menuitem"
                 disabled={entry.disabled}
-                className={`${itemClass} ${entry.danger === true ? 'text-red-800' : 'text-slate-900'}`}
+                className={`${itemClass} ${entry.danger === true ? 'text-risk-text hover:bg-risk-soft focus:bg-risk-soft' : 'text-ink-1'}`}
                 onClick={() => {
                   close(false);
                   entry.onSelect();

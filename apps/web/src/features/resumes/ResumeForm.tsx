@@ -39,11 +39,11 @@ interface FormContext {
 function IssueList({ issues }: { issues: readonly ResumeIssue[] | undefined }) {
   if (issues === undefined || issues.length === 0) return null;
   return (
-    <ul className="flex flex-col gap-1 text-sm">
+    <ul className="flex flex-col gap-1 text-body">
       {issues.map((issue) => (
         <li
           key={`${issue.code}-${issue.message}`}
-          className={issue.severity === 'error' ? 'text-red-800' : 'text-amber-950'}
+          className={issue.severity === 'error' ? 'text-risk-text' : 'text-attn-text'}
         >
           <span className="font-semibold">{issue.severity === 'error' ? 'Erro:' : 'Aviso:'}</span>{' '}
           {issue.message}
@@ -59,7 +59,7 @@ function BulletEditor({ ctx, s, e, b }: { ctx: FormContext; s: number; e: number
   const path = `sections.${String(s)}.entries.${String(e)}.bullets.${String(b)}`;
   const origin = displayOrigin(bullet, ctx.saved);
   return (
-    <li className="flex flex-col gap-2 rounded-md border border-slate-300 bg-slate-50 p-3">
+    <li className="flex flex-col gap-2 rounded-control border border-line bg-sunken p-3">
       <TextAreaField
         label={`Item ${String(b + 1)}`}
         rows={2}
@@ -96,10 +96,10 @@ function EntryEditor({ ctx, s, e }: { ctx: FormContext; s: number; e: number }) 
     <div
       role="group"
       aria-labelledby={headingId}
-      className="flex flex-col gap-3 rounded-md border border-slate-400 bg-white p-4"
+      className="flex flex-col gap-3 rounded-control border border-line-strong bg-surface p-4"
     >
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h3 id={headingId} className="text-base font-semibold text-slate-900">
+        <h3 id={headingId} className="text-body font-semibold text-ink-1">
           {entry.heading.trim() === '' ? 'Entrada sem título' : entry.heading}
         </h3>
         <Button
@@ -153,7 +153,7 @@ function EntryEditor({ ctx, s, e }: { ctx: FormContext; s: number; e: number }) 
           ))}
         </ul>
       ) : (
-        <p className="text-sm text-slate-700">Esta entrada não tem itens.</p>
+        <p className="text-body text-ink-2">Esta entrada não tem itens.</p>
       )}
       <div>
         <Button
@@ -178,7 +178,7 @@ function SectionEditor({ ctx, s }: { ctx: FormContext; s: number }) {
   return (
     <section aria-labelledby={headingId} className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 id={headingId} className="text-lg font-semibold">
+        <h2 id={headingId} className="text-section font-semibold">
           {section.title.trim() === '' ? 'Seção sem título' : section.title}
         </h2>
         <Button
@@ -202,7 +202,7 @@ function SectionEditor({ ctx, s }: { ctx: FormContext; s: number }) {
       </div>
       <IssueList issues={ctx.issues.get(path)} />
       {section.entries.length === 0 ? (
-        <p className="text-sm text-slate-700">Esta seção não tem entradas.</p>
+        <p className="text-body text-ink-2">Esta seção não tem entradas.</p>
       ) : null}
       {section.entries.map((entry, e) => (
         <EntryEditor key={entry.id} ctx={ctx} s={s} e={e} />
@@ -217,7 +217,7 @@ export function ResumeForm(ctx: FormContext) {
   return (
     <div className="flex flex-col gap-6">
       <section aria-labelledby="resume-header" className="flex flex-col gap-3">
-        <h2 id="resume-header" className="text-lg font-semibold">
+        <h2 id="resume-header" className="text-section font-semibold">
           Cabeçalho
         </h2>
         <div className="grid gap-3 sm:grid-cols-3">
@@ -256,16 +256,16 @@ export function ResumeForm(ctx: FormContext) {
           />
         </div>
         {header.contacts.length === 0 ? (
-          <p className="text-sm text-slate-700">Nenhum contato neste currículo.</p>
+          <p className="text-body text-ink-2">Nenhum contato neste currículo.</p>
         ) : (
           <ul aria-label="Contatos" className="flex flex-col gap-2">
             {header.contacts.map((contact, n) => (
               <li
                 key={`${contact.kind}-${contact.value}`}
-                className="flex flex-col gap-2 rounded-md border border-slate-300 bg-slate-50 p-3"
+                className="flex flex-col gap-2 rounded-control border border-line bg-sunken p-3"
               >
                 <div className="flex flex-wrap items-center justify-between gap-3">
-                  <span className="break-all font-medium text-slate-900">
+                  <span className="break-all font-medium text-ink-1">
                     {CONTACT_KIND_LABELS[contact.kind]}: {contact.value}
                     {contact.label !== null ? ` (${contact.label})` : ''}
                   </span>
@@ -286,7 +286,7 @@ export function ResumeForm(ctx: FormContext) {
       </section>
 
       {ctx.content.sections.length === 0 ? (
-        <p className="rounded-md border border-dashed border-slate-400 bg-white p-4 text-sm">
+        <p className="rounded-control border border-dashed border-line-strong bg-surface p-4 text-body">
           O currículo não tem nenhuma seção.
         </p>
       ) : null}

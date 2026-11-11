@@ -1,9 +1,11 @@
 import {
+  baseReadingResponseSchema,
   listProfileRevisionsResponseSchema,
   profileBaseResponseSchema,
   profileRevisionResponseSchema,
   saveProfileBaseRequestSchema,
   saveProfileBaseResponseSchema,
+  type BaseReadingResponse,
   type ListProfileRevisionsResponse,
   type ProfileBaseResponse,
   type ProfileRevisionResponse,
@@ -29,6 +31,8 @@ export interface ProfileApi {
   listRevisions(signal?: AbortSignal): Promise<ListProfileRevisionsResponse>;
   getRevision(id: string, signal?: AbortSignal): Promise<ProfileRevisionResponse>;
   restoreRevision(id: string): Promise<SaveProfileBaseResponse>;
+  /** How the program reads a base (saved or not); stores nothing. */
+  read(input: SaveProfileBaseRequest, signal?: AbortSignal): Promise<BaseReadingResponse>;
 }
 
 export function createProfileApi(client: ApiClient): ProfileApi {
@@ -45,6 +49,10 @@ export function createProfileApi(client: ApiClient): ProfileApi {
         schema: profileRevisionResponseSchema,
         signal,
       }),
+    read(input, signal) {
+      const body = validated(saveProfileBaseRequestSchema, input);
+      return client.post(`${BASE}/reading`, { body, schema: baseReadingResponseSchema, signal });
+    },
     restoreRevision: (id) =>
       client.post(`${BASE}/revisions/${idPath(id)}/restore`, {
         schema: saveProfileBaseResponseSchema,

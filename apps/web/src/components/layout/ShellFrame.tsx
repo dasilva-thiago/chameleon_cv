@@ -1,21 +1,33 @@
 import { useEffect, useRef, type MouseEvent, type ReactNode } from 'react';
 import { NavigationType, useLocation, useNavigationType } from 'react-router';
+import { cx } from '../ui/styles';
 
 export const MAIN_ID = 'conteudo';
 
+/** Content widths (plan §3.5): reading forms, working lists, full-width editors. */
+export type ShellWidth = 'read' | 'work' | 'full';
+
+const WIDTHS: Record<ShellWidth, string> = {
+  read: 'max-w-[44rem]',
+  work: 'max-w-[80rem]',
+  full: 'max-w-[110rem]',
+};
+
 /**
- * Estrutura comum: link para pular ao conteudo, landmarks (banner e main) e foco no titulo
- * da pagina a cada navegacao interna (leitores de tela anunciam a nova pagina).
+ * Estrutura comum: link para pular ao conteudo, landmarks (banner, navegação lateral opcional e main) e foco no
+ * titulo da pagina a cada navegacao interna (leitores de tela anunciam a nova pagina).
  */
 export function ShellFrame({
   header,
+  sidebar,
   children,
-  wide = false,
+  width = 'work',
 }: {
   header: ReactNode;
+  /** Barra lateral (área autenticada). */
+  sidebar?: ReactNode;
   children: ReactNode;
-  /** Area de conteudo larga (editor do perfil, com navegacao lateral). */
-  wide?: boolean;
+  width?: ShellWidth;
 }) {
   const mainRef = useRef<HTMLElement>(null);
   const { pathname } = useLocation();
@@ -39,23 +51,31 @@ export function ShellFrame({
   };
 
   return (
-    <div className="flex min-h-screen flex-col bg-slate-50 text-slate-900">
+    <div className="flex min-h-screen bg-canvas text-ink-1">
       <a
         href={`#${MAIN_ID}`}
         onClick={skipToContent}
-        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-10 focus:rounded-md focus:bg-white focus:px-4 focus:py-2 focus:text-blue-800 focus:outline-2 focus:outline-blue-700"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-control focus:bg-surface focus:px-4 focus:py-2 focus:font-medium focus:text-brand focus:shadow-md focus:outline-2 focus:outline-brand"
       >
         Pular para o conteúdo
       </a>
-      <header className="border-b border-slate-300 bg-white">{header}</header>
-      <main
-        id={MAIN_ID}
-        ref={mainRef}
-        tabIndex={-1}
-        className={`mx-auto w-full ${wide ? 'max-w-6xl' : 'max-w-3xl'} flex-1 px-4 py-8 focus:outline-none sm:px-6`}
-      >
-        {children}
-      </main>
+      {sidebar}
+      <div className="flex min-w-0 flex-1 flex-col">
+        <header className="sticky top-0 z-30 border-b border-line bg-canvas/85 backdrop-blur-md">
+          {header}
+        </header>
+        <main
+          id={MAIN_ID}
+          ref={mainRef}
+          tabIndex={-1}
+          className={cx(
+            'mx-auto w-full flex-1 px-4 pb-16 pt-6 focus:outline-none sm:px-6 lg:px-8 lg:pt-8',
+            WIDTHS[width],
+          )}
+        >
+          {children}
+        </main>
+      </div>
     </div>
   );
 }

@@ -10,6 +10,7 @@ import {
 import { useQuery } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
+import { linkClass } from '../../components/ui/styles';
 import { Link, useLocation, useNavigate } from 'react-router';
 import { PageHeading, usePageTitle } from '../../components/layout/PageHeading';
 import { Alert } from '../../components/ui/Alert';
@@ -46,10 +47,10 @@ export function AcceptInvitePage() {
   }, [hash, pathname, search, navigate]);
 
   return (
-    <div className="mx-auto flex w-full max-w-md flex-col gap-6">
+    <div className="mx-auto mt-[4vh] flex w-full max-w-md flex-col gap-6 rounded-panel border border-line bg-surface p-6 shadow-md sm:p-8">
       <div className="flex flex-col gap-2">
         <PageHeading>Criar conta</PageHeading>
-        <p className="text-base text-slate-700">
+        <p className="text-body text-ink-2">
           Você recebeu um convite. Defina sua senha para ativar a conta.
         </p>
       </div>
@@ -70,9 +71,9 @@ function InvalidInvite({ reason }: { reason: 'missing' | 'invalid' }) {
           ? 'O link de convite está incompleto. Abra o link exatamente como foi enviado a você ou peça um novo convite.'
           : 'Este convite não pode mais ser usado. Peça um novo convite a quem o enviou.'}
       </Alert>
-      <p className="text-sm text-slate-700">
+      <p className="text-body text-ink-2">
         Já tem uma conta?{' '}
-        <Link to="/login" className="font-medium text-blue-800 underline">
+        <Link to="/login" className={linkClass}>
           Entrar
         </Link>
       </p>
@@ -121,7 +122,7 @@ interface AcceptFormValues {
 
 function RequirementItem({ met, children }: { met: boolean; children: string }) {
   return (
-    <li className={met ? 'text-green-900' : 'text-slate-700'}>
+    <li className={met ? 'text-evid-text' : 'text-ink-2'}>
       {children}
       <span className="font-medium"> — {met ? 'atendido' : 'pendente'}</span>
     </li>
@@ -239,7 +240,7 @@ function AcceptInviteForm({ token, email }: { token: string; email: string }) {
             <RequirementItem met={lengthMet}>
               {`Pelo menos ${String(PASSWORD_MIN_LENGTH)} caracteres`}
             </RequirementItem>
-            <li className="text-slate-700">
+            <li className="text-ink-2">
               Evite senhas comuns ou que contenham o seu e-mail; elas são recusadas.
             </li>
           </ul>
@@ -282,12 +283,12 @@ function AcceptInviteForm({ token, email }: { token: string; email: string }) {
         }}
       />
 
-      <fieldset className="flex flex-col gap-3 rounded-md border border-slate-300 bg-white p-4">
-        <legend className="px-1 text-sm font-semibold text-slate-900">
+      <fieldset className="flex flex-col gap-3 rounded-control border border-line bg-surface p-4">
+        <legend className="px-1 text-body font-semibold text-ink-1">
           Tratamento de dados do perfil
         </legend>
         {PROFILE_CONSENT_PARAGRAPHS.map((paragraph) => (
-          <p key={paragraph} className="text-sm text-slate-700">
+          <p key={paragraph} className="text-body text-ink-2">
             {paragraph}
           </p>
         ))}

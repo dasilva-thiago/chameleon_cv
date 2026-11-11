@@ -8,6 +8,7 @@ import {
   patchJobRequestSchema,
   type DeleteJobResponse,
   type JobDetail,
+  type JobEvaluationSummary,
   type JobResponse,
   type JobStatus,
   type JobSummary,
@@ -16,7 +17,9 @@ import {
 import type { ApiModule } from '../../app';
 import { requireAuthContext } from '../../auth/context';
 import { notFound, parseDto, uuidParam } from '../../http/params';
+import { loadProfileBase } from '../profile';
 import { registerAnalysisRoutes } from './analysis';
+import { parseStoredResult } from './analysis-core';
 
 /**
  * Saved job postings (P1): `/api/jobs/**`. Every route is `auth: 'session'` (the registry adds the guard) and
@@ -74,6 +77,51 @@ export function summaryDto(row: JobRow): JobSummary {
   };
 }
 
+/**
+ * Latest evaluation of each listed job, reduced to what a list shows (score, recommendation, evidence rail).
+ * One query for the page; an evaluation stored in an old format counts as "not evaluated".
+ */
+async function evaluationsFor(
+  auth: ReturnType<typeof requireAuthContext>,
+  jobs: readonly { id: string; descriptionHash: string }[],
+): Promise<Map<string, JobEvaluationSummary>> {
+  const out = new Map<string, JobEvaluationSummary>();
+  if (jobs.length === 0) return out;
+  const [rows, base] = await Promise.all([
+    auth.db.jobAnalysis.findMany({
+      where: { jobId: { in: jobs.map((job) => job.id) } },
+      orderBy: [{ jobId: 'asc' }, { createdAt: 'desc' }],
+      distinct: ['jobId'],
+      select: {
+        jobId: true,
+        result: true,
+        descriptionHash: true,
+        profileHash: true,
+        createdAt: true,
+      },
+    }),
+    loadProfileBase(auth),
+  ]);
+  const hashOf = new Map(jobs.map((job) => [job.id, job.descriptionHash]));
+  for (const row of rows) {
+    const result = parseStoredResult(row.result);
+    if (result === null) continue;
+    const rail = { strong: 0, partial: 0, missing: 0, na: 0 };
+    for (const match of result.matches) rail[match.match] += 1;
+    out.set(row.jobId, {
+      score: result.score,
+      recommendation: result.verdict.recommendation,
+      dealbreaker: result.dealbreakers.length > 0,
+      rail,
+      stale:
+        row.descriptionHash !== hashOf.get(row.jobId) ||
+        row.profileHash !== (base?.contentHash ?? null),
+      evaluatedAt: row.createdAt.toISOString(),
+    });
+  }
+  return out;
+}
+
 export function detailDto(row: JobRow): JobDetail {
   return {
     ...summaryDto(row),
@@ -109,7 +157,8 @@ export const createJobsModule = (): ApiModule => (context) => {
     '/jobs',
     { auth: 'session', description: 'List saved job postings (filter by status, search text).' },
     async (req, res) => {
-      const { db } = requireAuthContext(req);
+      const auth = requireAuthContext(req);
+      const { db } = auth;
       const query = parseDto(listJobsQuerySchema, req.query);
       const statusFilter =
         query.status === 'all'
@@ -141,8 +190,12 @@ export const createJobsModule = (): ApiModule => (context) => {
         number
       >;
       for (const group of grouped) byStatus[group.status] = group._count._all;
+      const evaluations = await evaluationsFor(auth, rows);
       const response: ListJobsResponse = {
-        jobs: rows.map(summaryDto),
+        jobs: rows.map((row) => ({
+          ...summaryDto(row),
+          evaluation: evaluations.get(row.id) ?? null,
+        })),
         counts: {
           total: Object.values(byStatus).reduce((sum, n) => sum + n, 0),
           active: ACTIVE_JOB_STATUSES.reduce((sum, status) => sum + byStatus[status], 0),

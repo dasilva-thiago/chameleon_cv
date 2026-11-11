@@ -1,13 +1,20 @@
 import {
   PROFILE_BASE_LIMITS,
   saveProfileBaseRequestSchema,
+  type BaseReading,
+  type BaseReadingResponse,
   type ListProfileRevisionsResponse,
   type ProfileBase,
   type ProfileBaseResponse,
   type ProfileRevisionResponse,
   type SaveProfileBaseResponse,
 } from '@chameleon/contracts';
-import { hashProfileBase } from '@chameleon/domain';
+import {
+  avoidedExpressions,
+  hashProfileBase,
+  parseBaseCv,
+  resumeLanguage,
+} from '@chameleon/domain';
 import express, { type Request } from 'express';
 import type { ApiModule } from '../../app';
 import { requireAuthContext, type AuthContext } from '../../auth/context';
@@ -25,6 +32,7 @@ import { notFound, parseDto, uuidParam } from '../../http/params';
 export const PROFILE_BODY_LIMIT_BYTES = 512 * 1024;
 export const LARGE_BODY_ROUTES: readonly { method: string; path: string }[] = [
   { method: 'PUT', path: '/profile' },
+  { method: 'POST', path: '/profile/reading' },
 ];
 
 interface BaseRow {
@@ -50,6 +58,46 @@ const baseDto = (row: BaseRow): ProfileBase => ({
   hash: row.contentHash,
   updatedAt: row.updatedAt.toISOString(),
 });
+
+const cut = (value: string): string => (value.length <= 300 ? value : `${value.slice(0, 299)}…`);
+const cutOrNull = (value: string | null): string | null => (value === null ? null : cut(value));
+
+/** What the checks will see in the base (the parser the fact checks use), reduced to labels and counts. */
+export function readBase(cvMarkdown: string, profileMarkdown: string): BaseReading {
+  const cv = parseBaseCv(cvMarkdown);
+  const contacts = { email: 0, phone: 0, link: 0 };
+  for (const contact of cv.contacts) contacts[contact.kind] += 1;
+  return {
+    cv: {
+      name: cutOrNull(cv.name),
+      headline: cutOrNull(cv.headline),
+      location: cutOrNull(cv.location),
+      contacts,
+      summaryParagraphs: cv.summary.length,
+      experiences: cv.experiences.slice(0, 60).map((e) => ({
+        company: cut(e.company),
+        title: cutOrNull(e.title),
+        period: cutOrNull(e.period),
+        bullets: e.bullets.length,
+      })),
+      projects: cv.projects
+        .slice(0, 60)
+        .map((p) => ({ name: cut(p.name), bullets: p.bullets.length })),
+      education: cv.education.slice(0, 30).map((e) => ({
+        institution: cut(e.institution),
+        course: cutOrNull(e.course),
+        period: cutOrNull(e.period),
+      })),
+      skills: cv.skills.slice(0, 40).map((g) => ({ group: cut(g.group), items: g.items.length })),
+      languages: cv.languages.length,
+      courses: cv.courses.length,
+    },
+    profile: {
+      avoid: avoidedExpressions(profileMarkdown).slice(0, 100).map(cut),
+      language: cut(resumeLanguage(profileMarkdown)),
+    },
+  };
+}
 
 const revisionSummary = (row: RevisionRow) => ({
   id: row.id,
@@ -162,6 +210,24 @@ export const createProfileModule = (): ApiModule => (context) => {
         });
       }
       const response: SaveProfileBaseResponse = { base: baseDto(row), changed };
+      res.json(response);
+    },
+  );
+
+  routes.post(
+    '/profile/reading',
+    {
+      auth: 'session',
+      description:
+        'How the program reads a base (saved or not): experiences, titles, skills, avoided expressions. Stores nothing.',
+    },
+    requireProfileConsent,
+    bodyParser,
+    (req, res) => {
+      const body = parseDto(saveProfileBaseRequestSchema, req.body);
+      const response: BaseReadingResponse = {
+        reading: readBase(body.cvMarkdown, body.profileMarkdown),
+      };
       res.json(response);
     },
   );

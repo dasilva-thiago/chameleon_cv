@@ -16,6 +16,7 @@ describe('manifesto de rotas (gate de isolamento, ADR-0008 item 5b)', () => {
     expect(profile.map((r) => `${r.method} ${r.path}`)).toEqual([
       'GET /api/profile',
       'PUT /api/profile',
+      'POST /api/profile/reading',
       'GET /api/profile/revisions',
       'GET /api/profile/revisions/:revisionId',
       'POST /api/profile/revisions/:revisionId/restore',

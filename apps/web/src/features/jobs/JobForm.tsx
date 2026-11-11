@@ -155,12 +155,12 @@ export function JobForm({ job, submitLabel, pending, apiError, onSubmit, onCance
         onToggle={(event) => {
           setMoreOpen(event.currentTarget.open);
         }}
-        className="rounded-md border border-slate-400 bg-white"
+        className="group rounded-panel border border-line bg-surface"
       >
-        <summary className="cursor-pointer px-4 py-3 text-base font-medium text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700">
-          Mais detalhes <span className="font-normal text-slate-700">(opcional)</span>
+        <summary className="cursor-pointer rounded-panel px-4 py-3 text-body font-medium text-ink-1 transition-colors duration-150 hover:bg-sunken/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand">
+          Mais detalhes <span className="font-normal text-ink-2">(opcional)</span>
         </summary>
-        <div className="flex flex-col gap-4 border-t border-slate-300 p-4">
+        <div className="flex flex-col gap-4 border-t border-line p-4">
           <div className="grid gap-4 sm:grid-cols-2">
             <TextField
               label="Endereço da vaga (URL)"

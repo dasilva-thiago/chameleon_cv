@@ -1,4 +1,5 @@
 import { useId, useState } from 'react';
+import { linkClass } from './styles';
 
 /** Texto de linhas e/ou caracteres a partir do qual vale recolher. */
 const COLLAPSE_AFTER_LINES = 8;
@@ -26,7 +27,7 @@ export function ExpandableText({
     <div className="flex flex-col gap-2">
       <pre
         id={textId}
-        className={`whitespace-pre-wrap break-words rounded-md border border-slate-400 bg-white p-4 font-sans text-base text-slate-900 ${clipped ? 'line-clamp-6' : ''}`}
+        className={`whitespace-pre-wrap break-words rounded-panel border border-line bg-sunken p-4 font-sans text-body text-ink-1 ${clipped ? 'line-clamp-6' : ''}`}
       >
         {text}
       </pre>
@@ -39,7 +40,7 @@ export function ExpandableText({
             onClick={() => {
               setExpanded((value) => !value);
             }}
-            className="min-h-11 rounded-md px-1 font-medium text-blue-800 underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700"
+            className={`${linkClass} cursor-pointer px-0.5 py-1`}
           >
             {expanded ? collapseLabel : expandLabel}
           </button>

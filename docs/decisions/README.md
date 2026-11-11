@@ -14,3 +14,4 @@ Formato curto: contexto, decisão, alternativas, consequências e verificação.
 | [0012](ADR-0012-exportacao-docx-pdf.md) | Exportação DOCX/PDF sem LibreOffice | Aceita (não implementada) |
 | [0014](ADR-0014-privacidade-lgpd-piloto.md) | Privacidade, LGPD e tratamento dos dados do perfil-piloto | Aceita (não implementada); retenção depende do usuário |
 | [0015](ADR-0015-fluxo-career-ops-base-markdown.md) | Fluxo do career-ops: base em Markdown, avaliação e adaptação com IA | Implementada (substitui 0004-0007, 0011, 0013) |
+| [0016](ADR-0016-design-system-temas.md) | Design system com tokens semânticos, marca índigo e temas claro e escuro | Implementada |

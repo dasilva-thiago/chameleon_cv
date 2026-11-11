@@ -64,7 +64,7 @@ export function DownloadMenu({
           {messageForError(download.error)}
         </Alert>
       ) : null}
-      <div role="status" aria-live="polite" className="text-sm text-slate-700">
+      <div role="status" aria-live="polite" className="text-body text-ink-2">
         {download.isSuccess
           ? `Arquivo ${EXPORT_FORMAT_LABELS[download.data]} gerado (${context}). Verifique a pasta de downloads.`
           : ''}

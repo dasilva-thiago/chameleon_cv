@@ -1,13 +1,18 @@
 import type { ReactNode } from 'react';
+import { cx } from './styles';
 
-type BadgeTone = 'neutral' | 'good' | 'warn' | 'bad' | 'info';
+/**
+ * good = comprovado/recomendado/aprovado (verde, plano §2); warn = precisa de atenção; bad = bloqueia; info = destaque de
+ * marca (tipo de vaga, item atual); neutral = situação sem juízo (situação da vaga, contagens).
+ */
+export type BadgeTone = 'neutral' | 'good' | 'warn' | 'bad' | 'info';
 
 const TONES: Record<BadgeTone, string> = {
-  neutral: 'border-slate-500 bg-slate-100 text-slate-900',
-  good: 'border-green-800 bg-green-50 text-green-900',
-  warn: 'border-amber-800 bg-amber-50 text-amber-950',
-  bad: 'border-red-800 bg-red-50 text-red-900',
-  info: 'border-blue-800 bg-blue-50 text-blue-900',
+  neutral: 'border-line bg-sunken text-ink-2',
+  good: 'border-evid/25 bg-evid-soft text-evid-text',
+  warn: 'border-attn/30 bg-attn-soft text-attn-text',
+  bad: 'border-risk/25 bg-risk-soft text-risk-text',
+  info: 'border-brand/25 bg-brand-soft text-brand-text',
 };
 
 /**
@@ -17,16 +22,22 @@ const TONES: Record<BadgeTone, string> = {
 export function Badge({
   tone = 'neutral',
   prefix,
+  icon,
   children,
 }: {
   tone?: BadgeTone;
   prefix?: string;
+  icon?: ReactNode;
   children: ReactNode;
 }) {
   return (
     <span
-      className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-medium ${TONES[tone]}`}
+      className={cx(
+        'inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-2 py-0.5 text-meta font-medium',
+        TONES[tone],
+      )}
     >
+      {icon}
       {prefix !== undefined ? <span className="font-normal">{prefix}:</span> : null}
       {children}
     </span>

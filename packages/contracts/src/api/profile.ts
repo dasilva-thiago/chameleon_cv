@@ -81,3 +81,56 @@ export const profileRevisionResponseSchema = z.strictObject({
   }),
 });
 export type ProfileRevisionResponse = z.infer<typeof profileRevisionResponseSchema>;
+
+// --- Como o programa leu a base -------------------------------------------------------------------------------
+
+const readText = z.string().max(300);
+const count = z.number().int().nonnegative();
+
+/**
+ * `POST /api/profile/reading`: o que o programa reconhece no texto enviado (salvo ou ainda nao), sem gravar nada e
+ * sem IA. E o que as checagens dos curriculos usam (cargo exato por empresa, ordem das experiencias, expressoes a
+ * evitar), entao a pessoa pode conferir antes de gerar um curriculo.
+ */
+export const baseReadingSchema = z.strictObject({
+  cv: z.strictObject({
+    name: readText.nullable(),
+    headline: readText.nullable(),
+    location: readText.nullable(),
+    contacts: z.strictObject({ email: count, phone: count, link: count }),
+    summaryParagraphs: count,
+    experiences: z
+      .array(
+        z.strictObject({
+          company: readText,
+          title: readText.nullable(),
+          period: readText.nullable(),
+          bullets: count,
+        }),
+      )
+      .max(60),
+    projects: z.array(z.strictObject({ name: readText, bullets: count })).max(60),
+    education: z
+      .array(
+        z.strictObject({
+          institution: readText,
+          course: readText.nullable(),
+          period: readText.nullable(),
+        }),
+      )
+      .max(30),
+    skills: z.array(z.strictObject({ group: readText, items: count })).max(40),
+    languages: count,
+    courses: count,
+  }),
+  profile: z.strictObject({
+    /** Lista "Expressoes a evitar" (erro de checagem quando aparecem num curriculo). */
+    avoid: z.array(readText).max(100),
+    /** Idioma dos curriculos. */
+    language: readText,
+  }),
+});
+export type BaseReading = z.infer<typeof baseReadingSchema>;
+
+export const baseReadingResponseSchema = z.strictObject({ reading: baseReadingSchema });
+export type BaseReadingResponse = z.infer<typeof baseReadingResponseSchema>;

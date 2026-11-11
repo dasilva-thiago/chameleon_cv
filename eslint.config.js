@@ -202,6 +202,11 @@ export default tseslint.config(
     extends: [jsxA11y.flatConfigs.recommended, reactHooks.configs.flat['recommended-latest']],
     languageOptions: { globals: { ...globals.browser } },
   },
+  // Plain browser scripts served as-is (theme applied before the first paint).
+  {
+    files: ['apps/web/public/**/*.js'],
+    languageOptions: { sourceType: 'script', globals: { ...globals.browser } },
+  },
 
   // Node (api, scripts, configs).
   {

@@ -1,9 +1,11 @@
+import { Disclosure } from '../../components/ui/Disclosure';
 import { useState } from 'react';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { usePageTitle } from '../../components/layout/PageHeading';
 import { Section } from '../../components/layout/Section';
 import { Alert } from '../../components/ui/Alert';
 import { Button } from '../../components/ui/Button';
+import { ThemeToggle } from '../../components/ui/ThemeToggle';
 import { messageForError } from '../../lib/api';
 import { useLogoutAll, useSession } from '../auth/session';
 
@@ -14,7 +16,7 @@ function formatDate(iso: string): string {
   return Number.isNaN(date.getTime()) ? iso : dateFormatter.format(date);
 }
 
-const listClass = 'grid grid-cols-1 gap-x-6 gap-y-1 text-base sm:grid-cols-[10rem_1fr]';
+const listClass = 'grid grid-cols-1 gap-x-6 gap-y-1 text-body sm:grid-cols-[10rem_1fr]';
 
 export function AccountPage() {
   usePageTitle('Conta');
@@ -30,30 +32,39 @@ export function AccountPage() {
 
       <Section id="dados-da-conta" title="Dados da conta">
         <dl className={listClass}>
-          <dt className="text-slate-700">Nome</dt>
+          <dt className="text-ink-2">Nome</dt>
           <dd className="font-medium">{user.displayName ?? 'Não informado'}</dd>
-          <dt className="text-slate-700">E-mail</dt>
+          <dt className="text-ink-2">E-mail</dt>
           <dd className="break-all font-medium">{user.email}</dd>
         </dl>
       </Section>
 
+      <Section
+        id="aparencia"
+        title="Aparência"
+        description="Claro, escuro ou igual ao sistema. Atalho: Ctrl+Shift+L."
+      >
+        <div>
+          <ThemeToggle />
+        </div>
+      </Section>
+
       <Section id="seguranca" title="Segurança da sessão">
         <dl className={listClass}>
-          <dt className="text-slate-700">Sessão válida até</dt>
+          <dt className="text-ink-2">Sessão válida até</dt>
           <dd className="font-medium">{formatDate(session.expiresAt)}</dd>
         </dl>
-        <details className="text-sm text-slate-700">
-          <summary className="w-fit cursor-pointer underline decoration-dotted">
-            Detalhes da validade
-          </summary>
-          <dl className={`${listClass} mt-2`}>
-            <dt>Limite máximo</dt>
-            <dd>{formatDate(session.absoluteExpiresAt)}</dd>
-          </dl>
-          <p className="mt-1">
-            A validade é renovada enquanto você usa o serviço, até o limite máximo.
-          </p>
-        </details>
+        <div className="text-body text-ink-2">
+          <Disclosure variant="inline" summary="Detalhes da validade">
+            <dl className={`${listClass} mt-2`}>
+              <dt>Limite máximo</dt>
+              <dd>{formatDate(session.absoluteExpiresAt)}</dd>
+            </dl>
+            <p className="mt-1">
+              A validade é renovada enquanto você usa o serviço, até o limite máximo.
+            </p>
+          </Disclosure>
+        </div>
 
         {logoutAll.isError ? (
           <Alert tone="error" title="Não foi possível encerrar as sessões">
@@ -65,12 +76,12 @@ export function AccountPage() {
           <div
             role="group"
             aria-labelledby="confirmar-sair-todos"
-            className="flex flex-col gap-3 rounded-md border border-slate-400 bg-white p-4"
+            className="flex flex-col gap-3 rounded-control border border-line-strong bg-surface p-4"
           >
-            <p id="confirmar-sair-todos" className="text-base font-medium">
+            <p id="confirmar-sair-todos" className="text-body font-medium">
               Sair de todos os dispositivos?
             </p>
-            <p className="text-sm text-slate-700">
+            <p className="text-body text-ink-2">
               Todas as sessões desta conta, inclusive esta, serão encerradas e você precisará entrar
               novamente.
             </p>

@@ -71,6 +71,9 @@ pnpm typecheck                 # TypeScript em todos os pacotes
 pnpm test                      # unitarios + componentes (sem banco, sem rede)
 pnpm test:integration          # contra PostgreSQL real (precisa do banco rodando e TEST_DATABASE_ADMIN_URL)
 pnpm test:e2e                  # Playwright no stack real (API em banco descartavel, Vite, Chromium)
+                               # inclui o teste visual: telas nos temas claro e escuro, axe com contraste
+                               # real e capturas em e2e/.tmp/screens (nao versionadas)
+pnpm exec playwright test e2e/visual-themes.spec.ts   # so o teste visual
 pnpm test:all                  # test + test:integration + test:e2e
 
 # Rodar um unico arquivo de teste:
