@@ -1,29 +1,117 @@
-import type { ButtonHTMLAttributes, Ref } from 'react';
-
-type Variant = 'primary' | 'secondary' | 'danger';
-
-const VARIANTS: Record<Variant, string> = {
-  primary: 'bg-blue-700 text-white hover:bg-blue-800 border-transparent',
-  secondary: 'bg-white text-slate-900 hover:bg-slate-100 border-slate-400',
-  danger: 'bg-red-700 text-white hover:bg-red-800 border-transparent',
-};
+import type { AnchorHTMLAttributes, ButtonHTMLAttributes, ReactNode, Ref } from 'react';
+import { Link, type LinkProps } from 'react-router';
+import { Spinner } from './Spinner';
+import { buttonClasses, cx, type ButtonSize, type ButtonVariant } from './styles';
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: Variant;
+  variant?: ButtonVariant;
+  size?: ButtonSize;
+  /** Shows a spinner, sets aria-busy and disables the button while keeping its label (no layout jump). */
+  loading?: boolean;
+  /** Icon before the label (decorative). */
+  icon?: ReactNode;
   ref?: Ref<HTMLButtonElement>;
 }
 
 export function Button({
   variant = 'primary',
+  size = 'md',
+  loading = false,
+  icon,
   className = '',
   type = 'button',
+  disabled,
+  children,
   ...rest
 }: ButtonProps) {
   return (
     <button
       type={type}
-      className={`inline-flex min-h-11 items-center justify-center rounded-md border px-4 py-2 text-base font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700 disabled:cursor-not-allowed disabled:opacity-60 ${VARIANTS[variant]} ${className}`}
+      disabled={disabled === true || loading}
+      aria-busy={loading ? true : undefined}
+      className={cx(buttonClasses(variant, size), className)}
       {...rest}
-    />
+    >
+      {loading ? <Spinner /> : icon}
+      {children}
+    </button>
+  );
+}
+
+export interface LinkButtonProps extends Omit<LinkProps, 'className'> {
+  variant?: ButtonVariant;
+  size?: ButtonSize;
+  icon?: ReactNode;
+  className?: string;
+}
+
+/** A router link that looks like a button (navigation, not an action). */
+export function LinkButton({
+  variant = 'secondary',
+  size = 'md',
+  icon,
+  className = '',
+  children,
+  ...rest
+}: LinkButtonProps) {
+  return (
+    <Link className={cx(buttonClasses(variant, size), className)} {...rest}>
+      {icon}
+      {children}
+    </Link>
+  );
+}
+
+export interface ExternalLinkButtonProps extends AnchorHTMLAttributes<HTMLAnchorElement> {
+  variant?: ButtonVariant;
+  size?: ButtonSize;
+}
+
+export function ExternalLinkButton({
+  variant = 'secondary',
+  size = 'md',
+  className = '',
+  children,
+  ...rest
+}: ExternalLinkButtonProps) {
+  return (
+    <a className={cx(buttonClasses(variant, size), className)} {...rest}>
+      {children}
+    </a>
+  );
+}
+
+export interface IconButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'children'> {
+  /** Accessible name (also shown as a tooltip). */
+  label: string;
+  icon: ReactNode;
+  variant?: Exclude<ButtonVariant, 'primary'>;
+  size?: ButtonSize;
+  ref?: Ref<HTMLButtonElement>;
+}
+
+export function IconButton({
+  label,
+  icon,
+  variant = 'ghost',
+  size = 'md',
+  className = '',
+  type = 'button',
+  ...rest
+}: IconButtonProps) {
+  return (
+    <button
+      type={type}
+      aria-label={label}
+      title={label}
+      className={cx(
+        buttonClasses(variant, size),
+        size === 'sm' ? 'w-8 px-0 pointer-coarse:w-10' : 'w-9 px-0 pointer-coarse:w-11',
+        className,
+      )}
+      {...rest}
+    >
+      {icon}
+    </button>
   );
 }

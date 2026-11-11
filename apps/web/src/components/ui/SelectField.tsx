@@ -1,4 +1,5 @@
 import { useId, type ReactNode, type Ref, type SelectHTMLAttributes } from 'react';
+import { cx, errorTextClass, fieldClass, hintClass, labelClass } from './styles';
 
 export interface SelectFieldProps extends Omit<SelectHTMLAttributes<HTMLSelectElement>, 'id'> {
   label: string;
@@ -31,10 +32,10 @@ export function SelectField({
 
   return (
     <div className="flex flex-col gap-1.5">
-      <label htmlFor={id} className="text-sm font-medium text-slate-900">
+      <label htmlFor={id} className={labelClass}>
         {label}
         {required === true ? (
-          <span aria-hidden="true" className="text-red-700">
+          <span aria-hidden="true" className="text-risk-text">
             {' '}
             *
           </span>
@@ -47,9 +48,11 @@ export function SelectField({
         aria-required={required === true ? true : undefined}
         aria-invalid={error !== undefined ? true : undefined}
         aria-describedby={describedBy}
-        className={`min-h-11 w-full rounded-md border bg-white px-3 py-2 text-base text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-blue-700 disabled:bg-slate-100 ${
-          error !== undefined ? 'border-red-700' : 'border-slate-500'
-        } ${className}`}
+        className={cx(
+          fieldClass(error !== undefined),
+          'h-9 cursor-pointer pr-8 pointer-coarse:h-11',
+          className,
+        )}
         {...rest}
       >
         {placeholder !== null ? <option value="">{placeholder}</option> : null}
@@ -60,12 +63,12 @@ export function SelectField({
         ))}
       </select>
       {hint !== undefined ? (
-        <div id={hintId} className="text-sm text-slate-700">
+        <div id={hintId} className={hintClass}>
           {hint}
         </div>
       ) : null}
       {error !== undefined ? (
-        <p id={errorId} className="text-sm font-medium text-red-800">
+        <p id={errorId} className={errorTextClass}>
           {error}
         </p>
       ) : null}

@@ -2,12 +2,12 @@ import type { ReactNode } from 'react';
 import { Navigate, useLocation } from 'react-router';
 import { AuthenticatedLayout } from '../../components/layout/AuthenticatedLayout';
 import { PageHeading, usePageTitle } from '../../components/layout/PageHeading';
+import { PublicHeader } from '../../components/layout/PublicLayout';
 import { ShellFrame } from '../../components/layout/ShellFrame';
 import { Alert } from '../../components/ui/Alert';
 import { Button } from '../../components/ui/Button';
 import { LoadingStatus } from '../../components/ui/LoadingStatus';
 import { messageForError } from '../../lib/api';
-import { APP_NAME } from '../../lib/config';
 import { useAuthNotice, useSession } from './session';
 
 export interface LoginLocationState {
@@ -26,13 +26,7 @@ export function safeInternalPath(value: unknown): string | undefined {
 function SessionScreen({ title, children }: { title: string; children: ReactNode }) {
   usePageTitle(title);
   return (
-    <ShellFrame
-      header={
-        <div className="mx-auto flex w-full max-w-3xl items-center px-4 py-3 sm:px-6">
-          <p className="text-lg font-semibold tracking-tight">{APP_NAME}</p>
-        </div>
-      }
-    >
+    <ShellFrame header={<PublicHeader />} width="read">
       <PageHeading>{title}</PageHeading>
       {children}
     </ShellFrame>

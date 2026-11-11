@@ -1,5 +1,7 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router';
+import { ChevronLeftIcon } from '../ui/icons';
+import { cx, focusRing, transition } from '../ui/styles';
 import { PageHeading } from './PageHeading';
 
 /**
@@ -19,22 +21,28 @@ export function PageHeader({
   actions?: ReactNode;
 }) {
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-2">
       {back !== undefined ? (
         <Link
           to={back.to}
-          className="w-fit text-sm text-blue-800 underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700"
+          className={cx(
+            'inline-flex w-fit items-center gap-1 rounded-sm text-meta font-medium text-ink-3 hover:text-brand',
+            transition,
+            focusRing,
+          )}
         >
-          <span aria-hidden="true">← </span>
+          <ChevronLeftIcon />
           {back.label}
         </Link>
       ) : null}
       <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
         <div className="flex min-w-0 flex-col gap-1.5">
           <PageHeading>{title}</PageHeading>
-          {meta}
+          {meta !== undefined ? <div className="text-body text-ink-2">{meta}</div> : null}
         </div>
-        {actions !== undefined ? <div className="flex flex-wrap gap-3">{actions}</div> : null}
+        {actions !== undefined ? (
+          <div className="flex flex-wrap items-center gap-2">{actions}</div>
+        ) : null}
       </div>
     </div>
   );
