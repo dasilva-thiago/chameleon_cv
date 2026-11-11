@@ -10,7 +10,7 @@ import type { CoverageMap } from './support/gate';
  *
  * Adicionou uma rota? O route-gate.test.ts falha ate que ela apareca aqui. Ver README.md.
  */
-/** S2.1a: one A x B case covers the whole profile module (see cross-cases.ts). */
+/** One A x B case covers the whole professional-base module (see cross-cases.ts). */
 const PROFILE_CASE = 'profile.api/cross-owner-behaves-like-not-found';
 
 /** P1: one A x B case covers the whole jobs module (see cross-cases.ts). */
@@ -47,7 +47,6 @@ export const ROUTE_COVERAGE: CoverageMap = {
   'POST /api/resumes/:resumeId/versions': { kind: 'cross-case', caseId: RESUMES_CASE },
   'GET /api/jobs/:jobId/analysis': { kind: 'cross-case', caseId: JOBS_CASE },
   'POST /api/jobs/:jobId/analysis': { kind: 'cross-case', caseId: JOBS_CASE },
-  'PATCH /api/jobs/:jobId/analysis/review': { kind: 'cross-case', caseId: JOBS_CASE },
   'GET /health': {
     kind: 'no-private-data',
     reason: 'Liveness publico: resposta constante { status: "ok" }, sem sessao nem banco.',
@@ -76,31 +75,7 @@ export const ROUTE_COVERAGE: CoverageMap = {
   },
   'GET /api/profile': { kind: 'cross-case', caseId: PROFILE_CASE },
   'PUT /api/profile': { kind: 'cross-case', caseId: PROFILE_CASE },
-  'GET /api/profile/sections/:section': { kind: 'cross-case', caseId: PROFILE_CASE },
-  'PUT /api/profile/sections/:section': { kind: 'cross-case', caseId: PROFILE_CASE },
-  'POST /api/profile/records': { kind: 'cross-case', caseId: PROFILE_CASE },
-  'GET /api/profile/records/:recordId': { kind: 'cross-case', caseId: PROFILE_CASE },
-  'PUT /api/profile/records/:recordId': { kind: 'cross-case', caseId: PROFILE_CASE },
-  'DELETE /api/profile/records/:recordId': { kind: 'cross-case', caseId: PROFILE_CASE },
-  'PATCH /api/profile/records/:recordId/meta': { kind: 'cross-case', caseId: PROFILE_CASE },
-  'POST /api/profile/records/:recordId/archive': { kind: 'cross-case', caseId: PROFILE_CASE },
-  'POST /api/profile/confirmations': { kind: 'cross-case', caseId: PROFILE_CASE },
-  'GET /api/profile/evidence': { kind: 'cross-case', caseId: PROFILE_CASE },
-  'GET /api/profile/evidence/:evidenceId/links': { kind: 'cross-case', caseId: PROFILE_CASE },
-  'POST /api/profile/evidence/:evidenceId/links': { kind: 'cross-case', caseId: PROFILE_CASE },
-  'DELETE /api/profile/evidence/:evidenceId/links/:recordId': {
-    kind: 'cross-case',
-    caseId: PROFILE_CASE,
-  },
-  'GET /api/profile/pending': { kind: 'cross-case', caseId: PROFILE_CASE },
-  'PATCH /api/profile/pending/:pendingId': { kind: 'cross-case', caseId: PROFILE_CASE },
-  'POST /api/profile/revisions': { kind: 'cross-case', caseId: PROFILE_CASE },
   'GET /api/profile/revisions': { kind: 'cross-case', caseId: PROFILE_CASE },
   'GET /api/profile/revisions/:revisionId': { kind: 'cross-case', caseId: PROFILE_CASE },
-  'POST /api/profile/imports/preview': { kind: 'cross-case', caseId: PROFILE_CASE },
-  'GET /api/profile/imports': { kind: 'cross-case', caseId: PROFILE_CASE },
-  'GET /api/profile/imports/:importRecordId': { kind: 'cross-case', caseId: PROFILE_CASE },
-  'POST /api/profile/imports/:importRecordId/apply': { kind: 'cross-case', caseId: PROFILE_CASE },
-  'POST /api/profile/imports/:importRecordId/discard': { kind: 'cross-case', caseId: PROFILE_CASE },
-  'GET /api/profile/export': { kind: 'cross-case', caseId: PROFILE_CASE },
+  'POST /api/profile/revisions/:revisionId/restore': { kind: 'cross-case', caseId: PROFILE_CASE },
 };

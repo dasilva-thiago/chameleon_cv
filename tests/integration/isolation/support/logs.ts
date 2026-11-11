@@ -31,12 +31,12 @@ export function assertLogsClean(world: World): void {
     secrets.set(who.email, `e-mail de ${who.label}`);
     for (const canary of who.canaries) secrets.set(canary, `canario ${who.label}`);
   }
-  for (const actor of [...world.all, world.coverage]) {
-    secrets.set(actor.password, `senha de ${actor.fixtureId}`);
+  for (const actor of world.all) {
+    secrets.set(actor.password, `senha de ${actor.label}`);
     if (actor.client.sessionToken) {
-      secrets.set(actor.client.sessionToken, `sessao de ${actor.fixtureId}`);
+      secrets.set(actor.client.sessionToken, `sessao de ${actor.label}`);
     }
-    if (actor.client.csrfToken) secrets.set(actor.client.csrfToken, `csrf de ${actor.fixtureId}`);
+    if (actor.client.csrfToken) secrets.set(actor.client.csrfToken, `csrf de ${actor.label}`);
   }
   for (const [value, label] of extraSecrets.get(world) ?? []) secrets.set(value, label);
 

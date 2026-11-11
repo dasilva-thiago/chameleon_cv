@@ -14,31 +14,15 @@ export {
   GLOBAL_MODELS,
   OwnerScopeViolationError,
   PRIVATE_MODELS,
-  ProfileStoreError,
   UnscopedAccessError,
   createDb,
-  createProfileStore,
   isPrivateModel,
 } from '../../../../packages/db/src';
-export type {
-  Db,
-  PrivateModelName,
-  ProfileStore,
-  RevisionSummary,
-  SnapshotBuilder,
-} from '../../../../packages/db/src';
+export type { Db, PrivateModelName } from '../../../../packages/db/src';
 export { createTestDb } from '../../../../packages/db/src/testing';
 export type { TestDb } from '../../../../packages/db/src/testing';
 export type { AuthSessionResponse } from '../../../../packages/contracts/src';
-export { buildProfileSnapshot } from '../../../../packages/domain/src';
-export { importProfile } from '../../../../packages/profile-io/src';
-export {
-  listProfileCanaries,
-  listV2ProfileIds,
-  loadProfileYaml,
-  listProfileIds,
-} from '../../../../packages/test-fixtures/src';
-export type { ProfileId } from '../../../../packages/test-fixtures/src';
+export { buildBaseResume, parseBaseCv } from '../../../../packages/domain/src';
 
 // Helpers de teste da API (S1.2) e superficie publica usada para o manifesto de rotas.
 export {
@@ -49,16 +33,15 @@ export {
   buildTestApp,
   createTestAccount,
   createTwoAccounts,
+  scriptedProvider,
   testConfig,
 } from '../../../../apps/api/test/helpers';
+export { createAiService } from '../../../../apps/api/src/ai/service';
 export type { TestAccount, TestApp, TestResponse } from '../../../../apps/api/test/helpers';
 export { getRouteManifest, requireAuthContext } from '../../../../apps/api/src';
 export type { ApiModule, RouteManifestEntry } from '../../../../apps/api/src';
 export { createInvite } from '../../../../apps/api/src/auth/invites';
 
-// Helper INDEPENDENTE de snapshot do db (JCS + node:crypto) e documentos de fixture com UUIDs.
-export { testSnapshot } from '../../../../packages/db/test/support/snapshot';
-export { fixtureDocument } from '../../../../packages/db/test/support/profile-docs';
 export { generateToken, hashToken } from '../../../../apps/api/src/auth/tokens';
 
 // `express` so resolve a partir de apps/api: usado apenas para montar um router "fora do registro"

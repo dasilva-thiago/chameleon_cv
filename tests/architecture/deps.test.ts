@@ -109,17 +109,6 @@ describe('verificador (o teste de grafo detecta violacoes)', () => {
     expect(violations).toHaveLength(3);
   });
 
-  it('permite test-fixtures apenas em arquivos de teste', () => {
-    const violations = findViolations(
-      [
-        file('apps/api/src/x.ts', '@chameleon/test-fixtures'),
-        file('apps/api/test/x.test.ts', '@chameleon/test-fixtures'),
-      ],
-      [],
-    );
-    expect(violations.map((v) => v.where)).toEqual(['apps/api/src/x.ts']);
-  });
-
   it('reprova dependencias de manifesto proibidas, Prisma fora do db e ciclos', () => {
     const violations = findViolations(
       [],

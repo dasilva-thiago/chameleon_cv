@@ -1,41 +1,36 @@
 import { createHash, randomUUID } from 'node:crypto';
+import { expect } from 'vitest';
 import {
   PRIVATE_MODELS,
   TEST_PASSWORD,
-  buildProfileSnapshot,
+  buildBaseResume,
   buildTestApp,
-  createProfileStore,
+  createAiService,
   createTestAccount,
-  createTestDb,
   createTwoAccounts,
-  importProfile,
-  listProfileCanaries,
-  listProfileIds,
-  loadProfileYaml,
+  createTestDb,
+  parseBaseCv,
+  scriptedProvider,
   type ApiModule,
-  type ProfileId,
-  type ProfileStore,
   type TestAccount,
   type TestApp,
   type TestDb,
 } from './workspace';
 
-/** Fixture do dono A (muitos canarios em locais privados: 22) e do dono B (perfil nao-TI). */
-export const FIXTURE_A: ProfileId = 'private-heavy';
-export const FIXTURE_B: ProfileId = 'non-tech-nurse';
-
 export interface Actor extends TestAccount {
-  fixtureId: string;
-  profileId: string;
-  /** Importacao aplicada (com revisao) e uma previa pendente: alvos dos ataques cruzados. */
-  appliedImportId: string;
-  previewImportId: string;
+  label: string;
+  baseId: string;
+  /** Revisao atual da base (alvo dos ataques as rotas de revisao). */
   revisionId: string;
-  /** Canarios da fixture deste dono (`CANARY-<slug>-<campo>`). */
+  jobId: string;
+  analysisId: string;
+  resumeId: string;
+  versionId: string;
+  /** Canarios deste dono (`CANARY-<label>-<onde>-<n>`), espalhados pela base, vaga e curriculo. */
   canaries: readonly string[];
 }
 
-/** O que identifica um dono para as varreduras (inclui os donos auxiliares, que nao tem canarios). */
+/** O que identifica um dono para as varreduras (inclui o dono sem base, que nao tem canarios). */
 export interface Identity {
   label: string;
   ownerId: string;
@@ -48,18 +43,16 @@ export interface World {
   app: TestApp['app'];
   config: TestApp['config'];
   logs: TestApp['logs'];
-  /** ProfileStore compoe o `buildProfileSnapshot` REAL do dominio (injecao feita pela API). */
-  store: ProfileStore;
   a: Actor;
   b: Actor;
-  /** Um dono por fixture restante (13 perfis no total): mais canarios e mais linhas por tabela. */
+  /** Mais donos com dados completos: mais canarios e mais linhas por tabela. */
   others: Actor[];
-  /** A, B e `others`: os donos de fixtures (todos com canarios). */
+  /** A, B e `others`. */
   all: Actor[];
-  /** Dono de um perfil sintetico em que TODA FK e todo vinculo (certificacao, alvo de pendencia...) existe. */
+  /** Dono com dados completos usado como pai "alheio" nas provas de FK (um dos `others`). */
   coverage: Actor;
-  /** Dono com perfil vazio e SEM revisoes/importacoes (pai "limpo" para provar FKs cruzadas). */
-  bare: Identity & { profileId: string };
+  /** Dono SEM base nem vagas. */
+  bare: Identity;
   /** Todos os donos do mundo, para inventarios de vazamento. */
   everyone: Identity[];
   drop(): Promise<void>;
@@ -70,96 +63,121 @@ export interface WorldOptions {
   modules?: readonly ApiModule[];
 }
 
-/**
- * Perfil sintetico 100% ficticio que preenche as ligacoes que as fixtures de perfil nao usam
- * (certificacao de idioma, alvos de pendencia/restricao em contato e evidencia), para que a suite de
- * FK composta exercite TODA FK do catalogo com dados reais.
- */
-export const COVERAGE_PROFILE = {
-  schema_version: '2.1.0',
-  profile: {
-    contact_points: [
-      {
-        id: 'CP-1',
-        kind: 'email',
-        value: 'cobertura@example.invalid',
-        visibility: 'private',
-        include_by_default: false,
-      },
-    ],
-    certifications: [
-      { id: 'CRT-1', name: 'Certificado de proficiencia ficticio', issuer: 'Entidade ficticia' },
-    ],
-    languages: [
-      {
-        id: 'LNG-1',
-        language: 'Ingles',
-        language_code: 'en',
-        overall_level: 'B1',
-        certification_id: 'CRT-1',
-      },
-    ],
-    evidence: [
-      { id: 'EVD-1', type: 'document', title: 'Comprovante ficticio', supports: ['CRT-1'] },
-    ],
-    pending_items: [
-      {
-        id: 'PEND-1',
-        target: { record_id: 'CP-1', field: 'value' },
-        subject: 'Confirmar o contato',
-        reason: 'missing',
-        status: 'open',
-      },
-      {
-        id: 'PEND-2',
-        target: { record_id: 'EVD-1' },
-        subject: 'Confirmar a evidencia',
-        reason: 'missing',
-        status: 'open',
-      },
-    ],
-    usage_rules: {
-      restrictions: [
-        { target: { record_id: 'CP-1' }, rule: 'never_include', reason: 'Contato reservado.' },
-        { target: { record_id: 'EVD-1' }, rule: 'never_include', reason: 'Evidencia reservada.' },
-      ],
-    },
-  },
-} as const;
+/** Uma base sintetica com 20 canarios do dono (CV, perfil, vaga, curriculo). */
+export function baseFor(label: string): { cv: string; profile: string; canaries: string[] } {
+  const c = (where: string, n: number): string => `CANARY-${label}-${where}-${String(n)}`;
+  const canaries: string[] = [];
+  const keep = (value: string): string => {
+    canaries.push(value);
+    return value;
+  };
+  const cv = [
+    `# CV -- Pessoa ${label}`,
+    `**Headline:** Desenvolvedora ${keep(c('headline', 1))}`,
+    '**Location:** Curitiba - PR',
+    `**Email:** ${label}-contato@example.invalid`,
+    '',
+    '## Professional Summary',
+    '',
+    `Resumo com ${keep(c('summary', 1))} e ${keep(c('summary', 2))}.`,
+    '',
+    '## Work Experience',
+    '',
+    `### Empresa ${keep(c('company', 1))} — Curitiba - PR`,
+    '',
+    '**Suporte Técnico**',
+    '2025 - Atual',
+    '',
+    ...[1, 2, 3, 4, 5].map((n) => `- Atividade ${keep(c('bullet', n))}.`),
+    '',
+    '## Projects',
+    '',
+    `### Projeto ${keep(c('project', 1))}`,
+    '',
+    `- Detalhe ${keep(c('project', 2))}.`,
+    '',
+    '## Skills',
+    '',
+    `- **Backend:** Node.js, ${keep(c('skill', 1))}`,
+    '',
+  ].join('\n');
+  const profile = [
+    '## Alvos',
+    ...[1, 2, 3, 4].map((n) => `- Alvo ${keep(c('target', n))}`),
+    '',
+    '## Salário',
+    `- Faixa ${keep(c('salary', 1))}`,
+    `- Regra ${keep(c('salary', 2))}`,
+    '',
+  ].join('\n');
+  keep(c('job', 1));
+  keep(c('resume', 1));
+  return { cv, profile, canaries };
+}
 
-async function provisionActor(
-  store: ProfileStore,
-  account: TestAccount,
-  fixtureId: string,
-  input: string | Record<string, unknown>,
-  canaries: readonly string[],
-): Promise<Actor> {
-  // Caminho REAL de importacao: texto/objeto -> profile-io (migra/normaliza/valida/defaults/ids) -> store.
-  const imported = importProfile(input);
-  if (!imported.ok || !imported.document) {
-    throw new Error(`fixture ${fixtureId} nao importou: ${JSON.stringify(imported.report.errors)}`);
-  }
-  const applied = await store.applyImport(account.ownerId, {
-    document: imported.document,
-    report: imported.report,
-    mode: 'merge',
+/** Distinct per owner, so a copied row never trips the (resumeId, versionNumber) unique before the FK. */
+let nextVersionNumber = 1;
+
+async function provision(testDb: TestDb, account: TestAccount, label: string): Promise<Actor> {
+  const { cv, profile, canaries } = baseFor(label);
+  const saved = await account.client.put('/api/profile', {
+    cvMarkdown: cv,
+    profileMarkdown: profile,
   });
-  const preview = await store.createImportRecord(account.ownerId, { report: imported.report });
+  expect(saved.status, JSON.stringify(saved.body).slice(0, 200)).toBe(200);
+  const revisionId = (saved.body as { base: { revisionId: string } }).base.revisionId;
+  expect((await account.client.put('/api/ai/consent', { granted: true })).status).toBe(200);
+
+  const scoped = testDb.db.forOwner(account.ownerId);
+  const base = await scoped.profileBase.findFirstOrThrow({ select: { id: true } });
+  const description = `Vaga do mundo de teste ${canaries.at(-2) ?? ''}`;
+  const descriptionHash = createHash('sha256').update(description).digest('hex');
+  const job = await scoped.jobPosting.create({
+    data: { ownerId: account.ownerId, description, descriptionHash, company: `Empresa ${label}` },
+  });
+  const analysis = await scoped.jobAnalysis.create({
+    data: {
+      ownerId: account.ownerId,
+      jobId: job.id,
+      descriptionHash,
+      profileHash: createHash('sha256').update(`base ${label}`).digest('hex'),
+      engine: 'ai',
+      engineVersion: 'test-1',
+      result: { nota: `Avaliacao do mundo de teste ${label}` },
+    },
+  });
+  const resume = await scoped.resume.create({
+    data: { ownerId: account.ownerId, jobId: job.id, name: `Curriculo ${canaries.at(-1) ?? ''}` },
+  });
+  const content = buildBaseResume(parseBaseCv(cv), 'pt-BR');
+  const version = await scoped.resumeVersion.create({
+    data: {
+      ownerId: account.ownerId,
+      resumeId: resume.id,
+      versionNumber: nextVersionNumber++,
+      language: 'pt-BR',
+      content,
+      contentHash: createHash('sha256').update(JSON.stringify(content)).digest('hex'),
+      profileRevisionId: revisionId,
+      analysisId: analysis.id,
+    },
+  });
   return {
     ...account,
-    fixtureId,
-    profileId: applied.save.profileId,
-    appliedImportId: applied.importRecord.id,
-    previewImportId: preview.id,
-    revisionId: applied.revision.revision.id,
+    label,
+    baseId: base.id,
+    revisionId,
+    jobId: job.id,
+    analysisId: analysis.id,
+    resumeId: resume.id,
+    versionId: version.id,
     canaries,
   };
 }
 
 /**
- * Par de contas DESCARTAVEL (A' com a fixture de A, B' com a de B), com senhas DISTINTAS, para os
- * casos que destroem sessoes (logout, revogacao, usuario desativado) sem estragar A/B do mundo.
- * Mesmos canarios de A/B (mesma fixture), por isso nao entram em `world.everyone`.
+ * Par de contas DESCARTAVEL (A' e B'), com senhas DISTINTAS e dados completos, para casos que destroem sessoes
+ * ou escrevem. Canarios proprios (rotulo do par), por isso nao entram em `world.everyone`.
  */
 export async function createPair(world: World, label: string): Promise<{ a: Actor; b: Actor }> {
   const ctx = { app: world.app, config: world.config, db: world.testDb.db };
@@ -171,152 +189,79 @@ export async function createPair(world: World, label: string): Promise<{ a: Acto
     email: `${label}-b@example.test`,
     password: `senha-correta-de-B-${label}-73645`,
   });
-  const fixture = (id: ProfileId) => [id, loadProfileYaml(id), listProfileCanaries(id)] as const;
   return {
-    a: await provisionActor(world.store, accountA, ...fixture(FIXTURE_A)),
-    b: await provisionActor(world.store, accountB, ...fixture(FIXTURE_B)),
+    a: await provision(world.testDb, accountA, `${label}-a`),
+    b: await provision(world.testDb, accountB, `${label}-b`),
   };
 }
 
 const identityOf = (actor: Actor): Identity => ({
-  label: actor.fixtureId,
+  label: actor.label,
   ownerId: actor.ownerId,
   email: actor.email,
   canaries: actor.canaries,
 });
 
 /**
- * Mundo da suite: banco clonado, app completo (com LogCapture), 13 donos (um por fixture de perfil),
- * cada um com perfil importado, revisao e importacao em previa; A e B sao as contas "de interesse"
- * criadas por `createTwoAccounts` (fluxo real convite -> aceite). Mais um dono sintetico de cobertura
- * de FK e um dono com perfil vazio.
+ * Mundo da suite: banco clonado, app completo (com LogCapture e um provedor de IA simulado), A e B pelo fluxo
+ * real convite -> aceite, mais tres donos com dados completos e um dono sem base.
  */
 export async function createWorld(options: WorldOptions = {}): Promise<World> {
   const testDb = await createTestDb();
-  const { app, config, logs } = buildTestApp(
-    testDb.db,
-    options.modules ? { modules: options.modules } : {},
-  );
-  const store = createProfileStore(testDb.db, { snapshot: buildProfileSnapshot });
+  const ai = createAiService({
+    mode: 'auto',
+    providers: [scriptedProvider()],
+    limits: { totalDailyRequests: 10_000, totalDailyTokens: 10_000_000 },
+  });
+  const { app, config, logs } = buildTestApp(testDb.db, {
+    ai,
+    ...(options.modules ? { modules: options.modules } : {}),
+  });
   const ctx = { app, config, db: testDb.db };
 
   const { a: accountA, b: accountB } = await createTwoAccounts(ctx);
-  const fixture = (id: ProfileId) => [id, loadProfileYaml(id), listProfileCanaries(id)] as const;
-  const a = await provisionActor(store, accountA, ...fixture(FIXTURE_A));
-  const b = await provisionActor(store, accountB, ...fixture(FIXTURE_B));
-
+  const a = await provision(testDb, accountA, 'dono-a');
+  const b = await provision(testDb, accountB, 'dono-b');
   const others: Actor[] = [];
-  let index = 0;
-  for (const fixtureId of listProfileIds()) {
-    if (fixtureId === FIXTURE_A || fixtureId === FIXTURE_B) continue;
-    index += 1;
+  for (const index of [1, 2, 3]) {
     const account = await createTestAccount(ctx, {
       email: `dono-${String(index).padStart(2, '0')}@example.test`,
-      displayName: `Dono ${index}`,
+      displayName: `Dono ${String(index)}`,
     });
-    others.push(await provisionActor(store, account, ...fixture(fixtureId)));
+    others.push(await provision(testDb, account, `dono-${String(index)}`));
   }
-
-  const coverageAccount = await createTestAccount(ctx, { email: 'cobertura@example.test' });
-  const coverage = await provisionActor(
-    store,
-    coverageAccount,
-    'fk-coverage',
-    structuredClone(COVERAGE_PROFILE),
-    [],
-  );
-
   const bareAccount = await createTestAccount(ctx, { email: 'vazio@example.test' });
-  const bareSaved = await store.saveProfileDocument(bareAccount.ownerId, {
-    schema_version: '2.1.0',
-    profile: {},
-  });
 
-  // Consentimentos e auditoria do dono A (modelos privados fora do agregado de perfil).
-  const scopedA = testDb.db.forOwner(a.ownerId);
-  await scopedA.consentRecord.create({
+  await testDb.db.forOwner(a.ownerId).auditEvent.create({
     data: {
       ownerId: a.ownerId,
-      purpose: 'profile_processing',
-      granted: true,
-      policyVersion: 'policy-2026-11',
-    },
-  });
-  await scopedA.auditEvent.create({
-    data: {
-      ownerId: a.ownerId,
-      action: 'profile.import',
-      entityType: 'ImportRecord',
-      entityId: a.appliedImportId,
+      action: 'test.event',
+      entityType: 'ProfileBase',
+      entityId: a.baseId,
       correlationId: randomUUID(),
       metadata: { note: 'sem PII' },
     },
   });
 
-  // Uma vaga salva por dono (modelo privado fora do agregado de perfil).
-  for (const [position, actor] of [a, b, ...others].entries()) {
-    const description = `Vaga do mundo de teste ${actor.fixtureId}`;
-    const descriptionHash = createHash('sha256').update(description).digest('hex');
-    const job = await testDb.db.forOwner(actor.ownerId).jobPosting.create({
-      data: {
-        ownerId: actor.ownerId,
-        description,
-        descriptionHash,
-        company: `Empresa ${actor.fixtureId}`,
-      },
-    });
-    const analysis = await testDb.db.forOwner(actor.ownerId).jobAnalysis.create({
-      data: {
-        ownerId: actor.ownerId,
-        jobId: job.id,
-        descriptionHash,
-        profileHash: createHash('sha256').update(`perfil ${actor.fixtureId}`).digest('hex'),
-        engine: 'deterministic',
-        engineVersion: 'test-1',
-        result: { nota: `Analise do mundo de teste ${actor.fixtureId}` },
-        review: {},
-      },
-    });
-    const resume = await testDb.db.forOwner(actor.ownerId).resume.create({
-      data: { ownerId: actor.ownerId, jobId: job.id, name: `Curriculo ${actor.fixtureId}` },
-    });
-    const content = { schemaVersion: 1, nota: `Versao do mundo de teste ${actor.fixtureId}` };
-    await testDb.db.forOwner(actor.ownerId).resumeVersion.create({
-      data: {
-        ownerId: actor.ownerId,
-        resumeId: resume.id,
-        // distinct per owner so a copied row never trips the (resumeId, versionNumber) unique before the FK
-        versionNumber: position + 1,
-        language: 'pt-BR',
-        content,
-        contentHash: createHash('sha256').update(JSON.stringify(content)).digest('hex'),
-        profileRevisionId: actor.revisionId,
-        analysisId: analysis.id,
-      },
-    });
-  }
-
   const all = [a, b, ...others];
-  const bare = {
+  const bare: Identity = {
     label: 'bare',
     ownerId: bareAccount.ownerId,
     email: bareAccount.email,
-    canaries: [] as string[],
-    profileId: bareSaved.profileId,
+    canaries: [],
   };
   return {
     testDb,
     app,
     config,
     logs,
-    store,
     a,
     b,
     others,
     all,
-    coverage,
+    coverage: others[0]!,
     bare,
-    everyone: [...all.map(identityOf), identityOf(coverage), bare],
+    everyone: [...all.map(identityOf), bare],
     drop: () => testDb.drop(),
   };
 }
