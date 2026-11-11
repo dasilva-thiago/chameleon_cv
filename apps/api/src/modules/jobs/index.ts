@@ -15,7 +15,7 @@ import {
 } from '@chameleon/contracts';
 import type { ApiModule } from '../../app';
 import { requireAuthContext } from '../../auth/context';
-import { notFound, parseDto, uuidParam } from '../profiles/errors';
+import { notFound, parseDto, uuidParam } from '../../http/params';
 import { registerAnalysisRoutes } from './analysis';
 
 /**

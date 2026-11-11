@@ -103,7 +103,7 @@ not shown at that step). The server then checks: `granted` must be `true` (else 
 `policyVersion` must be one of `PROFILE_POLICY_VERSIONS` (else `400 CONSENT_INVALID`); a missing or empty list,
 or another purpose, is a `400 VALIDATION_ERROR`. On rejection nothing is created and the invite is not consumed.
 The stored `ConsentRecord` takes purpose and grant from the server; only the (validated) version comes from the
-client. Phase 2 routes that process profile data must gate on
+client. Routes that process the professional base must gate on
 `hasGrantedConsent(req.auth.db, req.auth.ownerId, 'profile_processing')` (`src/consent`): the **latest** record
 for the purpose wins, so a later withdrawal revokes an earlier grant; the owner-scoped client makes a mismatched
 `ownerId` throw instead of reading another owner's consent.
@@ -138,110 +138,29 @@ que o anterior tenha expirado ou que se use `--replace`. `--revoke` encerra o co
 convite revogado/substituído é registrado como `usedAt` preenchido **sem** `usedByUserId`. A CLI recusa
 e-mail que já tem conta. Códigos de saída: `0` ok, `1` erro de regra de negócio, `2` uso incorreto.
 
-## Profile module (S2.1a): `/api/profile/**`
+## Professional base: `/api/profile/**`
 
-Code in `src/modules/profiles/`; DTOs in `packages/contracts/src/api/profile.ts` (strict Zod, reusing the v2.1.0 record
-schemas; no DTO carries an `ownerId` or `profileId`). One primary profile per owner.
+Code in `src/modules/profile/`; DTOs in `packages/contracts/src/api/profile.ts`. One base per owner: the CV and the
+profile/rules in Markdown (career-ops `cv.md` + `modes/_profile.md`). Every route needs the session and the
+`profile_processing` consent (`403 CONSENT_REQUIRED_FOR_PROFILE`), and uses only `req.auth.db` (owner-scoped).
 
-**Structural guarantees**
+| Method | Path                                         | What                                                                                                                      |
+| ------ | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| GET    | `/api/profile`                               | The base (`null` until saved)                                                                                             |
+| PUT    | `/api/profile`                               | Save. New content creates an immutable revision; the same content is a no-op (`changed: false`). Own body limit (512 KiB) |
+| GET    | `/api/profile/revisions`                     | Revisions, newest first, without content                                                                                  |
+| GET    | `/api/profile/revisions/:revisionId`         | One revision with its content                                                                                             |
+| POST   | `/api/profile/revisions/:revisionId/restore` | Make an old revision the current base (a new revision)                                                                    |
 
-- **Consent gate.** Every route is declared through `profileRoutes()` (`gate.ts`), which puts, in this order, the session guard
-  (registry), `requireProfileConsent` and the owner-bound scope in front of the handlers. A caller whose LATEST
-  `profile_processing` record is not `granted` (absent or withdrawn) gets `403 CONSENT_REQUIRED_FOR_PROFILE` before any body is
-  read. Test: `test/profiles-consent.int.test.ts` sweeps the real manifest.
-- **Owner-bound store.** Handlers never see `ProfileStore`: `scopeOf(res)` returns an `OwnerProfileStore` built per request from
-  `req.auth` (`scope.ts`); the owner is closed over, `profileId` is not accepted. `test/profiles-owner-binding.test.ts` scans the
-  module sources (no `ownerId`, `req.auth` or raw store outside `scope.ts`/`gate.ts`/`index.ts`).
-- **Not-found parity.** Missing, foreign and malformed ids in a URL all answer the same `404 NOT_FOUND` (same body). Records are
-  created by OMITTING the id (the server generates it); ids the stored profile does not know are `400 VALIDATION_ERROR`, so there
-  is no `ID_CONFLICT` existence oracle on edits.
-- **Writes are serialized per owner** (`OwnerLocks`, in-process): every edit is read-modify-write over the whole document
-  (the contract validates references on the full document). Single-instance assumption.
-- **Body limits.** `JSON_BODY_LIMIT_BYTES` (100 KiB) applies everywhere EXCEPT three route patterns that declare their own parser
-  with `UPLOAD_MAX_BYTES` (default 2 MiB): `POST /profile/imports/preview`, `PUT /profile` and `PUT /profile/sections/:section`
-  (`isLargeBodyRoute`, exact method + path; `app.ts` skips the global parser only for them).
-- **Audit trail** (`AuditEvent`, no PII): `profile.save`, `profile.record.*`, `profile.confirm_batch`, `profile.import.*`,
-  `profile.revision.create`, `profile.export`.
-
-**Routes** (all `auth: session` + consent gate; mutations also need Origin + `X-CSRF-Token`)
-
-| Method and path                                               | Request DTO                                       | Response DTO                                            |
-| ------------------------------------------------------------- | ------------------------------------------------- | ------------------------------------------------------- |
-| `GET /api/profile`                                            | -                                                 | `ProfileStateResponse` (`exists:false` when no profile) |
-| `PUT /api/profile`                                            | `SaveProfileRequest` (`onMissing` default `keep`) | `ProfileWriteResponse`                                  |
-| `GET /api/profile/sections/:section`                          | -                                                 | `ProfileSectionResponse`                                |
-| `PUT /api/profile/sections/:section`                          | `SaveSectionRequest`                              | `ProfileWriteResponse`                                  |
-| `POST /api/profile/records`                                   | `CreateRecordRequest`                             | `ProfileRecordWriteResponse` (`201`)                    |
-| `GET /api/profile/records/:recordId`                          | -                                                 | `ProfileRecordResponse`                                 |
-| `PUT /api/profile/records/:recordId`                          | `ReplaceRecordRequest`                            | `ProfileRecordWriteResponse`                            |
-| `DELETE /api/profile/records/:recordId`                       | -                                                 | `DeleteRecordResponse` (`409 RECORD_IN_USE`)            |
-| `PATCH /api/profile/records/:recordId/meta`                   | `PatchRecordMetaRequest`                          | `ProfileRecordWriteResponse`                            |
-| `POST /api/profile/records/:recordId/archive`                 | -                                                 | `ProfileRecordWriteResponse`                            |
-| `POST /api/profile/confirmations`                             | `ConfirmRecordsRequest` (explicit ids, max 500)   | `ConfirmRecordsResponse`                                |
-| `GET /api/profile/evidence`                                   | -                                                 | `EvidenceListResponse`                                  |
-| `GET /api/profile/evidence/:evidenceId/links`                 | -                                                 | `EvidenceLinksResponse`                                 |
-| `POST /api/profile/evidence/:evidenceId/links`                | `LinkEvidenceRequest`                             | `EvidenceLinksResponse`                                 |
-| `DELETE /api/profile/evidence/:evidenceId/links/:recordId`    | -                                                 | `EvidenceLinksResponse` (idempotent)                    |
-| `GET /api/profile/pending?status=open/resolved/dismissed/all` | -                                                 | `PendingListResponse`                                   |
-| `PATCH /api/profile/pending/:pendingId`                       | `PatchPendingRequest`                             | `ProfileRecordResponse`                                 |
-| `POST /api/profile/revisions`                                 | `CreateRevisionRequest`                           | `CreateRevisionResponse` (`201`, `200` if reused)       |
-| `GET /api/profile/revisions?limit=&before=`                   | -                                                 | `ListRevisionsResponse`                                 |
-| `GET /api/profile/revisions/:revisionId`                      | -                                                 | `RevisionDetailResponse` (`verified` = hash recomputed) |
-| `POST /api/profile/imports/preview`                           | `ImportPreviewRequest` or raw `text/yaml` body    | `ImportPreviewResponse` (`201`; `422 IMPORT_INVALID`)   |
-| `GET /api/profile/imports?status=&limit=`                     | -                                                 | `ListImportsResponse`                                   |
-| `GET /api/profile/imports/:importRecordId`                    | -                                                 | `ImportDetailResponse`                                  |
-| `POST /api/profile/imports/:importRecordId/apply`             | `ApplyImportRequest` (`mode` required)            | `ApplyImportResponse`                                   |
-| `POST /api/profile/imports/:importRecordId/discard`           | -                                                 | `DiscardImportResponse`                                 |
-| `GET /api/profile/export?format=yaml/json`                    | -                                                 | the v2.1.0 document (attachment, `no-store`)            |
-
-**Governance rules the API enforces** (ADR-0005): records have no `meta` until someone sets it (the store treats that as the most
-restrictive default); `PATCH .../meta` is the only way to confirm one by one, `POST /confirmations` the only batch way (explicit ids,
-only `needs_review` -> `confirmed`; unknown ids are reported as `not_found`, foreign ones identically); `archived` always means
-`resume_use: never` (filled when missing, `400` when a write says otherwise, on every write path); a file can never confirm
-anything. Per-record edits use `onMissing: archive` over the COMPLETE document (nothing is missing, and link rows removed from
-`supports`/`evidence_ids` are really dropped); whole-document and section saves default to `keep` (explicit `archive`/`delete`
-only). With `keep`, removing an id from `evidence.supports`/`meta.evidence_ids` does NOT unlink (store limitation): use the
-`.../links` routes, or an explicit `onMissing`.
-
-**Import (ADR-0013)**
-
-1. `POST /imports/preview`: JSON `{ text, format?, mode? }` or a raw body (`text/yaml`, `application/yaml`, `application/x-yaml`,
-   `text/plain`; `?mode=`). Text is UNTRUSTED: at most `UPLOAD_MAX_BYTES` bytes of UTF-8 (default 2 MiB; `413 PAYLOAD_TOO_LARGE`;
-   the JSON envelope is accepted up to 2x + 4 KiB for escaping and then checked on the decoded text), content type allowlist (`415`),
-   `profile-io` parse limits (depth 32, 200k nodes, strings 20k, no aliases/anchors/tags/merge keys, no `__proto__`/`constructor`/
-   `prototype` keys), then migration/validation. Errors carry a FIXED text per code (JSON/YAML library messages quote the input and are
-   never forwarded); nothing from the file reaches the logs. A failing file creates no `ImportRecord` (`422 IMPORT_INVALID`). A valid
-   one creates an `ImportRecord` in `preview` (source/target versions, steps, warnings, `idMap`) and returns the `ImportPreview`
-   (counts, per-record `create|update|unchanged` against the CURRENT profile, using `getImportIdMap` + the stored document).
-   Per-owner quota: 30 previews / 10 min (`429` + `Retry-After`). The first preview creates the (empty) profile row the
-   `ImportRecord` hangs from.
-2. The processed document of a preview is kept in memory (30 min, 5 per owner, 100 total) because `ImportRecord` does not persist it.
-   After a restart or the TTL, apply answers `409 IMPORT_PREVIEW_EXPIRED` and the user previews again.
-3. `POST /imports/:id/apply { mode: merge|replace }`: explicit, one-shot. `replace` needs `confirmReplace: true` (it archives facts and
-   removes contacts/evidence/pending/restrictions the file omits). Before applying, a revision of the previous state is created
-   (`previousRevision`). Everything imported is `needs_review` (`archived` stays `archived`, with `resume_use: never`), EXCEPT records
-   the file leaves unchanged against the stored profile: those keep their current `meta` (confirmed/archived decisions survive
-   re-importing your own export; a changed record goes back to review). Ids that belong to another account give
-   `409 ID_CONFLICT` (no hint of whose); `regenerateConflictingIds: true` imports them with new ids.
-4. Re-importing an export is idempotent: `preview.totals.create == 0`, `update == 0`, and applying creates/updates nothing.
-
-**Export.** `GET /export?format=yaml|json` returns the canonical v2.1.0 document with ids (round-trips with import), including
-private fields (it is the owner's own data). File name `chameleon-profile-YYYYMMDD.<ext>`, `Content-Disposition: attachment`,
-`Cache-Control: no-store`, `X-Content-Type-Options: nosniff`. A profile that does not exist yet answers `404`.
-
-**New error codes** (`API_ERROR_CODES`): `CONSENT_REQUIRED_FOR_PROFILE` (403), `IMPORT_INVALID` (422), `IMPORT_PREVIEW_EXPIRED` (409),
-`IMPORT_NOT_APPLICABLE` (409), `ID_CONFLICT` (409), `DUPLICATE_SKILL` (409), `CONCURRENT_MODIFICATION` (409), `RECORD_IN_USE` (409).
-
-**Tests.** Unit: `test/profiles-owner-binding.test.ts`, `test/profiles-units.test.ts`, `packages/contracts/test/api-profile.test.ts`.
-Integration: `test/profiles-consent.int.test.ts`; `tests/integration/profile-api/` (`import-export` for all 13 fixtures through HTTP,
-`records`, `lifecycle`, `hostile`); the A x B case `profile.api/cross-owner-behaves-like-not-found` in `tests/integration/isolation/`.
+Line endings are normalized before hashing. Audit events carry ids and sizes, never text. Tests: `test/profile.int.test.ts`
+and the isolation case `profile.api/cross-owner-behaves-like-not-found`.
 
 ## Jobs module (P1): `/api/jobs/**`
 
 Saved job postings of the owner. All routes are `auth: 'session'` and use only `req.auth.db` (owner-scoped), so a foreign
 id is indistinguishable from a missing one (404). No profile-consent gate: a posting is not profile data (the consent
 for **external AI processing** will gate the analysis routes, P2). Job text is untrusted data: stored verbatim (hash =
-SHA-256 of the exact text, the cache key of the future analysis), never interpreted, never logged; audit events carry ids
+SHA-256 of the exact text, part of the evaluation cache key), never interpreted, never logged; audit events carry ids
 and field names only. DTOs: `packages/contracts/src/api/jobs.ts`.
 
 | Method | Path                          | What                                                                                                                                                                                                                                              |
@@ -252,44 +171,34 @@ and field names only. DTOs: `packages/contracts/src/api/jobs.ts`.
 | PATCH  | `/api/jobs/:jobId`            | Change the sent fields (`null` clears); changing `description` recomputes the hash; `status` also archives                                                                                                                                        |
 | DELETE | `/api/jobs/:jobId`            | Delete permanently                                                                                                                                                                                                                                |
 
-### Analysis (P2): `/api/jobs/:jobId/analysis**`
+### Evaluation: `/api/jobs/:jobId/analysis`
 
-Deterministic and local (`@chameleon/domain` `analyzeJob`; no network, no AI provider): requirements are cut from the
-posting by section (mandatory / desirable / responsibilities), each is matched to profile records and classified
-`direct` (confirmed professional experience), `partial` (confirmed project/study/declared), `transferable` (related
-technology, heuristic), `pending` (exists, not confirmed) or `absent`, with the supporting record ids, cautions and the
-gap. Only confirmed, resume-allowed, non-private facts count as usable evidence. All three routes require the
-`profile_processing` consent (they read the profile) and are cached by (job, text hash, profile hash, engine version).
+The career-ops evaluation (`modes/oferta.md`) with AI (`@chameleon/ai` `evaluateJob`), checked by the program
+(`@chameleon/domain` `verifyExtraction` / `finalizeAnalysis`): see `docs/architecture.md` §3. Needs the profile consent
+and an AI provider with the owner's AI consent. Cached by (job, text hash, base hash, prompt versions).
 
-| Method | Path                               | What                                                                                                                                                                     |
-| ------ | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| GET    | `/api/jobs/:jobId/analysis`        | Latest analysis or `null`; `stale` + `staleBecause` (`job_text`, `profile`) when an input changed                                                                        |
-| POST   | `/api/jobs/:jobId/analysis`        | Analyze. Same inputs -> `200 reused: true` (nothing recomputed); `{force: true}` recomputes. `409 PROFILE_REQUIRED` without a profile. Moves a `saved` job to `analyzed` |
-| PATCH  | `/api/jobs/:jobId/analysis/review` | Owner review of the plan: `excludedRecordIds`, `pinnedRecordIds` (no overlap), notes per requirement id                                                                  |
+| Method | Path                        | What                                                                                                                                                                                                |
+| ------ | --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GET    | `/api/jobs/:jobId/analysis` | Latest evaluation or `null`; `stale` + `staleBecause` (`job_text`, `profile`)                                                                                                                       |
+| POST   | `/api/jobs/:jobId/analysis` | Evaluate. Same inputs -> `reused: true`, no AI call; `{force: true}` asks again. `409 PROFILE_REQUIRED` without a base, `409 AI_REQUIRED` without AI, `503 AI_UNAVAILABLE` when no provider answers |
 
-Tests: `test/job-analysis.int.test.ts`, `packages/domain/test/matching.test.ts`, `tests/matching/matching-fixtures.test.ts`
-(all synthetic job x profile fixtures, including the prompt-injection posting).
+### Resumes: `/api/jobs/:jobId/resumes` and `/api/resumes/**`
 
-### Resumes (P3/P4): `/api/jobs/:jobId/resumes` and `/api/resumes/**`
+Generation (career-ops `modes/pdf.md`): evaluate (or reuse), one AI call for the tailoring plan (`tailorResume`), build
+the resume with titles/companies/dates/links from the base (`buildResume`), check it (`validateResume`) and measure the
+keyword coverage. If the tailoring call fails, the resume is the base without tailoring (with a note). A version is
+`draft` or `approved` (immutable in the API and by a trigger); editing an approved version means a NEW draft.
 
-Generation is deterministic and local (`generateResume`, `@chameleon/domain`): every line is copied verbatim from a
-confirmed, resume-allowed, non-private profile fact and carries that fact's id (`sourceIds`); the job analysis (plan +
-owner review) only decides what shows first, what is hidden and what is forced. Nothing is paraphrased or invented; what
-does not fit is left out and reported in `notes`. Generating freezes the profile in an immutable `pre_generation`
-revision. A version is `draft` (editable) or `approved` (immutable in the API and by a database trigger); editing an
-approved version, or recovering an old one, means copying it into a NEW draft. All routes need the `profile_processing`
-consent.
-
-| Method               | Path                                                                 | What                                                                                                                                                          |
-| -------------------- | -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| POST                 | `/api/jobs/:jobId/resumes`                                           | Generate resume + version 1 (draft). Runs/reuses the job analysis; `409 PROFILE_REQUIRED` without a profile. Returns `notes`                                  |
-| GET                  | `/api/jobs/:jobId/resumes`                                           | Resumes of the job with their versions (newest first, no content)                                                                                             |
-| GET / PATCH / DELETE | `/api/resumes/:resumeId`                                             | Read / rename / delete (all versions)                                                                                                                         |
-| GET                  | `/api/resumes/:resumeId/versions/:versionId`                         | Content + factuality issues (drafts: against the current profile; approved: against the frozen revision)                                                      |
-| PUT                  | `/api/resumes/:resumeId/versions/:versionId`                         | Replace a DRAFT's content. Edited text is re-marked `edited`, new bullets `added` (a client cannot claim `generated`). `409 VERSION_APPROVED` on approved     |
-| POST                 | `/api/resumes/:resumeId/versions/:versionId/approve`                 | Approve: every item needs confirmed sources in the CURRENT profile (`409 RESUME_INVALID` + details); warnings (terms/numbers not in the sources) do not block |
-| POST                 | `/api/resumes/:resumeId/versions`                                    | New draft copied from `fromVersionId`                                                                                                                         |
-| GET                  | `/api/resumes/:resumeId/versions/:versionId/export?format=docx\|pdf` | Download an APPROVED version (`409 VERSION_NOT_APPROVED`); one export at a time; `503 EXPORT_UNAVAILABLE` if no browser for the PDF                           |
+| Method               | Path                                                                       | What                                                                                                            |
+| -------------------- | -------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| POST                 | `/api/jobs/:jobId/resumes`                                                 | Generate resume + version 1 (draft); returns `notes`                                                            |
+| GET                  | `/api/jobs/:jobId/resumes`                                                 | Resumes of the job with their versions (no content)                                                             |
+| GET / PATCH / DELETE | `/api/resumes/:resumeId`                                                   | Read / rename / delete (all versions)                                                                           |
+| GET                  | `/api/resumes/:resumeId/versions/:versionId`                               | Content, check issues and keyword coverage (drafts: against the current base; approved: against their revision) |
+| PUT                  | `/api/resumes/:resumeId/versions/:versionId`                               | Replace a DRAFT's content; edited text becomes `edited`, new bullets `added`                                    |
+| POST                 | `/api/resumes/:resumeId/versions/:versionId/approve`                       | Approve: zero check errors against the current base (`409 RESUME_INVALID` + details); warnings do not block     |
+| POST                 | `/api/resumes/:resumeId/versions`                                          | New draft copied from `fromVersionId`                                                                           |
+| GET                  | `/api/resumes/:resumeId/versions/:versionId/export?format=docx\|pdf\|html` | Download an APPROVED version; `503 EXPORT_UNAVAILABLE` if no browser for the PDF                                |
 
 Export (`@chameleon/documents`): one `RenderModel` feeds the DOCX (`docx`: native styles, one column, real bullet list and
 hyperlinks, no tables/images) and the PDF (escaped HTML printed by Chromium through `playwright-core`, JavaScript and
@@ -298,27 +207,29 @@ Chromium, then Chrome, then Edge. File name: `<Name>_<Title>_<Company>_<YYYYMMDD
 are rendered again from the approved content (its hash is verified first), and the audit event records format, version and
 hash only.
 
-Tests: `test/resumes.int.test.ts`, `packages/domain/test/resume.test.ts`, `packages/documents/test/documents.test.ts`,
-`packages/db/test/resume-version.int.test.ts`, isolation case `resumes.api/cross-owner-behaves-like-not-found`.
+Tests: `test/ai.int.test.ts`, `test/resumes.int.test.ts`, `packages/domain/test/domain.test.ts`, `packages/ai/test/ai.test.ts`,
+`packages/documents/test/documents.test.ts`, `packages/db/test/resume-version.int.test.ts`, isolation case
+`resumes.api/cross-owner-behaves-like-not-found`.
 
 Tests: `test/jobs.int.test.ts` (CRUD, validation, search, ownership, anonymous) and the isolation case
 `jobs.api/cross-owner-behaves-like-not-found`.
 
-## Como um módulo de domínio entra (S2+)
+## Como um módulo de domínio entra
 
 ```ts
-// src/modules/profiles/index.ts
-export const profilesModule: ApiModule = ({ routes, profileStore }) => {
+// src/modules/notes/index.ts
+export const notesModule: ApiModule = ({ routes }) => {
   // auth: 'session' makes the registry put requireAuth in front of the handlers: it cannot be forgotten.
-  routes.get('/profiles/:id', { auth: 'session' }, async (req, res) => {
+  routes.get('/notes/:id', { auth: 'session' }, requireProfileConsent, async (req, res) => {
     const auth = requireAuthContext(req);
-    const revision = await profileStore.getRevision(auth.ownerId, String(req.params.id)); // owner-scoped
-    if (!revision)
-      return void (res.status(404).json(/* standard 404 body, same as "other owner" */));
-    res.json(revision);
+    const note = await auth.db.profileBaseRevision.findFirst({
+      where: { id: uuidParam(req.params.id) },
+    }); // owner-scoped
+    if (!note) throw notFound(); // same 404 as "other owner" and "malformed id"
+    res.json(note);
   });
 };
-// createApp({ ..., modules: [profilesModule] })
+// createApp({ ..., modules: [notesModule] })
 ```
 
 Rules:
@@ -328,8 +239,7 @@ Rules:
 - `auth: 'session'` is **structural**: `RouteRegistry` prepends the session guard itself (an explicit
   `requireAuth` in the handler list is accepted and deduplicated). `auth: 'public'` routes never see
   `req.auth`, and registering one together with the session guard throws at startup.
-- The module context carries **no `Db`**. Modules use `req.auth.db` / `req.auth.ownerId` or the injected
-  `profileStore`. `db.global`, `db.unsafeRaw` and raw SQL (`$queryRaw*`, `$executeRaw*`, `$queryRawTyped`,
+- The module context carries **no `Db`**. Modules use `req.auth.db` / `req.auth.ownerId` (owner-scoped). `db.global`, `db.unsafeRaw` and raw SQL (`$queryRaw*`, `$executeRaw*`, `$queryRawTyped`,
   `$runCommandRaw`) are restricted by ESLint to `packages/db` and `apps/api/src/auth` (`unsafeRaw` is only used by
   `auth/sessions.ts`); the auth module receives the unrestricted handle as `AuthModuleDeps.authDb`.
 - A resource that does not exist and one that belongs to another owner answer the same (404).

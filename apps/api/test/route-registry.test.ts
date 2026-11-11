@@ -11,13 +11,19 @@ afterAll(async () => db.$disconnect());
 describe('manifesto de rotas (gate de isolamento, ADR-0008 item 5b)', () => {
   it('lista as rotas reais com metodo, caminho, auth e parametros de recurso', () => {
     const full = getRouteManifest(buildTestApp(db).app);
-    // The profile module (S2.1a) has its own manifest checks: profiles-consent.int.test.ts and the isolation gate.
+    // The professional base module is covered by profile.int.test.ts and the isolation gate.
     const profile = full.filter((r) => r.path.startsWith('/api/profile'));
-    expect(profile).toHaveLength(26);
+    expect(profile.map((r) => `${r.method} ${r.path}`)).toEqual([
+      'GET /api/profile',
+      'PUT /api/profile',
+      'GET /api/profile/revisions',
+      'GET /api/profile/revisions/:revisionId',
+      'POST /api/profile/revisions/:revisionId/restore',
+    ]);
     expect(profile.every((r) => r.auth === 'session')).toBe(true);
     // The jobs module (P1) is covered by jobs.int.test.ts and the isolation gate.
     const jobs = full.filter((r) => r.path.startsWith('/api/jobs'));
-    expect(jobs).toHaveLength(10);
+    expect(jobs).toHaveLength(9);
     expect(jobs.every((r) => r.auth === 'session')).toBe(true);
     // The AI module (status and consent) is covered by ai.int.test.ts.
     const ai = full.filter((r) => r.path.startsWith('/api/ai'));
@@ -198,7 +204,6 @@ describe('manifesto de rotas (gate de isolamento, ADR-0008 item 5b)', () => {
       'ai',
       'config',
       'logger',
-      'profileStore',
       'requireAuth',
       'router',
       'routes',

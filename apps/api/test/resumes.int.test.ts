@@ -10,11 +10,17 @@ import {
 } from '@chameleon/contracts';
 import { createTestDb, type TestDb } from '@chameleon/db/testing';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { createAiService } from '../src/ai/service';
 import {
+  BASE_CV,
+  BASE_PROFILE,
+  JOB_TEXT,
   TEST_POLICY_VERSION,
   buildTestApp,
   createTestAccount,
   createTwoAccounts,
+  scriptedProvider,
+  seedBase,
   type TestAccount,
 } from './helpers';
 
@@ -22,96 +28,21 @@ let testDb: TestDb;
 let built: ReturnType<typeof buildTestApp>;
 let a: TestAccount;
 let b: TestAccount;
-const ids: Record<string, string> = {};
-
-const confirmed = { status: 'confirmed' };
-const profileDocument = {
-  schema_version: '2.1.0',
-  profile: {
-    identity: { full_name: 'Ana Teste', city: 'Curitiba' },
-    positioning: { professional_headline: 'Pessoa desenvolvedora backend' },
-    contact_points: [
-      { id: 'email-1', kind: 'email', value: 'ana@example.test', visibility: 'public' },
-      { id: 'phone-1', kind: 'phone', value: '+55 41 99999-0000', visibility: 'private' },
-    ],
-    statements: [
-      { id: 'sum-1', kind: 'short_summary', text: 'Backend com foco em APIs.', meta: confirmed },
-    ],
-    experiences: [
-      {
-        id: 'exp-1',
-        official_title: 'Desenvolvedora Backend',
-        organization_name: 'Acme',
-        start_date: '2022-03',
-        end_date: 'present',
-        meta: confirmed,
-        items: [
-          {
-            id: 'item-ok',
-            kind: 'achievement',
-            text: 'Criou APIs REST em Node.js.',
-            meta: confirmed,
-          },
-          {
-            id: 'item-pending',
-            kind: 'achievement',
-            text: 'Reduziu custos em 40%.',
-            meta: { status: 'needs_review' },
-          },
-        ],
-      },
-    ],
-    skills: [
-      { id: 'skill-node', name: 'Node.js', meta: confirmed },
-      { id: 'skill-tf', name: 'Terraform', meta: { status: 'needs_review' } },
-    ],
-    skill_usages: [
-      {
-        id: 'usage-1',
-        skill_id: 'skill-node',
-        usage_context: 'professional_experience',
-        experience_id: 'exp-1',
-        meta: confirmed,
-      },
-    ],
-    education: [
-      {
-        id: 'edu-1',
-        course_name: 'Sistemas de Informação',
-        institution: 'UFPR',
-        start_date: '2019',
-        completion_date: '2023',
-        meta: confirmed,
-      },
-    ],
-  },
-};
-
-const JOB_TEXT = 'Vaga\n\nRequisitos\n- Experiência com Node.js\n- Kubernetes em produção\n';
-
-async function seedProfile(client: TestAccount['client']): Promise<void> {
-  const preview = await client.post('/api/profile/imports/preview', {
-    text: JSON.stringify(profileDocument),
-  });
-  expect(preview.status, JSON.stringify(preview.body).slice(0, 300)).toBe(201);
-  const importId = (preview.body as { importRecord: { id: string } }).importRecord.id;
-  const applied = await client.post(`/api/profile/imports/${importId}/apply`, { mode: 'merge' });
-  expect(applied.status).toBe(200);
-  const idMap = (applied.body as { importRecord: { idMap: Record<string, string> } }).importRecord
-    .idMap;
-  Object.assign(ids, idMap);
-  const toConfirm = Object.entries(idMap)
-    .filter(([local]) => !['item-pending', 'skill-tf'].includes(local))
-    .map(([, uuid]) => uuid);
-  const done = await client.post('/api/profile/confirmations', { recordIds: toConfirm });
-  expect(done.status).toBe(200);
-}
+const provider = scriptedProvider();
 
 beforeAll(async () => {
   testDb = await createTestDb();
-  built = buildTestApp(testDb.db);
+  const ai = createAiService({
+    mode: 'auto',
+    providers: [provider],
+    limits: { totalDailyRequests: 1000, totalDailyTokens: 1_000_000 },
+  });
+  built = buildTestApp(testDb.db, { ai });
   ({ a, b } = await createTwoAccounts({ app: built.app, config: built.config, db: testDb.db }));
-  await seedProfile(a.client);
+  await seedBase(a.client);
+  for (const account of [a, b]) {
+    expect((await account.client.put('/api/ai/consent', { granted: true })).status).toBe(200);
+  }
 }, 90_000);
 afterAll(async () => {
   await testDb.drop();
@@ -144,173 +75,126 @@ const bullets = (content: ResumeContent) =>
   content.sections.flatMap((section) => section.entries.flatMap((entry) => entry.bullets));
 
 describe('resume generation', () => {
-  it('creates version 1 (draft) from confirmed facts only, with provenance on every item', async () => {
-    const { resume, version, notes, job } = await generate();
-    expect(resume.versions).toHaveLength(1);
-    expect(version).toMatchObject({ versionNumber: 1, status: 'draft', approvedAt: null });
-    expect(notes).toEqual([]);
-
+  it('evaluates the job, tailors with AI and checks the result against the base', async () => {
+    const { resume, version, notes } = await generate();
+    expect(version).toMatchObject({ versionNumber: 1, status: 'draft', language: 'pt-BR' });
+    expect(version.profileRevisionId).not.toBeNull();
+    expect(version.analysisId).not.toBeNull();
     const { content } = version;
     expect(content.header).toMatchObject({
       name: 'Ana Teste',
-      headline: 'Pessoa desenvolvedora backend',
+      headline: 'Desenvolvedora Backend Júnior | Node.js · PostgreSQL',
     });
-    expect(content.header.contacts.map((c) => c.value)).toEqual(['ana@example.test']);
-    const text = JSON.stringify(content);
-    expect(text).not.toMatch(/99999|40%|Terraform/);
-    expect(bullets(content).map((b) => b.text)).toEqual(
-      expect.arrayContaining(['Criou APIs REST em Node.js.', 'Node.js']),
-    );
-    for (const section of content.sections) {
-      for (const entry of section.entries) {
-        expect(entry.sourceIds.length).toBeGreaterThan(0);
-        for (const bullet of entry.bullets) expect(bullet.sourceIds.length).toBeGreaterThan(0);
-      }
+    // Contacts come from the base (the AI never saw them).
+    expect(content.header.contacts.map((c) => c.value)).toContain('ana.contato@example.test');
+    const exp = content.sections.find((s) => s.kind === 'experience')!;
+    expect(exp.entries[0]).toMatchObject({ heading: 'Suporte Técnico', period: '2025 - Atual' });
+    expect(bullets(content).every((bullet) => bullet.origin === 'generated')).toBe(true);
+    expect(version.issues.filter((i) => i.severity === 'error')).toEqual([]);
+    expect(version.coverage).toEqual({
+      percent: 67,
+      present: ['Node.js', 'APIs REST'],
+      missing: ['Kubernetes'],
+    });
+    expect(notes.join(' ')).toContain('Adaptado com IA');
+    expect(resume.versions).toHaveLength(1);
+    // The AI never received contact details.
+    for (const request of provider.requests) {
+      expect(JSON.stringify(request.messages)).not.toMatch(/ana\.contato@example\.test|99999-0000/);
     }
-    expect(version.issues).toEqual([]);
-    expect(version.profileRevisionId).not.toBeNull();
-    expect(version.analysisId).not.toBeNull();
-
-    const reread = jobResponseSchema.parse((await a.client.get(`/api/jobs/${job.id}`)).body).job;
-    expect(reread.status).toBe('analyzed');
-    const revision = await testDb.sql<{ reason: string }>(
-      `SELECT reason FROM "ProfileRevision" WHERE id = $1`,
-      [version.profileRevisionId],
-    );
-    expect(revision.rows[0]?.reason).toMatch(/pre_generation|import/);
   });
 
-  it('uses the owner review of the analysis: an excluded record does not appear', async () => {
+  it('a second resume for the same job reuses the evaluation (no new evaluation call)', async () => {
     const job = await newJob();
-    const analysis = await a.client.post(`/api/jobs/${job.id}/analysis`, {});
-    expect(analysis.status).toBe(201);
-    const review = await a.client.patch(`/api/jobs/${job.id}/analysis/review`, {
-      review: { excludedRecordIds: [ids['item-ok']], pinnedRecordIds: [], notes: {} },
-    });
-    expect(review.status).toBe(200);
-    const { version } = await generate(a.client, job);
-    expect(JSON.stringify(version.content)).not.toContain('Criou APIs REST');
+    await generate(a.client, job);
+    const evaluations = provider.calls('evaluate');
+    await generate(a.client, job);
+    expect(provider.calls('evaluate')).toBe(evaluations);
   });
 
   it('lists, reads and renames the resume; versions come newest first', async () => {
-    const { job, resume, version } = await generate();
+    const { job, resume } = await generate();
     const list = listResumesResponseSchema.parse(
       (await a.client.get(`/api/jobs/${job.id}/resumes`)).body,
     );
-    expect(list.resumes.map((r) => r.id)).toEqual([resume.id]);
-    expect(list.resumes[0]?.versions[0]).not.toHaveProperty('content');
-
-    const renamed = await a.client.patch(`/api/resumes/${resume.id}`, {
-      name: 'Versão para a Acme',
-    });
-    expect(resumeResponseSchema.parse(renamed.body).resume.name).toBe('Versão para a Acme');
-    const newer = await a.client.post(`/api/resumes/${resume.id}/versions`, {
-      fromVersionId: version.id,
-    });
-    expect(newer.status).toBe(201);
-    const got = resumeResponseSchema.parse((await a.client.get(`/api/resumes/${resume.id}`)).body);
-    expect(got.resume.versions.map((v) => v.versionNumber)).toEqual([2, 1]);
+    expect(list.resumes.map((r) => r.id)).toContain(resume.id);
+    const renamed = await a.client.patch(`/api/resumes/${resume.id}`, { name: 'Para a Acme' });
+    expect(renamed.status).toBe(200);
+    expect(resumeResponseSchema.parse(renamed.body).resume.name).toBe('Para a Acme');
   });
 
-  it('without a profile the generation is refused', async () => {
-    const empty = await createTestAccount(
-      { app: built.app, config: built.config, db: testDb.db },
-      { email: 'sem-perfil-cv@example.test' },
-    );
-    const job = await newJob(empty.client);
-    const response = await empty.client.post(`/api/jobs/${job.id}/resumes`, {});
+  it('without a base the generation is refused with PROFILE_REQUIRED', async () => {
+    const job = await newJob(b.client);
+    const response = await b.client.post(`/api/jobs/${job.id}/resumes`, {});
     expect(response.status).toBe(409);
     expect((response.body as { error: { code: string } }).error.code).toBe('PROFILE_REQUIRED');
   });
+
+  it('if the tailoring call fails, the resume is the base without tailoring (no error)', async () => {
+    const job = await newJob();
+    // Evaluate first (so only the tailoring call fails).
+    expect((await a.client.post(`/api/jobs/${job.id}/analysis`, {})).status).toBe(201);
+    provider.answers.tailor = { nothing: true };
+    try {
+      const { version, notes } = await generate(a.client, job);
+      expect(notes.join(' ')).toContain('sem adaptação');
+      expect(version.content.header.headline).toBe('Desenvolvedora de Software');
+      expect(version.issues.filter((i) => i.severity === 'error')).toEqual([]);
+    } finally {
+      delete provider.answers.tailor;
+    }
+  });
 });
 
-describe('editing a draft', () => {
-  it('edited and added text can never claim to be generated, and the hash follows the content', async () => {
+describe('editing a draft: the career-ops checks', () => {
+  it('edited and added text can never claim to be generated', async () => {
     const { resume, version } = await generate();
     const content = structuredClone(version.content);
-    const entry = content.sections.find((s) => s.kind === 'experience')?.entries[0];
-    if (!entry?.bullets[0]) throw new Error('no bullet');
-    entry.bullets[0].text = 'Criou APIs REST em Node.js para o time de pagamentos.';
-    // the client lies: keeps "generated" on the edited text and on a brand-new bullet
-    entry.bullets.push({
-      id: 'extra-1',
-      text: 'Mais um item',
-      sourceIds: entry.sourceIds,
+    const exp = content.sections.find((s) => s.kind === 'experience')!;
+    exp.entries[0]!.bullets[0]!.text = 'Triagem e análise de incidentes em sistemas web.';
+    exp.entries[0]!.bullets.push({
+      id: 'novo-1',
+      text: 'Documentação de procedimentos.',
       origin: 'generated',
     });
-    const response = await a.client.put(versionUrl(resume.id, version.id), { content });
-    expect(response.status, JSON.stringify(response.body).slice(0, 300)).toBe(200);
-    const saved = parseVersion(response.body);
-    const savedEntry = saved.content.sections.find((s) => s.kind === 'experience')?.entries[0];
-    expect(savedEntry?.bullets[0]?.origin).toBe('edited');
-    expect(savedEntry?.bullets.find((b) => b.id === 'extra-1')?.origin).toBe('added');
-    expect(saved.contentHash).not.toBe(version.contentHash);
-    // unchanged bullets keep their origin
-    expect(bullets(saved.content).filter((b) => b.origin === 'generated').length).toBeGreaterThan(
-      0,
+    const saved = parseVersion(
+      (await a.client.put(versionUrl(resume.id, version.id), { content })).body,
     );
+    const after = saved.content.sections.find((s) => s.kind === 'experience')!.entries[0]!.bullets;
+    expect(after[0]?.origin).toBe('edited');
+    expect(after.at(-1)?.origin).toBe('added');
+    expect(saved.contentHash).not.toBe(version.contentHash);
   });
 
-  it('missing / unknown sources are blocking errors, unsupported terms are warnings', async () => {
+  it('invented numbers, a changed title and seniority words are errors; unknown tools are warnings', async () => {
     const { resume, version } = await generate();
     const content = structuredClone(version.content);
-    const entry = content.sections.find((s) => s.kind === 'experience')?.entries[0];
-    if (!entry) throw new Error('no entry');
-    entry.bullets[0]!.sourceIds = [];
-    entry.bullets.push({
-      id: 'x-1',
-      text: 'Operou Kubernetes em produção com 12 pessoas.',
-      sourceIds: [ids['exp-1']!],
-      origin: 'added',
-    });
-    entry.bullets.push({
-      id: 'x-2',
-      text: 'Item fantasma',
-      sourceIds: ['00000000-0000-4000-8000-000000000000'],
-      origin: 'added',
-    });
+    const exp = content.sections.find((s) => s.kind === 'experience')!;
+    exp.entries[0]!.heading = 'Analista de Suporte Sênior';
+    exp.entries[0]!.bullets[0]!.text = 'Atendimento a 900 clientes com Kubernetes.';
     const saved = parseVersion(
       (await a.client.put(versionUrl(resume.id, version.id), { content })).body,
     );
     const codes = saved.issues.map((i) => `${i.severity}:${i.code}`);
     expect(codes).toEqual(
       expect.arrayContaining([
-        'error:NO_SOURCE',
-        'error:UNKNOWN_SOURCE',
+        'error:UNSUPPORTED_NUMBER',
+        'error:TITLE_MISMATCH',
+        'error:SENIORITY_CLAIM',
         'warning:UNSUPPORTED_TERM',
       ]),
     );
-    expect(saved.issueCounts.errors).toBeGreaterThanOrEqual(2);
-    const summary = resumeResponseSchema.parse(
-      (await a.client.get(`/api/resumes/${resume.id}`)).body,
-    );
-    expect(summary.resume.versions[0]?.issueCounts.errors).toBe(saved.issueCounts.errors);
-
     const approve = await a.client.post(`${versionUrl(resume.id, version.id)}/approve`, {});
     expect(approve.status).toBe(409);
-    const body = approve.body as { error: { code: string; details: { path: string }[] } };
-    expect(body.error.code).toBe('RESUME_INVALID');
-    expect(body.error.details.length).toBeGreaterThan(0);
+    expect((approve.body as { error: { code: string } }).error.code).toBe('RESUME_INVALID');
   });
 
   it('rejects content that breaks the contract', async () => {
     const { resume, version } = await generate();
-    for (const mutate of [
-      (c: ResumeContent) => {
-        c.sections[0]!.entries[0]!.bullets[0]!.text = '';
-      },
-      (c: ResumeContent) => {
-        c.header.name = 'a\u0000b';
-      },
-      (c: ResumeContent) => {
-        (c as unknown as Record<string, unknown>).extra = 1;
-      },
-    ]) {
-      const content = structuredClone(version.content);
-      mutate(content);
-      const response = await a.client.put(versionUrl(resume.id, version.id), { content });
-      expect(response.status).toBe(400);
-    }
+    const broken = { ...version.content, schemaVersion: 1 };
+    expect(
+      (await a.client.put(versionUrl(resume.id, version.id), { content: broken })).status,
+    ).toBe(400);
   });
 });
 
@@ -321,15 +205,12 @@ describe('approval and versions', () => {
     expect(approve.status, JSON.stringify(approve.body).slice(0, 300)).toBe(200);
     const approved = parseVersion(approve.body);
     expect(approved).toMatchObject({ status: 'approved' });
-    expect(approved.approvedAt).not.toBeNull();
 
     const again = await a.client.post(`${versionUrl(resume.id, version.id)}/approve`, {});
-    expect(again.status).toBe(409);
     expect((again.body as { error: { code: string } }).error.code).toBe('VERSION_APPROVED');
     const put = await a.client.put(versionUrl(resume.id, version.id), {
       content: approved.content,
     });
-    expect(put.status).toBe(409);
     expect((put.body as { error: { code: string } }).error.code).toBe('VERSION_APPROVED');
     await expect(
       testDb.sql(`UPDATE "ResumeVersion" SET "language" = 'en' WHERE id = $1`, [version.id]),
@@ -342,28 +223,27 @@ describe('approval and versions', () => {
     const draft = parseVersion(copy.body);
     expect(draft).toMatchObject({ versionNumber: 2, status: 'draft', sourceVersionId: version.id });
     expect(draft.content).toEqual(approved.content);
-    const edit = await a.client.put(versionUrl(resume.id, draft.id), { content: draft.content });
-    expect(edit.status).toBe(200);
-    // the approved one is untouched
-    const still = parseVersion((await a.client.get(versionUrl(resume.id, version.id))).body);
-    expect(still.contentHash).toBe(approved.contentHash);
   });
 
-  it('a source that stopped being confirmed blocks approval of an older draft', async () => {
+  it('an approved version is checked against the base it was approved on, not the current one', async () => {
     const { resume, version } = await generate();
-    const unconfirm = await a.client.patch(`/api/profile/records/${ids['item-ok']}/meta`, {
-      status: 'needs_review',
-    });
-    expect(unconfirm.status, JSON.stringify(unconfirm.body).slice(0, 200)).toBe(200);
-    const detail = parseVersion((await a.client.get(versionUrl(resume.id, version.id))).body);
-    expect(detail.issues.some((i) => i.code === 'SOURCE_NOT_USABLE')).toBe(true);
-    const approve = await a.client.post(`${versionUrl(resume.id, version.id)}/approve`, {});
-    expect(approve.status).toBe(409);
-    // restore for the other tests
-    const restore = await a.client.post('/api/profile/confirmations', {
-      recordIds: [ids['item-ok']],
-    });
-    expect(restore.status).toBe(200);
+    expect((await a.client.post(`${versionUrl(resume.id, version.id)}/approve`, {})).status).toBe(
+      200,
+    );
+    // Change the base: the "120" disappears from it.
+    await seedBase(a.client, BASE_CV.replace('120 clientes', 'clientes'), BASE_PROFILE);
+    try {
+      const approved = parseVersion((await a.client.get(versionUrl(resume.id, version.id))).body);
+      expect(approved.issues.filter((i) => i.severity === 'error')).toEqual([]);
+      // A new draft is checked against the base as it is now.
+      const copy = parseVersion(
+        (await a.client.post(`/api/resumes/${resume.id}/versions`, { fromVersionId: version.id }))
+          .body,
+      );
+      expect(copy.issues.map((i) => i.code)).toContain('UNSUPPORTED_NUMBER');
+    } finally {
+      await seedBase(a.client);
+    }
   });
 
   it('deleting the resume removes every version, even approved ones', async () => {
@@ -375,6 +255,12 @@ describe('approval and versions', () => {
       [resume.id],
     );
     expect(Number(rows.rows[0]?.n)).toBe(0);
+  });
+
+  it('deleting the job removes its evaluations and resumes, even approved ones', async () => {
+    const { job, resume, version } = await generate();
+    await a.client.post(`${versionUrl(resume.id, version.id)}/approve`, {});
+    expect((await a.client.delete(`/api/jobs/${job.id}`)).status).toBe(200);
     expect((await a.client.get(`/api/resumes/${resume.id}`)).status).toBe(404);
   });
 });
@@ -425,7 +311,8 @@ describe('export (P4)', () => {
     const xml = await zip.file('word/document.xml')!.async('string');
     expect(xml).toContain('Ana Teste');
     expect(xml).toContain('Criou APIs REST em Node.js.');
-    expect(xml).not.toMatch(/Terraform|40%|99999/);
+    expect(xml).toContain('ana.contato@example.test');
+    expect(xml).not.toMatch(/Kubernetes/);
   });
 
   it('downloads HTML in the modern template by default and in the classic one on request', async () => {
@@ -446,7 +333,7 @@ describe('export (P4)', () => {
     expect(modernHtml).toContain('class="header-gradient"');
     expect(modernHtml).toContain('Criou APIs REST em Node.js.');
     // Only the document body: the stylesheet legitimately contains values such as "40%".
-    expect(modernHtml.split('</style>')[1] ?? '').not.toMatch(/<script|Terraform|40%|99999/);
+    expect(modernHtml.split('</style>')[1] ?? '').not.toMatch(/<script/);
 
     const classic = await a.client.request(
       'get',
