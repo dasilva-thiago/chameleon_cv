@@ -3,7 +3,7 @@
   var choice = 'system';
   try {
     choice = localStorage.getItem('chameleon.theme') || 'system';
-  } catch (e) {
+  } catch {
     /* storage blocked: follow the system */
   }
   var dark =

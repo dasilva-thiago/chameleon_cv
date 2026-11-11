@@ -68,6 +68,8 @@ Sem dependências externas (só `@chameleon/contracts`).
 | react-router                   | 8.5.1     | MIT     |
 | @tanstack/react-query          | 5.105.3   | MIT     |
 | react-hook-form                | 7.91.0    | MIT     |
+| @fontsource-variable/inter     | 5.3.0     | OFL-1.1 (fonte; código MIT) |
+| @fontsource-variable/jetbrains-mono | 5.3.0 | OFL-1.1 (fonte; código MIT) |
 | vite (dev)                     | 8.3.5     | MIT     |
 | @vitejs/plugin-react (dev)     | 6.2.1     | MIT     |
 | tailwindcss / @tailwindcss/vite (dev) | 4.3.4 | MIT |

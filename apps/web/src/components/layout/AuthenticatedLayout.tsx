@@ -63,6 +63,7 @@ function NavItem({
     <NavLink
       to={item.to}
       end={item.end}
+      viewTransition
       title={collapsed ? item.label : undefined}
       className={({ isActive }) =>
         cx(
