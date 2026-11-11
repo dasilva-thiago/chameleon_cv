@@ -52,13 +52,6 @@ const envSchema = z.object({
     .min(1024)
     .max(10 * 1024 * 1024)
     .default(100 * 1024),
-  STORAGE_ROOT: z.string().min(1).default('.data/storage'),
-  UPLOAD_MAX_BYTES: z.coerce
-    .number()
-    .int()
-    .positive()
-    .max(50 * 1024 * 1024)
-    .default(2 * 1024 * 1024),
   /**
    * `auto`: use the AI providers that have a key (GEMINI_API_KEY, GROQ_API_KEY...; see packages/ai) and fall back
    * to the local deterministic engine when none answers. `deterministic`: never call an AI provider.

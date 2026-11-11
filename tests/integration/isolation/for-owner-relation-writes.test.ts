@@ -4,11 +4,9 @@ import { assertLogsClean } from './support/logs';
 import { createWorld, delegateName, type World } from './support/world';
 
 /**
- * Escritas por RELACAO (`data: { profile: { connect: ... } }`) em `forOwner`. O README do db afirma
- * que "conectar a linha de outro dono falha no banco" (FK composta), mas em tabelas cuja unica FK
- * privada e `(profileId, ownerId)` o Prisma troca AS DUAS colunas: a linha de B muda de dono e passa
- * a pertencer ao perfil de A (nenhuma FK e violada). `assertDataKeepsOwner` so olha `data.ownerId` e
- * `data.owner`. Este teste GERA um caso por tabela com FK `(profileId, ownerId)` -> ProfessionalProfile.
+ * Escritas por RELACAO (`data: { job: { connect: ... } }`) em `forOwner`. Numa FK composta `(xId, ownerId)`
+ * o Prisma troca AS DUAS colunas: sem a defesa da camada de aplicacao, a linha de B mudaria de dono e passaria a
+ * apontar para a linha de A (nenhuma FK violada). Este teste GERA um caso por FK composta privada do catalogo.
  *
  * Invariante: depois de qualquer escrita de B, nenhuma linha de B pode ter mudado de dono e A nao pode
  * ter ganhado linhas.
@@ -18,13 +16,13 @@ let profileFks: ForeignKey[];
 beforeAll(async () => {
   world = await createWorld();
   profileFks = (await listForeignKeys(world.testDb)).filter(
-    (fk) =>
-      fk.refTable === 'ProfessionalProfile' &&
-      fk.columns.length === 2 &&
-      fk.columns[0] === 'profileId' &&
-      fk.columns[1] === 'ownerId',
+    (fk) => fk.columns.length === 2 && fk.columns[1] === 'ownerId',
   );
 }, 120_000);
+
+/** Nome da relacao Prisma da FK: `jobId` -> `job`; `profileRevisionId` -> `revision`. */
+const relationOf = (column: string): string =>
+  column === 'profileRevisionId' ? 'revision' : column.replace(/Id$/, '');
 afterAll(async () => {
   if (!world) return;
   assertLogsClean(world);
@@ -43,11 +41,11 @@ const countOwned = async (table: string, ownerId: string): Promise<number> =>
     ).rows[0]?.n,
   );
 
-it('guard: o catalogo tem tabelas com FK (profileId, ownerId) para o perfil', () => {
-  expect(profileFks.length).toBeGreaterThanOrEqual(7);
+it('guard: o catalogo tem FKs compostas (xId, ownerId) entre tabelas privadas', () => {
+  expect(profileFks.length).toBeGreaterThanOrEqual(5);
 });
 
-describe('forOwner(B): update por relacao (connect) para o perfil de A nao pode transferir a linha', () => {
+describe('forOwner(B): update por relacao (connect) para uma linha de A nao pode transferir a linha', () => {
   it('nenhuma tabela troca o dono da linha de B nem entrega linha ao perfil de A', async () => {
     const { a, b, testDb } = world;
     const scoped = testDb.db.forOwner(b.ownerId) as unknown as Record<string, Delegate>;
@@ -68,8 +66,18 @@ describe('forOwner(B): update por relacao (connect) para o perfil de A nao pode 
 
       const delegate = scoped[delegateName(fk.table)];
       if (!delegate?.update) throw new Error(`delegate ausente: ${fk.table}`);
+      const target = (
+        await testDb.sql<{ id: string }>(
+          `SELECT id::text FROM ${quote(fk.refTable)} WHERE "ownerId" = $1::uuid LIMIT 1`,
+          [a.ownerId],
+        )
+      ).rows[0];
+      if (!target) throw new Error(`A sem linha em ${fk.refTable}`);
       await delegate
-        .update({ where: { id: row.id }, data: { profile: { connect: { id: a.profileId } } } })
+        .update({
+          where: { id: row.id },
+          data: { [relationOf(fk.columns[0] ?? '')]: { connect: { id: target.id } } },
+        })
         .catch(() => undefined); // rejeitar (erro) e o comportamento desejado
 
       const owner = (

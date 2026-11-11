@@ -57,8 +57,8 @@ export interface Db {
    */
   readonly unsafeRaw: PrismaClient;
   /**
-   * Account deletion (ADR-0014): deletes ALL data of `ownerId` (user, credentials, sessions, profile,
-   * immutable revisions, imports, consent, audit) in one transaction that sets `chameleon.allow_purge`
+   * Account deletion (ADR-0014): deletes ALL data of `ownerId` (user, credentials, sessions, base,
+   * immutable base revisions, jobs, resumes, consent, audit) in one transaction that sets `chameleon.allow_purge`
    * transaction-locally, verifies that nothing remains and records a minimal PII-free
    * `AccountDeletion` row. Narrow, trusted-server-only entry point: callers need no `unsafeRaw`. The
    * caller authenticates/authorizes the request and deletes stored files separately.

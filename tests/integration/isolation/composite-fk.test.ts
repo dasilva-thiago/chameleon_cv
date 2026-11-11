@@ -65,7 +65,7 @@ describe('catalogo: o schema respeita o desenho de isolamento', () => {
 
   it('toda FK entre tabelas privadas e composta e inclui ownerId nos dois lados, na mesma posicao', () => {
     const fks = privateFks();
-    expect(fks.length).toBeGreaterThan(40); // guarda contra catalogo vazio
+    expect(fks.length).toBeGreaterThanOrEqual(6); // guarda contra catalogo vazio
     for (const fk of fks) {
       expect(fk.columns, `${fk.name}: colunas`).toContain(OWNER);
       expect(fk.refColumns, `${fk.name}: colunas referenciadas`).toContain(OWNER);

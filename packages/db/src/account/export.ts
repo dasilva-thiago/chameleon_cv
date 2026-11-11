@@ -1,7 +1,5 @@
-import type { ProfileDocument } from '@chameleon/contracts';
 import type { Db } from '../client';
 import { assertOwnerId } from '../for-owner';
-import type { LoadedProfile } from '../profile-store';
 
 /**
  * Account export (ADR-0014, "Exportar tudo"): everything the owner is entitled to take with them, as
@@ -13,11 +11,11 @@ import type { LoadedProfile } from '../profile-store';
  * Reads go through `db.forOwner(ownerId)` (plus the owner's accepted invitation through `db.global`),
  * never through `unsafeRaw`. Sections are read one after the other, not in one snapshot: a write that
  * races with the export may appear in some sections and not in others (acceptable for a data-subject
- * export; the profile document and revisions are individually consistent).
+ * export).
  */
 
 export const ACCOUNT_EXPORT_FORMAT = 'chameleon.account-export' as const;
-export const ACCOUNT_EXPORT_VERSION = 1 as const;
+export const ACCOUNT_EXPORT_VERSION = 2 as const;
 
 type Json = null | boolean | number | string | Json[] | { [key: string]: Json };
 
@@ -31,45 +29,22 @@ export interface ExportedAccount {
   deletedAt: string | null;
 }
 
-export interface ExportedProfile {
-  profileId: string;
-  isPrimary: boolean;
-  storedSchemaVersion: string;
+export interface ExportedProfileBase {
+  id: string;
+  cvMarkdown: string;
+  profileMarkdown: string;
+  contentHash: string;
+  revisionId: string;
   createdAt: string;
   updatedAt: string;
-  /** Canonical ProfileDocument (current contract version), as the editor and `GET /profile` see it. */
-  document: ProfileDocument;
 }
 
-export interface ExportedRevision {
+export interface ExportedProfileRevision {
   id: string;
-  profileId: string;
-  revisionNumber: number;
-  schemaVersion: string;
+  cvMarkdown: string;
+  profileMarkdown: string;
   contentHash: string;
-  reason: string;
   createdAt: string;
-  /** Immutable snapshot, in the contract version named by `schemaVersion`. */
-  snapshot: Json;
-}
-
-export interface ExportedImportRecord {
-  id: string;
-  profileId: string;
-  sourceFormat: string;
-  sourceSchemaVersion: string | null;
-  targetSchemaVersion: string;
-  mode: string;
-  status: string;
-  steps: Json;
-  warnings: Json;
-  errors: Json;
-  idMap: Json;
-  unmapped: Json;
-  summary: Json;
-  revisionId: string | null;
-  createdAt: string;
-  appliedAt: string | null;
 }
 
 export interface ExportedConsent {
@@ -138,8 +113,6 @@ export interface ExportedJobAnalysis {
   engine: string;
   engineVersion: string;
   result: Json;
-  review: Json;
-  reviewedAt: string | null;
   createdAt: string;
 }
 
@@ -174,9 +147,8 @@ export interface AccountExport {
   version: typeof ACCOUNT_EXPORT_VERSION;
   generatedAt: string;
   account: ExportedAccount;
-  profiles: ExportedProfile[];
-  revisions: ExportedRevision[];
-  imports: ExportedImportRecord[];
+  profileBase: ExportedProfileBase | null;
+  profileRevisions: ExportedProfileRevision[];
   jobs: ExportedJob[];
   jobAnalyses: ExportedJobAnalysis[];
   resumes: ExportedResume[];
@@ -189,10 +161,6 @@ export interface AccountExport {
 }
 
 export interface ExportAccountDeps {
-  /** The profile store composed by the caller (it needs the snapshot builder injected by apps/api). */
-  store: {
-    loadProfileDocument(ownerId: string, profileId?: string): Promise<LoadedProfile | null>;
-  };
   now?: () => Date;
 }
 
@@ -211,7 +179,7 @@ export class AccountNotFoundError extends Error {
 export async function exportAccountData(
   db: Db,
   ownerId: string,
-  deps: ExportAccountDeps,
+  deps: ExportAccountDeps = {},
 ): Promise<AccountExport> {
   assertOwnerId(ownerId);
   const scoped = db.forOwner(ownerId);
@@ -230,55 +198,24 @@ export async function exportAccountData(
   });
   if (!user) throw new AccountNotFoundError();
 
-  const profileRows = await scoped.professionalProfile.findMany({
-    select: { id: true, isPrimary: true },
-    orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
-  });
-  const profiles: ExportedProfile[] = [];
-  for (const row of profileRows) {
-    const loaded = await deps.store.loadProfileDocument(ownerId, row.id);
-    if (!loaded) continue; // deleted between the two reads
-    profiles.push({
-      profileId: loaded.profileId,
-      isPrimary: row.isPrimary,
-      storedSchemaVersion: loaded.storedSchemaVersion,
-      createdAt: iso(loaded.createdAt),
-      updatedAt: iso(loaded.updatedAt),
-      document: loaded.document,
-    });
-  }
-
-  const revisions = await scoped.profileRevision.findMany({
+  const profileBase = await scoped.profileBase.findFirst({
     select: {
       id: true,
-      profileId: true,
-      revisionNumber: true,
-      schemaVersion: true,
+      cvMarkdown: true,
+      profileMarkdown: true,
       contentHash: true,
-      reason: true,
-      createdAt: true,
-      snapshot: true,
-    },
-    orderBy: [{ profileId: 'asc' }, { revisionNumber: 'asc' }],
-  });
-  const imports = await scoped.importRecord.findMany({
-    select: {
-      id: true,
-      profileId: true,
-      sourceFormat: true,
-      sourceSchemaVersion: true,
-      targetSchemaVersion: true,
-      mode: true,
-      status: true,
-      steps: true,
-      warnings: true,
-      errors: true,
-      idMap: true,
-      unmapped: true,
-      summary: true,
       revisionId: true,
       createdAt: true,
-      appliedAt: true,
+      updatedAt: true,
+    },
+  });
+  const profileRevisions = await scoped.profileBaseRevision.findMany({
+    select: {
+      id: true,
+      cvMarkdown: true,
+      profileMarkdown: true,
+      contentHash: true,
+      createdAt: true,
     },
     orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
   });
@@ -309,8 +246,6 @@ export async function exportAccountData(
       engine: true,
       engineVersion: true,
       result: true,
-      review: true,
-      reviewedAt: true,
       createdAt: true,
     },
     orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
@@ -391,35 +326,15 @@ export async function exportAccountData(
       updatedAt: iso(user.updatedAt),
       deletedAt: isoOrNull(user.deletedAt),
     },
-    profiles,
-    revisions: revisions.map((row) => ({
-      id: row.id,
-      profileId: row.profileId,
-      revisionNumber: row.revisionNumber,
-      schemaVersion: row.schemaVersion,
-      contentHash: row.contentHash,
-      reason: row.reason,
-      createdAt: iso(row.createdAt),
-      snapshot: json(row.snapshot),
-    })),
-    imports: imports.map((row) => ({
-      id: row.id,
-      profileId: row.profileId,
-      sourceFormat: row.sourceFormat,
-      sourceSchemaVersion: row.sourceSchemaVersion,
-      targetSchemaVersion: row.targetSchemaVersion,
-      mode: row.mode,
-      status: row.status,
-      steps: json(row.steps),
-      warnings: json(row.warnings),
-      errors: json(row.errors),
-      idMap: json(row.idMap),
-      unmapped: json(row.unmapped),
-      summary: json(row.summary),
-      revisionId: row.revisionId,
-      createdAt: iso(row.createdAt),
-      appliedAt: isoOrNull(row.appliedAt),
-    })),
+    profileBase:
+      profileBase === null
+        ? null
+        : {
+            ...profileBase,
+            createdAt: iso(profileBase.createdAt),
+            updatedAt: iso(profileBase.updatedAt),
+          },
+    profileRevisions: profileRevisions.map((row) => ({ ...row, createdAt: iso(row.createdAt) })),
     jobs: jobs.map((row) => ({
       id: row.id,
       title: row.title,
@@ -443,8 +358,6 @@ export async function exportAccountData(
       engine: row.engine,
       engineVersion: row.engineVersion,
       result: json(row.result),
-      review: json(row.review),
-      reviewedAt: isoOrNull(row.reviewedAt),
       createdAt: iso(row.createdAt),
     })),
     resumes: resumes.map((row) => ({

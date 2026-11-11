@@ -1,58 +1,29 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { cloneJson, type ImportReport } from '@chameleon/contracts';
-import { listProfileCanaries, type ProfileId } from '@chameleon/test-fixtures';
-import { createProfileStore, type ProfileStore } from '../../src/profile-store';
 import type { TestDb } from '../../src/testing';
-import { fixtureDocument } from './profile-docs';
-import { testSnapshot } from './snapshot';
 
 /** Everything seeded for one owner, with the secrets/PII values the tests look for. */
 export interface SeededOwner {
   ownerId: string;
   email: string;
-  profileId: string;
+  baseId: string;
   revisionIds: string[];
-  importRecordId: string;
-  /** Fixture canaries that live inside the profile document. */
+  /** Canaries that live inside the professional base (CV and profile Markdown). */
   canaries: readonly string[];
   /** Secret values that must never be exported. */
   secrets: { passwordHash: string; sessionTokenHash: string; usedInviteTokenHash: string };
-  /** Value placed in `AuditEvent.metadata` and `ConsentRecord`/import fields. */
+  /** Value placed in `AuditEvent.metadata`, the job text and the resume/analysis JSON. */
   auditCanary: string;
   inviteIds: { used: string; open: string };
 }
 
 export const sha256 = (value: string): string => createHash('sha256').update(value).digest('hex');
 
-export function importReport(source: ImportReport['source_format'], canary: string): ImportReport {
-  return {
-    source_format: source,
-    source_schema_version: '2.0.0',
-    target_schema_version: '2.1.0',
-    mode: 'lenient',
-    steps: [{ id: 'parse', from: null, to: 'object', description: 'Parse', changes: 1 }],
-    warnings: [],
-    errors: [],
-    unmapped: [{ path: 'profile.extra', value: { note: canary }, reason: 'lenient' }],
-    id_map: { 'LOCAL-1': randomUUID() },
-  };
-}
-
-export function makeStore(testDb: TestDb): ProfileStore {
-  return createProfileStore(testDb.db, { snapshot: testSnapshot });
-}
-
 /**
- * Creates a complete owner: user, credential, session, consent, audit event, profile (fixture), two
- * revisions, an applied markdown import, one invitation accepted by the user and one open invitation
+ * Creates a complete owner: user, credential, session, consent, audit event, the professional base with two
+ * revisions, a job with an evaluation and a resume, one invitation accepted by the user and one open invitation
  * addressed to the same e-mail.
  */
-export async function seedOwner(
-  testDb: TestDb,
-  store: ProfileStore,
-  label: string,
-  fixture: ProfileId,
-): Promise<SeededOwner> {
+export async function seedOwner(testDb: TestDb, label: string): Promise<SeededOwner> {
   const email = `${label}-${randomUUID().slice(0, 8)}@example.test`;
   const user = await testDb.db.global.user.create({ data: { email, displayName: label } });
   const ownerId = user.id;
@@ -107,20 +78,42 @@ export async function seedOwner(
     },
   });
 
-  const document = fixtureDocument(fixture);
-  const applied = await store.applyImport(ownerId, {
-    document,
-    report: importReport('markdown', auditCanary),
+  // The professional base: two revisions (a real edit), the base pointing to the second.
+  const cvCanary = `CV-CANARY-${label}-${randomUUID().slice(0, 8)}`;
+  const profileCanary = `PROFILE-CANARY-${label}-${randomUUID().slice(0, 8)}`;
+  const revisionIds: string[] = [];
+  for (const version of [1, 2]) {
+    const cvMarkdown = `# CV -- ${label}
+
+## Experiência
+
+### Empresa ${cvCanary} v${String(version)}
+`;
+    const profileMarkdown = `## Alvos
+- ${profileCanary}
+`;
+    const revision = await scoped.profileBaseRevision.create({
+      data: {
+        ownerId,
+        cvMarkdown,
+        profileMarkdown,
+        contentHash: sha256(cvMarkdown + profileMarkdown),
+      },
+    });
+    revisionIds.push(revision.id);
+  }
+  const lastRevision = await scoped.profileBaseRevision.findFirstOrThrow({
+    where: { id: revisionIds[1] },
   });
-  // A real edit, so the second revision is a new snapshot (an unchanged hash would reuse the first).
-  const edited = cloneJson(document);
-  edited.profile.identity = { ...edited.profile.identity, preferred_name: `Edited ${label}` };
-  const saved = await store.saveProfileDocument(ownerId, edited, {
-    onMissing: 'keep',
-    revision: 'manual_save',
+  const base = await scoped.profileBase.create({
+    data: {
+      ownerId,
+      cvMarkdown: lastRevision.cvMarkdown,
+      profileMarkdown: lastRevision.profileMarkdown,
+      contentHash: lastRevision.contentHash,
+      revisionId: lastRevision.id,
+    },
   });
-  const second = saved.revision;
-  if (!second || second.reused) throw new Error('second revision was not created');
 
   // A saved job posting whose text carries the audit canary (it must be exported, and purged, with the account).
   const jobText = `Job posting text ${auditCanary}`;
@@ -131,7 +124,7 @@ export async function seedOwner(
   const resume = await testDb.db.forOwner(ownerId).resume.create({
     data: { ownerId, jobId: job.id, name: 'Currículo de teste' },
   });
-  const content = { schemaVersion: 1, note: auditCanary };
+  const content = { schemaVersion: 2, note: auditCanary };
   await testDb.db.forOwner(ownerId).resumeVersion.create({
     data: {
       ownerId,
@@ -140,6 +133,7 @@ export async function seedOwner(
       language: 'pt-BR',
       content,
       contentHash: createHash('sha256').update(JSON.stringify(content)).digest('hex'),
+      profileRevisionId: revisionIds[1] ?? null,
     },
   });
   await testDb.db.forOwner(ownerId).jobAnalysis.create({
@@ -148,20 +142,18 @@ export async function seedOwner(
       jobId: job.id,
       descriptionHash: jobHash,
       profileHash: createHash('sha256').update(`profile ${auditCanary}`).digest('hex'),
-      engine: 'deterministic',
+      engine: 'ai',
       engineVersion: 'test-1',
       result: { note: auditCanary },
-      review: {},
     },
   });
 
   return {
     ownerId,
     email,
-    profileId: applied.save.profileId,
-    revisionIds: [applied.revision.revision.id, second.revision.id],
-    importRecordId: applied.importRecord.id,
-    canaries: listProfileCanaries(fixture),
+    baseId: base.id,
+    revisionIds,
+    canaries: [cvCanary, profileCanary],
     secrets: { passwordHash, sessionTokenHash, usedInviteTokenHash },
     auditCanary,
     inviteIds: { used: used.id, open: open.id },

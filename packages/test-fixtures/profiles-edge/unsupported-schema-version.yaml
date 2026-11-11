@@ -1,6 +1,0 @@
-# Edge case sintetico: versao de schema desconhecida/antiga sem cadeia de migracao. REJEITADO com erro de versao
-# (nao e tentado como 1.0.0 nem como 2.0.0).
-schema_version: '0.9.0'
-profile:
-  identity:
-    full_name: Carla Exemplo Prates

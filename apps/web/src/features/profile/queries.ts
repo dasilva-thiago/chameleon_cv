@@ -1,109 +1,38 @@
-import type {
-  ApplyImportRequest,
-  CreateRecordRequest,
-  ImportPreviewRequest,
-  PatchRecordMetaRequest,
-  ProfileSection,
-} from '@chameleon/contracts';
+import type { SaveProfileBaseRequest } from '@chameleon/contracts';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { profileApi } from '../../lib/api';
 
 export const PROFILE_KEY = ['profile'] as const;
-export const STATE_KEY = ['profile', 'state'] as const;
-export type PendingFilter = 'open' | 'resolved' | 'dismissed' | 'all';
 
-export function useProfileState() {
+export function useProfileBase() {
   return useQuery({
-    queryKey: STATE_KEY,
-    queryFn: ({ signal }) => profileApi.getState(signal),
-    staleTime: 30_000,
+    queryKey: [...PROFILE_KEY, 'base'],
+    queryFn: ({ signal }) => profileApi.get(signal),
   });
 }
 
-export function usePendingList(status: PendingFilter) {
+export function useProfileRevisions(enabled: boolean) {
   return useQuery({
-    queryKey: ['profile', 'pending', status],
-    queryFn: ({ signal }) => profileApi.listPending(status, signal),
+    queryKey: [...PROFILE_KEY, 'revisions'],
+    queryFn: ({ signal }) => profileApi.listRevisions(signal),
+    enabled,
   });
 }
 
-export function useEvidenceList() {
-  return useQuery({
-    queryKey: ['profile', 'evidence'],
-    queryFn: ({ signal }) => profileApi.listEvidence(signal),
-  });
-}
-
-/** Toda escrita invalida o cache do perfil: o servidor e a fonte da verdade (sem copia otimista). */
+/** Salvar ou restaurar muda a base: as avaliacoes das vagas passam a aparecer como desatualizadas. */
 function useProfileMutation<TVars, TData>(fn: (vars: TVars) => Promise<TData>) {
   const client = useQueryClient();
   return useMutation({
     mutationFn: fn,
     onSuccess: async () => {
       await client.invalidateQueries({ queryKey: PROFILE_KEY });
+      await client.invalidateQueries({ queryKey: ['jobs'] });
     },
   });
 }
 
-export const useCreateRecord = () =>
-  useProfileMutation((input: CreateRecordRequest) => profileApi.createRecord(input));
+export const useSaveProfileBase = () =>
+  useProfileMutation((input: SaveProfileBaseRequest) => profileApi.save(input));
 
-export const useReplaceRecord = () =>
-  useProfileMutation((vars: { id: string; record: Record<string, unknown> }) =>
-    profileApi.replaceRecord(vars.id, vars.record),
-  );
-
-export const usePatchMeta = () =>
-  useProfileMutation((vars: { id: string; patch: PatchRecordMetaRequest }) =>
-    profileApi.patchMeta(vars.id, vars.patch),
-  );
-
-export const useArchiveRecord = () =>
-  useProfileMutation((id: string) => profileApi.archiveRecord(id));
-
-export const useDeleteRecord = () =>
-  useProfileMutation((id: string) => profileApi.deleteRecord(id));
-
-export const useConfirmRecords = () =>
-  useProfileMutation((ids: string[]) => profileApi.confirmRecords(ids));
-
-export const useSaveSection = () =>
-  useProfileMutation((vars: { section: ProfileSection; value: unknown }) =>
-    profileApi.saveSection(vars.section, vars.value),
-  );
-
-export const usePatchPending = () =>
-  useProfileMutation((vars: { id: string; status: 'open' | 'resolved' | 'dismissed' }) =>
-    profileApi.patchPending(vars.id, vars.status),
-  );
-
-export const useLinkEvidence = () =>
-  useProfileMutation((vars: { evidenceId: string; recordId: string }) =>
-    profileApi.linkEvidence(vars.evidenceId, vars.recordId),
-  );
-
-export const useUnlinkEvidence = () =>
-  useProfileMutation((vars: { evidenceId: string; recordId: string }) =>
-    profileApi.unlinkEvidence(vars.evidenceId, vars.recordId),
-  );
-
-export const usePreviewImport = () =>
-  useMutation({ mutationFn: (input: ImportPreviewRequest) => profileApi.previewImport(input) });
-
-/**
- * Alem do sucesso, recarrega o perfil do servidor quando a chamada falha: um timeout ou queda de rede nao
- * prova que a importacao nao foi aplicada (a transacao pode ter concluido no servidor).
- */
-export const useApplyImport = () => {
-  const client = useQueryClient();
-  return useMutation({
-    mutationFn: (vars: { importId: string; input: ApplyImportRequest }) =>
-      profileApi.applyImport(vars.importId, vars.input),
-    onSettled: async () => {
-      await client.invalidateQueries({ queryKey: PROFILE_KEY });
-    },
-  });
-};
-
-export const useDiscardImport = () =>
-  useMutation({ mutationFn: (importId: string) => profileApi.discardImport(importId) });
+export const useRestoreRevision = () =>
+  useProfileMutation((id: string) => profileApi.restoreRevision(id));

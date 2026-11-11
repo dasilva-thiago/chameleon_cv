@@ -9,7 +9,6 @@ import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { TextAreaField } from '../../components/ui/TextAreaField';
 import { TextField } from '../../components/ui/TextField';
-import type { ProfileIndex } from '../profile/document';
 import {
   addBullet,
   displayOrigin,
@@ -23,7 +22,6 @@ import {
   removeSection,
 } from './content';
 import { CONTACT_KIND_LABELS, ORIGIN_LABELS } from './labels';
-import { SourceList } from './SourceList';
 
 const ORIGIN_TONES = { generated: 'neutral', edited: 'info', added: 'warn' } as const;
 
@@ -36,7 +34,6 @@ interface FormContext {
   /** Problemas do servidor por caminho do item (`sections.0.entries.1.bullets.2`). */
   issues: ReadonlyMap<string, ResumeIssue[]>;
   saved: ReadonlyMap<string, ResumeBullet>;
-  index: ProfileIndex | null;
 }
 
 function IssueList({ issues }: { issues: readonly ResumeIssue[] | undefined }) {
@@ -85,7 +82,6 @@ function BulletEditor({ ctx, s, e, b }: { ctx: FormContext; s: number; e: number
           Remover item <span className="sr-only">{String(b + 1)}</span>
         </Button>
       </div>
-      <SourceList sourceIds={bullet.sourceIds} index={ctx.index} />
       <IssueList issues={ctx.issues.get(path)} />
     </li>
   );
@@ -149,7 +145,6 @@ function EntryEditor({ ctx, s, e }: { ctx: FormContext; s: number; e: number }) 
           }}
         />
       </div>
-      <SourceList sourceIds={entry.sourceIds} index={ctx.index} />
       <IssueList issues={ctx.issues.get(path)} />
       {entry.bullets.length > 0 ? (
         <ul className="flex flex-col gap-3">
@@ -266,7 +261,7 @@ export function ResumeForm(ctx: FormContext) {
           <ul aria-label="Contatos" className="flex flex-col gap-2">
             {header.contacts.map((contact, n) => (
               <li
-                key={contact.sourceId}
+                key={`${contact.kind}-${contact.value}`}
                 className="flex flex-col gap-2 rounded-md border border-slate-300 bg-slate-50 p-3"
               >
                 <div className="flex flex-wrap items-center justify-between gap-3">
@@ -283,7 +278,6 @@ export function ResumeForm(ctx: FormContext) {
                     Remover contato <span className="sr-only">{contact.value}</span>
                   </Button>
                 </div>
-                <SourceList sourceIds={[contact.sourceId]} index={ctx.index} />
                 <IssueList issues={ctx.issues.get(`header.contacts.${String(n)}`)} />
               </li>
             ))}

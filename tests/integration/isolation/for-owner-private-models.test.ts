@@ -112,7 +112,7 @@ const countOf = async (model: string): Promise<number> =>
 
 describe('guard: o registro de modelos privados e os dados das fixtures', () => {
   it('o registro tem os modelos esperados e TODO modelo privado tem linhas no mundo de teste', async () => {
-    expect(PRIVATE_MODELS.length).toBeGreaterThanOrEqual(30);
+    expect(PRIVATE_MODELS.length).toBeGreaterThanOrEqual(10);
     const empty: string[] = [];
     for (const model of PRIVATE_MODELS) if ((await countOf(model)) === 0) empty.push(model);
     expect(empty, 'modelos privados sem nenhuma linha (adicione dados ao mundo de teste)').toEqual(

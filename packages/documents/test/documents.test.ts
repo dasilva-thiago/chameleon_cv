@@ -19,31 +19,28 @@ import {
   toRenderModel,
 } from '../src';
 
-const id = (n: number): string => `0190a8f0-0000-7000-8000-${String(n).padStart(12, '0')}`;
-
 const HOSTILE = 'Criou <script>alert("x")</script> APIs & "painéis" <b>fortes</b> em Node.js.';
 
-const bullets = (prefix: string, texts: string[], firstSource: number) =>
+const bullets = (prefix: string, texts: string[], _firstSource: number) =>
   texts.map((text, n) => ({
     id: `${prefix}-b${String(n + 1)}`,
     text,
-    sourceIds: [id(firstSource + n)],
     origin: 'generated' as const,
   }));
 
 function sample(language = 'pt-BR'): ResumeContent {
   return resumeContentSchema.parse({
-    schemaVersion: 1,
+    schemaVersion: 2,
     language,
     header: {
       name: 'Ana Souza Teste',
       headline: 'Pessoa desenvolvedora backend',
       location: 'Curitiba',
       contacts: [
-        { kind: 'email', value: 'ana@example.test', label: null, sourceId: id(1) },
-        { kind: 'link', value: 'https://github.com/ana-teste', label: null, sourceId: id(2) },
-        { kind: 'link', value: 'javascript:alert(1)', label: null, sourceId: id(3) },
-        { kind: 'phone', value: '+55 41 99999-0000', label: null, sourceId: id(4) },
+        { kind: 'email', value: 'ana@example.test', label: null },
+        { kind: 'link', value: 'https://github.com/ana-teste', label: null },
+        { kind: 'link', value: 'javascript:alert(1)', label: null },
+        { kind: 'phone', value: '+55 41 99999-0000', label: null },
       ],
     },
     sections: [
@@ -58,7 +55,6 @@ function sample(language = 'pt-BR'): ResumeContent {
             subheading: null,
             period: null,
             bullets: bullets('summary-1', ['Backend com foco em APIs.'], 10),
-            sourceIds: [id(10)],
           },
         ],
       },
@@ -73,7 +69,6 @@ function sample(language = 'pt-BR'): ResumeContent {
             subheading: null,
             period: null,
             bullets: bullets('competencies-1', ['Node.js', 'PostgreSQL'], 20),
-            sourceIds: [id(20)],
           },
         ],
       },
@@ -89,15 +84,14 @@ function sample(language = 'pt-BR'): ResumeContent {
             period: '03/2022 – Atual',
             detail: 'Curitiba - PR',
             bullets: [
-              { id: 'experience-1-b1', text: HOSTILE, sourceIds: [id(30)], origin: 'edited' },
+              { id: 'experience-1-b1', text: HOSTILE, origin: 'edited' },
               {
                 id: 'experience-1-b2',
                 text: 'Manteve rotinas de deploy.',
-                sourceIds: [id(31)],
+
                 origin: 'generated',
               },
             ],
-            sourceIds: [id(30)],
           },
         ],
       },
@@ -114,7 +108,6 @@ function sample(language = 'pt-BR'): ResumeContent {
             detail: 'TypeScript, Node.js, PostgreSQL',
             url: 'https://example.test/painel',
             bullets: bullets('project-1', ['Painel de métricas de equipamentos.'], 50),
-            sourceIds: [id(50)],
           },
         ],
       },
@@ -130,7 +123,6 @@ function sample(language = 'pt-BR'): ResumeContent {
             period: '2019 – 2023',
             detail: 'Curitiba, PR',
             bullets: [],
-            sourceIds: [id(40)],
           },
         ],
       },
@@ -145,7 +137,6 @@ function sample(language = 'pt-BR'): ResumeContent {
             subheading: 'AWS',
             period: '2024',
             bullets: [],
-            sourceIds: [id(60)],
           },
         ],
       },
@@ -160,7 +151,6 @@ function sample(language = 'pt-BR'): ResumeContent {
             subheading: null,
             period: null,
             bullets: bullets('skills-1', ['Python', 'Ação & Reação'], 70),
-            sourceIds: [id(70)],
           },
         ],
       },
@@ -175,7 +165,6 @@ function sample(language = 'pt-BR'): ResumeContent {
             subheading: 'avançado',
             period: null,
             bullets: [],
-            sourceIds: [id(80)],
           },
         ],
       },

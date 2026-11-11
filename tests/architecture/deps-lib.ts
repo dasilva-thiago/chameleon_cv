@@ -29,13 +29,10 @@ export interface Violation {
 export const ALLOWED_INTERNAL: Readonly<Record<string, readonly string[]>> = {
   'packages/contracts': [],
   'packages/domain': ['contracts'],
-  'packages/profile-io': ['contracts', 'domain'],
   'packages/ai': ['contracts', 'domain'],
   'packages/documents': ['contracts', 'domain'],
   'packages/db': ['contracts'],
-  // test-fixtures valida as fixtures com o contrato e o importador (somente em testes; profile-io nao pode depender dele).
-  'packages/test-fixtures': ['contracts', 'profile-io'],
-  'apps/api': ['contracts', 'domain', 'profile-io', 'db', 'ai', 'documents'],
+  'apps/api': ['contracts', 'domain', 'db', 'ai', 'documents'],
   'apps/web': ['contracts'],
 };
 
@@ -76,10 +73,6 @@ function internalName(specifier: string): string | undefined {
   return specifier.slice(SCOPE.length).split('/')[0];
 }
 
-function isTestFile(path: string): boolean {
-  return /\.(test|spec)\.[cm]?[jt]sx?$/.test(path) || path.includes('/test/');
-}
-
 function selfName(workspace: string): string {
   return workspace.split('/')[1] ?? workspace;
 }
@@ -104,7 +97,6 @@ export function findViolations(files: SourceFile[], manifests: Manifest[]): Viol
       const name = internalName(specifier);
       if (name && name !== selfName(workspace)) {
         const allowed = new Set(ALLOWED_INTERNAL[workspace] ?? []);
-        if (isTestFile(file.path)) allowed.add('test-fixtures');
         if (!allowed.has(name)) {
           violations.push({
             rule: 'internal-dependency',
@@ -128,7 +120,7 @@ export function findViolations(files: SourceFile[], manifests: Manifest[]): Viol
     }
   }
 
-  // Manifestos: dependencies seguem a mesma matriz; devDependencies so podem acrescentar test-fixtures.
+  // Manifestos: dependencies e devDependencies seguem a mesma matriz.
   for (const manifest of manifests) {
     const allowed = ALLOWED_INTERNAL[manifest.dir];
     if (!allowed) continue;
@@ -144,7 +136,7 @@ export function findViolations(files: SourceFile[], manifests: Manifest[]): Viol
     }
     for (const dep of manifest.devDependencies) {
       const name = internalName(dep);
-      if (name && !allowed.includes(name) && name !== 'test-fixtures') {
+      if (name && !allowed.includes(name)) {
         violations.push({
           rule: 'manifest-dependency',
           where: `${manifest.dir}/package.json`,

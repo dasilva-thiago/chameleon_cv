@@ -1,0 +1,41 @@
+// Base profissional em Markdown (como o career-ops: cv.md + perfil e regras). Dado privado do dono (ownerId, FK
+// em cascata para User, ownerId imutavel por trigger). A pessoa edita os dois textos livremente; cada gravacao com
+// conteudo novo cria uma ProfileBaseRevision imutavel, que os curriculos referenciam.
+
+model ProfileBase {
+  id              String   @id @default(uuid(7)) @db.Uuid
+  ownerId         String   @db.Uuid
+  /// O CV completo (fonte de verdade dos fatos).
+  cvMarkdown      String
+  /// Alvos, regras, faixas salariais, politica de local e regras de escrita.
+  profileMarkdown String
+  /// SHA-256 hex do conteudo (chave de cache das avaliacoes).
+  contentHash     String
+  /// Revisao que corresponde ao conteudo atual.
+  revisionId      String   @db.Uuid
+  createdAt       DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt       DateTime @updatedAt @db.Timestamptz(3)
+
+  owner    User                @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  revision ProfileBaseRevision @relation("CurrentRevision", fields: [revisionId, ownerId], references: [id, ownerId], onDelete: Cascade)
+
+  @@unique([ownerId])
+  @@unique([id, ownerId])
+}
+
+/// Foto imutavel da base (trigger no banco impede UPDATE). Criada a cada gravacao com conteudo novo.
+model ProfileBaseRevision {
+  id              String   @id @default(uuid(7)) @db.Uuid
+  ownerId         String   @db.Uuid
+  cvMarkdown      String
+  profileMarkdown String
+  contentHash     String
+  createdAt       DateTime @default(now()) @db.Timestamptz(3)
+
+  owner          User            @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  resumeVersions ResumeVersion[]
+  currentOf      ProfileBase[]   @relation("CurrentRevision")
+
+  @@unique([id, ownerId])
+  @@index([ownerId, createdAt])
+}

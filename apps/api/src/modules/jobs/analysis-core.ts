@@ -1,14 +1,14 @@
-import { ANALYSIS_PROMPT_VERSION, analyzeJobWithAi, type AiRunInfo } from '@chameleon/ai';
+import { AiUnavailableError, EVALUATION_ENGINE_VERSION, evaluateJob } from '@chameleon/ai';
 import {
-  EMPTY_REVIEW,
   analysisResultSchema,
   type AnalysisResult,
-  type ProfileDocument,
+  type JobExtraction,
 } from '@chameleon/contracts';
-import { MATCHER_VERSION, analyzeJob } from '@chameleon/domain';
+import { resumeLanguage } from '@chameleon/domain';
 import type { Request } from 'express';
-import type { AiService } from '../../ai/service';
+import type { AiAccessReason, AiService } from '../../ai/service';
 import type { AuthContext } from '../../auth/context';
+import { HttpError } from '../../http/errors';
 
 export interface AnalysisJob {
   id: string;
@@ -17,89 +17,122 @@ export interface AnalysisJob {
   descriptionHash: string;
 }
 
+export interface AnalysisBase {
+  cvMarkdown: string;
+  profileMarkdown: string;
+  contentHash: string;
+}
+
 export interface AnalysisRowCore {
   id: string;
   jobId: string;
   descriptionHash: string;
   profileHash: string;
   result: unknown;
-  review: unknown;
-  reviewedAt: Date | null;
   createdAt: Date;
 }
 
-const LOCAL_FALLBACK_WARNING =
-  'A IA não respondeu agora; esta é a análise local, mais simples. Use "Refazer análise" para tentar a IA de novo.';
+const NO_AI_MESSAGES: Record<Exclude<AiAccessReason, 'ok'>, string> = {
+  off: 'A IA esta desligada nesta instalacao (AI_PROVIDER=deterministic): a avaliacao precisa dela.',
+  unconfigured:
+    'Nenhum provedor de IA esta configurado: adicione uma chave (GEMINI_API_KEY, GROQ_API_KEY...) no .env.',
+  no_consent: 'Ative o uso de IA na sua conta para avaliar vagas e gerar curriculos.',
+};
+
+/** Throws the 409 that explains why there is no AI for this owner. */
+export function noAiError(reason: AiAccessReason): HttpError {
+  return new HttpError(
+    409,
+    'AI_REQUIRED',
+    reason === 'ok' ? 'IA indisponivel.' : NO_AI_MESSAGES[reason],
+  );
+}
+
+export const unavailableError = (): HttpError =>
+  new HttpError(
+    503,
+    'AI_UNAVAILABLE',
+    'Nenhum provedor de IA respondeu agora (limite diario ou instabilidade). Tente de novo em alguns minutos.',
+  );
+
+export const profileRequiredError = (): HttpError =>
+  new HttpError(
+    409,
+    'PROFILE_REQUIRED',
+    'Preencha a sua base profissional (CV e perfil) antes de avaliar uma vaga ou gerar um curriculo.',
+  );
+
+/** A stored result in the current format, or null (old formats are simply not reused). */
+export function parseStoredResult(value: unknown): AnalysisResult | null {
+  const parsed = analysisResultSchema.safeParse(value);
+  return parsed.success ? parsed.data : null;
+}
 
 /**
- * Cache key = (job, text hash, profile hash, engine version). The engine version is the AI prompt version for an
- * AI analysis and the matcher version for the local one, so the two never overwrite each other and a provider
- * change does not invalidate a stored analysis. Same key -> the stored analysis is returned untouched (`reused`).
- *
- * With AI available (configured + consented) a missing AI analysis is requested; when no provider answers (limits,
- * outages, bad keys) the local, deterministic analysis is used instead and the user sees no error. `force`
- * recomputes in place (the review is kept). Shared by the analysis routes and by resume generation, which always
- * works from an analysis of the current inputs.
+ * Cache key = (job, text hash, base hash, engine version). Same key and no `force` -> the stored evaluation is
+ * returned untouched (`reused`), with no AI call. When only the base changed, the posting is not read again: the
+ * extraction of an earlier evaluation of the same text is reused (career-ops pass 1 depends on the posting alone).
+ * Shared by the evaluation routes and by resume generation.
  */
-export async function analyzeOrReuse(
+export async function evaluateOrReuse(
   auth: AuthContext,
   req: Request,
   job: AnalysisJob,
-  document: ProfileDocument,
-  profileHash: string,
+  base: AnalysisBase,
   force: boolean,
   ai: AiService,
 ): Promise<{ row: AnalysisRowCore; reused: boolean; created: boolean; result: AnalysisResult }> {
-  const base = { jobId: job.id, descriptionHash: job.descriptionHash, profileHash };
-  const aiKey = { ...base, engineVersion: ANALYSIS_PROMPT_VERSION };
-  const localKey = { ...base, engineVersion: MATCHER_VERSION };
+  const key = {
+    jobId: job.id,
+    descriptionHash: job.descriptionHash,
+    profileHash: base.contentHash,
+    engineVersion: EVALUATION_ENGINE_VERSION,
+  };
+  const existing = await auth.db.jobAnalysis.findFirst({ where: key });
+  const existingResult = existing ? parseStoredResult(existing.result) : null;
+  if (existing && existingResult && !force) {
+    return { row: existing, reused: true, created: false, result: existingResult };
+  }
 
-  const reuse = (row: AnalysisRowCore) => ({
-    row,
-    reused: true,
-    created: false,
-    result: analysisResultSchema.parse(row.result),
-  });
-
-  const existingAi = await auth.db.jobAnalysis.findFirst({ where: aiKey });
-  if (existingAi && !force) return reuse(existingAi);
   const { router, reason } = await ai.access(auth);
-  const existingLocal = await auth.db.jobAnalysis.findFirst({ where: localKey });
-  if (!router && existingLocal && !force) return reuse(existingLocal);
+  if (!router) throw noAiError(reason);
 
-  let result: AnalysisResult | undefined;
-  let aiRun: AiRunInfo | undefined;
-  let aiFailed = false;
-  if (router) {
-    try {
-      const out = await analyzeJobWithAi(router, { jobText: job.description, document });
-      result = analysisResultSchema.parse(out.result);
-      aiRun = out.run;
-    } catch {
-      aiFailed = true; // any failure of the AI path keeps the local analysis (never an error for the user)
+  let previousExtraction: JobExtraction | null = null;
+  if (!force) {
+    const sameText = await auth.db.jobAnalysis.findMany({
+      where: { jobId: job.id, descriptionHash: job.descriptionHash },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      take: 3,
+      select: { result: true },
+    });
+    for (const row of sameText) {
+      const parsed = parseStoredResult(row.result);
+      if (parsed) {
+        previousExtraction = parsed.extraction;
+        break;
+      }
     }
   }
-  if (result === undefined && aiFailed && existingLocal && !force) return reuse(existingLocal);
 
-  const usedAi = result !== undefined;
-  if (result === undefined) {
-    const local = analyzeJob(job.description, document);
-    if (aiFailed) local.warnings = [...local.warnings, LOCAL_FALLBACK_WARNING].slice(0, 10);
-    result = analysisResultSchema.parse(local);
+  let outcome: Awaited<ReturnType<typeof evaluateJob>>;
+  try {
+    outcome = await evaluateJob(router, {
+      jobText: job.description,
+      cvMarkdown: base.cvMarkdown,
+      profileMarkdown: base.profileMarkdown,
+      language: resumeLanguage(base.profileMarkdown),
+      previousExtraction,
+    });
+  } catch (error) {
+    if (error instanceof AiUnavailableError) throw unavailableError();
+    throw error;
   }
-  const key = usedAi ? aiKey : localKey;
-  const existing = usedAi ? existingAi : existingLocal;
+  const result = analysisResultSchema.parse(outcome.result);
 
   const row = existing
     ? await auth.db.jobAnalysis.update({ where: { id: existing.id }, data: { result } })
     : await auth.db.jobAnalysis.create({
-        data: {
-          ownerId: auth.ownerId,
-          ...key,
-          engine: result.engine,
-          result,
-          review: EMPTY_REVIEW,
-        },
+        data: { ownerId: auth.ownerId, ...key, engine: 'ai', result },
       });
   if (job.status === 'saved') {
     await auth.db.jobPosting.update({ where: { id: job.id }, data: { status: 'analyzed' } });
@@ -107,22 +140,19 @@ export async function analyzeOrReuse(
   await auth.db.auditEvent.create({
     data: {
       ownerId: auth.ownerId,
-      action: 'job.analyze',
+      action: 'job.evaluate',
       entityType: 'JobAnalysis',
       entityId: row.id,
       correlationId: req.correlationId,
       metadata: {
         engineVersion: key.engineVersion,
-        requirements: result.summary.requirements,
         forced: force,
-        ai: usedAi
-          ? {
-              provider: aiRun?.provider,
-              model: aiRun?.model,
-              tokens: aiRun?.usage.totalTokens,
-              attempts: aiRun?.attempts.map((attempt) => `${attempt.provider}:${attempt.outcome}`),
-            }
-          : { used: false, reason: aiFailed ? 'unavailable' : reason },
+        score: result.score,
+        recommendation: result.verdict.recommendation,
+        requirements: result.extraction.requirements.length,
+        extractionReused: previousExtraction !== null,
+        providers: outcome.runs.map((run) => `${run.provider}:${run.model}`).join(','),
+        tokens: outcome.runs.reduce((sum, run) => sum + run.usage.totalTokens, 0),
       },
     },
   });

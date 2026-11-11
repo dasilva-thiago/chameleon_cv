@@ -15,9 +15,8 @@ export const EXPORT_SECTIONS = [
   'invitations',
   'consents',
   'auditEvents',
-  'profiles',
-  'revisions',
-  'imports',
+  'profileBase',
+  'profileRevisions',
   'jobs',
   'jobAnalyses',
   'resumes',
@@ -34,12 +33,6 @@ export type ExportClassification =
       note?: string;
     }
   | { status: 'excluded'; reason: string };
-
-const viaProfile = (note: string): ExportClassification => ({
-  status: 'exported',
-  section: 'profiles',
-  note,
-});
 
 export const ACCOUNT_EXPORT_REGISTRY = {
   User: {
@@ -71,41 +64,15 @@ export const ACCOUNT_EXPORT_REGISTRY = {
     section: 'auditEvents',
     note: 'Events about the account; metadata never carries personal content (ADR-0014).',
   },
-  ProfessionalProfile: viaProfile('Profile root: exported inside the canonical profile document.'),
-  ProfileFact: viaProfile('Governance of a fact: inside the profile document (`meta`).'),
-  ProfileStatement: viaProfile('Profile document.'),
-  CompetencyExample: viaProfile('Profile document.'),
-  CompetencyExampleSkill: viaProfile('Link table: serialized as references in the document.'),
-  Experience: viaProfile('Profile document.'),
-  ExperienceItem: viaProfile('Profile document.'),
-  Project: viaProfile('Profile document.'),
-  ProjectItem: viaProfile('Profile document.'),
-  ProjectCollaborator: viaProfile('Profile document.'),
-  Education: viaProfile('Profile document.'),
-  Course: viaProfile('Profile document.'),
-  Skill: viaProfile('Profile document.'),
-  SkillUsage: viaProfile('Profile document.'),
-  LanguageProficiency: viaProfile('Profile document.'),
-  Certification: viaProfile('Profile document.'),
-  Award: viaProfile('Profile document.'),
-  Publication: viaProfile('Profile document.'),
-  Volunteering: viaProfile('Profile document.'),
-  ContactPoint: viaProfile('Profile document.'),
-  Evidence: viaProfile('Profile document.'),
-  EvidenceLink: viaProfile('Link table: serialized as `supports` / `evidence_ids`.'),
-  PendingItem: viaProfile('Profile document.'),
-  UsageRestriction: viaProfile('Profile document.'),
-  ProfileRevision: {
+  ProfileBase: {
     status: 'exported',
-    section: 'revisions',
-    note: 'Revision metadata plus the full immutable snapshot.',
+    section: 'profileBase',
+    note: 'The professional base: CV and profile/rules in Markdown.',
   },
-  ImportRecord: {
+  ProfileBaseRevision: {
     status: 'exported',
-    section: 'imports',
-    note:
-      'Import reports (steps, warnings, id map, unmapped values, summary). The raw uploaded file is not ' +
-      'stored in this table; stored files are exported by the storage layer (S2.x).',
+    section: 'profileRevisions',
+    note: 'Immutable snapshots of the professional base.',
   },
   JobPosting: {
     status: 'exported',
@@ -115,7 +82,7 @@ export const ACCOUNT_EXPORT_REGISTRY = {
   JobAnalysis: {
     status: 'exported',
     section: 'jobAnalyses',
-    note: 'Derived analyses of saved jobs (requirements, matches, plan) and the owner review.',
+    note: 'Derived evaluations of saved jobs (score, requirements, gaps, keywords).',
   },
   Resume: {
     status: 'exported',
@@ -125,7 +92,7 @@ export const ACCOUNT_EXPORT_REGISTRY = {
   ResumeVersion: {
     status: 'exported',
     section: 'resumeVersions',
-    note: 'Resume versions: structured content with per-item sources, status and links to the profile revision and analysis used.',
+    note: 'Resume versions: structured content, status and links to the base revision and evaluation used.',
   },
   AccountDeletion: {
     status: 'excluded',

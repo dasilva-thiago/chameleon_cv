@@ -12,8 +12,6 @@ import { Button } from '../../components/ui/Button';
 import { CheckboxField } from '../../components/ui/CheckboxField';
 import { LoadingStatus } from '../../components/ui/LoadingStatus';
 import { isApiError, messageForError } from '../../lib/api';
-import { buildIndex } from '../profile/document';
-import { useProfileState } from '../profile/queries';
 import {
   bulletsById,
   errorsByPath,
@@ -22,7 +20,7 @@ import {
   locationLabel,
   warningSignature,
 } from './content';
-import { DownloadButtons } from './DownloadButtons';
+import { DownloadMenu } from './DownloadMenu';
 import { VERSION_STATUS_LABELS, countsText, editorPath, formatDateTime } from './labels';
 import {
   useApproveVersion,
@@ -47,7 +45,6 @@ function EditorView({
   version: ResumeVersionDetail;
 }) {
   const navigate = useNavigate();
-  const profile = useProfileState();
   const save = useSaveVersion();
   const approve = useApproveVersion();
   const newVersion = useNewVersion();
@@ -60,10 +57,6 @@ function EditorView({
 
   const approved = version.status === 'approved';
   const dirty = JSON.stringify(content) !== JSON.stringify(version.content);
-  const index = useMemo(
-    () => (profile.isSuccess ? buildIndex(profile.data.document) : null),
-    [profile.isSuccess, profile.data],
-  );
   const issues = useMemo(() => issuesByPath(version.issues), [version.issues]);
   const saved = useMemo(() => bulletsById(version.content), [version.content]);
   const counts = issueCounts(version.issues);
@@ -145,7 +138,7 @@ function EditorView({
           versão (um rascunho copiado desta). Os arquivos DOCX e PDF são gerados desta versão.
         </Alert>
         <p role="status" className="text-sm text-slate-800">
-          Verificação de fontes: {countsText(counts)}.
+          Checagem contra a base: {countsText(counts)}.
         </p>
         <div className="flex flex-wrap items-start gap-3">
           <Button
@@ -163,7 +156,7 @@ function EditorView({
           >
             {newVersion.isPending ? 'Criando…' : 'Criar nova versão para editar'}
           </Button>
-          <DownloadButtons
+          <DownloadMenu
             resumeId={version.resumeId}
             versionId={version.id}
             context={`versão ${String(version.versionNumber)}`}
@@ -184,22 +177,36 @@ function EditorView({
       {header}
       <div>{backLink}</div>
 
-      {profile.isError ? (
-        <Alert tone="error" title="Não foi possível carregar o perfil">
-          As fontes dos itens não podem ser mostradas agora. {messageForError(profile.error)}
-        </Alert>
+      {version.coverage !== null ? (
+        <div className="flex flex-col gap-1 text-sm text-slate-800">
+          <p>
+            <span className="font-semibold">Palavras-chave da vaga cobertas:</span>{' '}
+            {String(version.coverage.percent)}%
+          </p>
+          {version.coverage.missing.length > 0 ? (
+            <p className="text-slate-700">
+              Ausentes: {version.coverage.missing.join(', ')}. Inclua só as que a sua base sustenta.
+            </p>
+          ) : null}
+        </div>
       ) : null}
 
       <div role="status" className="text-sm text-slate-800">
-        Verificação de fontes:{' '}
+        Checagem contra a base:{' '}
         {counts.errors + counts.warnings === 0 ? 'nenhum problema encontrado' : countsText(counts)}
         {dirty ? ' (da última versão salva; salve para atualizar)' : ''}.
       </div>
       {(issues.get('sections') ?? []).length > 0 ? (
-        <ul className="flex flex-col gap-1 text-sm text-red-800">
+        <ul className="flex flex-col gap-1 text-sm">
           {(issues.get('sections') ?? []).map((issue) => (
-            <li key={issue.message}>
-              <span className="font-semibold">Erro:</span> {issue.message}
+            <li
+              key={issue.message}
+              className={issue.severity === 'error' ? 'text-red-800' : 'text-amber-900'}
+            >
+              <span className="font-semibold">
+                {issue.severity === 'error' ? 'Erro:' : 'Aviso:'}
+              </span>{' '}
+              {issue.message}
             </li>
           ))}
         </ul>
@@ -303,7 +310,6 @@ function EditorView({
           errors={errors}
           issues={issues}
           saved={saved}
-          index={index}
         />
       ) : (
         <div className="flex flex-col gap-3">

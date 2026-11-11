@@ -33,14 +33,12 @@ pnpm db:local:stop             # para o servidor
 # DATABASE_URL e TEST_DATABASE_ADMIN_URL no .env.
 
 
-3) PRISMA / MIGRATIONS / SEED
+3) PRISMA / MIGRATIONS
 -----------------------------------------------------------------------------
 pnpm db:generate               # regenera o cliente Prisma
 pnpm db:migrate                # cria/aplica migration em desenvolvimento (prisma migrate dev)
 pnpm db:migrate:deploy         # aplica migrations existentes (sem criar novas)
 pnpm db:reset                  # APAGA e recria o banco (so roda se o banco for local)
-pnpm db:seed                   # popula dados de exemplo
-pnpm db:seed:pilot             # popula dados do piloto
 
 
 4) EXECUTAR O APP
@@ -58,7 +56,7 @@ pnpm ai:check
 
 5) QUALIDADE: FORMATACAO, LINT, TIPOS
 -----------------------------------------------------------------------------
-pnpm check                     # tudo de uma vez: format:check + lint + typecheck + contracts:check + test
+pnpm check                     # tudo de uma vez: format:check + lint + typecheck + test
 pnpm format                    # corrige a formatacao (prettier --write)
 pnpm format:check              # so verifica a formatacao
 pnpm lint                      # eslint
@@ -66,13 +64,9 @@ pnpm lint:fix                  # eslint com correcao automatica
 pnpm typecheck                 # TypeScript em todos os pacotes
 
 
-6) CONTRATOS (packages/contracts)
------------------------------------------------------------------------------
-pnpm contracts:generate        # regenera os contratos/JSON Schema
-pnpm contracts:check           # confere se os contratos gerados estao atualizados
 
 
-7) TESTES
+6) TESTES
 -----------------------------------------------------------------------------
 pnpm test                      # unitarios + componentes (sem banco, sem rede)
 pnpm test:integration          # contra PostgreSQL real (precisa do banco rodando e TEST_DATABASE_ADMIN_URL)
@@ -89,7 +83,7 @@ pnpm exec playwright install chromium
 #             e2e/**/*.spec.ts = Playwright
 
 
-8) DICAS
+7) DICAS
 -----------------------------------------------------------------------------
 pnpm install --frozen-lockfile # instalacao reprodutivel (igual ao lockfile, ideal para CI)
 pnpm -r build                  # build recursivo em todos os pacotes

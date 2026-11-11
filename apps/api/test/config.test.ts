@@ -14,7 +14,6 @@ describe('loadConfig', () => {
     expect(config).toMatchObject({
       API_PORT: 3000,
       SIGNUP_MODE: 'invite',
-      UPLOAD_MAX_BYTES: 2 * 1024 * 1024,
       AI_PROVIDER: 'auto',
       AI_DAILY_REQUESTS_TOTAL: 120,
       AI_DAILY_TOKEN_LIMIT_PER_USER: 200_000,

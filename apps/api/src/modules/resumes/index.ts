@@ -1,7 +1,5 @@
-import { tailorResumeWithAi } from '@chameleon/ai';
+import { AiUnavailableError, tailorResume } from '@chameleon/ai';
 import {
-  EMPTY_REVIEW,
-  analysisReviewSchema,
   createResumeRequestSchema,
   exportResumeQuerySchema,
   RESUME_EXPORT_CONTENT_TYPES,
@@ -12,7 +10,6 @@ import {
   type CreateResumeResponse,
   type DeleteResumeResponse,
   type ListResumesResponse,
-  type ProfileDocument,
   type ResumeContent,
   type ResumeIssue,
   type ResumeResponse,
@@ -22,28 +19,33 @@ import {
   type ResumeVersionSummary,
 } from '@chameleon/contracts';
 import {
+  buildResume,
   canonicalJson,
-  generateResume,
-  hashProfileDocument,
+  keywordCoverage,
+  parseBaseCv,
   reconcileOrigins,
+  resumeLanguage,
   sha256Hex,
   validateResume,
+  type TailoredPlan,
 } from '@chameleon/domain';
 import { ExportUnavailableError, exportFileName, renderResume } from '@chameleon/documents';
 import type { Request } from 'express';
 import type { ApiModule } from '../../app';
 import { requireAuthContext, type AuthContext } from '../../auth/context';
+import { requireProfileConsent } from '../../consent';
 import { HttpError } from '../../http/errors';
-import { analyzeOrReuse } from '../jobs/analysis-core';
-import { notFound, parseDto, uuidParam } from '../profiles/errors';
-import { requireProfileConsent } from '../profiles/gate';
-import { bindProfileStore, type OwnerProfileStore } from '../profiles/scope';
+import { notFound, parseDto, uuidParam } from '../../http/params';
+import { evaluateOrReuse, parseStoredResult, profileRequiredError } from '../jobs/analysis-core';
+import { loadProfileBase } from '../profile';
 
 /**
- * Resumes per saved job (P3): `/api/jobs/:jobId/resumes` and `/api/resumes/**`. Generation is deterministic and
- * local (see `generateResume`): every line is copied from a confirmed fact and carries its id. All routes need the
- * profile consent (they read the profile) and the owner-scoped client; a foreign id answers 404 like a missing one.
- * An approved version is immutable (also in the database); editing means a NEW draft version.
+ * Resumes per saved job: `/api/jobs/:jobId/resumes` and `/api/resumes/**`. Generation follows career-ops (`pdf`
+ * mode): evaluate the job (or reuse the evaluation), let the AI write the tailored text from the professional base,
+ * build the resume keeping titles, companies, dates and links from the base, then check it (numbers, terms, titles,
+ * order, avoided expressions) and measure the keyword coverage. Every route needs the profile consent and the
+ * owner-scoped client; a foreign id answers 404 like a missing one. An approved version is immutable (also in the
+ * database); editing means a NEW draft version, checked against the base as it is now.
  */
 
 interface VersionRow {
@@ -70,6 +72,11 @@ interface ResumeRow {
   name: string;
   createdAt: Date;
   updatedAt: Date;
+}
+
+interface Sources {
+  cvMarkdown: string;
+  profileMarkdown: string;
 }
 
 const hashContent = (content: ResumeContent): string => sha256Hex(canonicalJson(content));
@@ -126,40 +133,52 @@ function exclusiveExport<T>(task: () => Promise<T>): Promise<T> {
 }
 
 export const createResumesModule = (): ApiModule => (context) => {
-  const { routes, profileStore, ai } = context;
+  const { routes, ai } = context;
 
-  const store = (auth: AuthContext): OwnerProfileStore =>
-    bindProfileStore(profileStore, auth.ownerId);
-
-  const currentDocument = async (auth: AuthContext): Promise<ProfileDocument | null> =>
-    (await store(auth).loadProfileDocument())?.document ?? null;
-
-  /** Drafts are checked against the profile as it is NOW; approved versions against the frozen revision. */
-  async function validationDocument(
-    auth: AuthContext,
-    row: VersionRow,
-    current: ProfileDocument | null,
-  ): Promise<ProfileDocument | null> {
-    if ((row.status === 'approved' || current === null) && row.profileRevisionId !== null) {
-      const revision = await store(auth).getRevision(row.profileRevisionId);
-      if (revision) return revision.snapshot;
+  /** Drafts are checked against the base as it is NOW; approved versions against the revision they were approved on. */
+  async function sourcesFor(auth: AuthContext, row: VersionRow): Promise<Sources | null> {
+    if (row.status === 'approved' && row.profileRevisionId !== null) {
+      const revision = await auth.db.profileBaseRevision.findFirst({
+        where: { id: row.profileRevisionId },
+        select: { cvMarkdown: true, profileMarkdown: true },
+      });
+      if (revision) return revision;
     }
-    return current;
+    return loadProfileBase(auth);
   }
 
-  async function detailDto(
+  async function keywordsOf(auth: AuthContext, analysisId: string | null): Promise<string[]> {
+    if (analysisId === null) return [];
+    const row = await auth.db.jobAnalysis.findFirst({
+      where: { id: analysisId },
+      select: { result: true },
+    });
+    return parseStoredResult(row?.result)?.extraction.keywords ?? [];
+  }
+
+  async function check(
     auth: AuthContext,
-    row: VersionRow,
-    current: ProfileDocument | null,
-  ): Promise<ResumeVersionDetail> {
+    content: ResumeContent,
+    sources: Sources | null,
+    analysisId: string | null,
+  ): Promise<{ issues: ResumeIssue[]; coverage: ResumeVersionDetail['coverage'] }> {
+    const keywords = await keywordsOf(auth, analysisId);
+    return {
+      issues: sources === null ? [] : validateResume(content, { ...sources, keywords }),
+      coverage: keywordCoverage(content, keywords),
+    };
+  }
+
+  async function detailDto(auth: AuthContext, row: VersionRow): Promise<ResumeVersionDetail> {
     const content = parseContent(row);
-    const document = await validationDocument(auth, row, current);
-    const issues = document === null ? [] : validateResume(content, document);
+    const sources = await sourcesFor(auth, row);
+    const { issues, coverage } = await check(auth, content, sources, row.analysisId);
     return {
       ...versionSummaryDto(row),
-      issueCounts: document === null ? versionSummaryDto(row).issueCounts : counts(issues),
+      issueCounts: sources === null ? versionSummaryDto(row).issueCounts : counts(issues),
       content,
       issues,
+      coverage,
       profileRevisionId: row.profileRevisionId,
       analysisId: row.analysisId,
     };
@@ -217,7 +236,7 @@ export const createResumesModule = (): ApiModule => (context) => {
     {
       auth: 'session',
       description:
-        'Generate a resume (version 1, draft) for a job from the confirmed profile facts and the job analysis.',
+        'Generate a tailored resume (version 1, draft) for a job: evaluation + AI tailoring from the professional base, then the fact checks.',
     },
     requireProfileConsent,
     async (req, res) => {
@@ -227,87 +246,61 @@ export const createResumesModule = (): ApiModule => (context) => {
       });
       if (!job) throw notFound();
       const body = parseDto(createResumeRequestSchema, req.body);
-      const document = await currentDocument(auth);
-      if (document === null) {
-        throw new HttpError(
-          409,
-          'PROFILE_REQUIRED',
-          'Cadastre ou importe o perfil profissional antes de gerar um curriculo.',
-        );
-      }
-      const analysis = await analyzeOrReuse(
-        auth,
-        req,
-        job,
-        document,
-        hashProfileDocument(document),
-        false,
-        ai,
-      );
-      const parsedReview = analysisReviewSchema.safeParse(analysis.row.review);
-      const review = parsedReview.success ? parsedReview.data : EMPTY_REVIEW;
+      const base = await auth.db.profileBase.findFirst({
+        select: { cvMarkdown: true, profileMarkdown: true, contentHash: true, revisionId: true },
+      });
+      if (base === null) throw profileRequiredError();
 
-      // Freeze the profile this resume is built from (immutable revision; reused when nothing changed).
-      const { revision } = await store(auth).createRevision({ reason: 'pre_generation' });
-      let generated = generateResume(document, { analysis: analysis.result, review });
+      const analysis = await evaluateOrReuse(auth, req, job, base, false, ai);
+      const language = resumeLanguage(base.profileMarkdown);
+      const parsedBase = parseBaseCv(base.cvMarkdown);
 
-      // AI tailoring (headline, summary, key skills, choice and order of items). Whatever the AI cannot support is
-      // dropped by the program; if no provider answers, the deterministic resume above is used, with no error.
+      let plan: TailoredPlan | null = null;
+      let notes: string[] = [];
+      let aiMeta: Record<string, string | number | boolean> = { aiUsed: false };
       const access = await ai.access(auth);
-      let aiNotes: string[] = [];
-      let aiMeta: Record<string, string | number | boolean> = {
-        aiUsed: false,
-        aiReason: access.reason,
-      };
       if (access.router) {
         try {
-          const out = await tailorResumeWithAi(access.router, {
-            content: generated.content,
-            document,
+          const out = await tailorResume(access.router, {
             analysis: analysis.result,
             jobTitle: job.title ?? null,
+            cvMarkdown: base.cvMarkdown,
+            profileMarkdown: base.profileMarkdown,
+            language,
           });
-          if (
-            validateResume(out.applied.content, document).some(
-              (issue) => issue.severity === 'error',
-            )
-          ) {
-            aiNotes = [
-              'A versão escrita pela IA foi descartada por ter itens sem fonte: este currículo usa o texto original dos seus registros.',
-            ];
-            aiMeta = { aiUsed: false, aiReason: 'rejected' };
-          } else {
-            generated = { content: out.applied.content, notes: generated.notes };
-            aiNotes = [
-              `Redigido com IA (${out.run.provider}, ${out.run.model}): revise o texto antes de aprovar.`,
-              ...out.applied.notes,
-            ];
-            aiMeta = {
-              aiUsed: true,
-              aiProvider: out.run.provider,
-              aiModel: out.run.model,
-              aiTokens: out.run.usage.totalTokens,
-              aiApplied: Object.entries(out.applied.applied)
-                .filter(([, used]) => used)
-                .map(([part]) => part)
-                .join(','),
-              aiAttempts: out.run.attempts
-                .map((attempt) => `${attempt.provider}:${attempt.outcome}`)
-                .join(','),
-            };
-          }
-        } catch {
-          aiNotes = [
-            'A IA não respondeu agora: este currículo usa o texto original dos seus registros.',
-          ];
+          plan = out.plan;
+          notes.push(
+            `Adaptado com IA (${out.run.provider}, ${out.run.model}): revise o texto antes de aprovar.`,
+          );
+          aiMeta = {
+            aiUsed: true,
+            aiProvider: out.run.provider,
+            aiModel: out.run.model,
+            aiTokens: out.run.usage.totalTokens,
+          };
+        } catch (error) {
+          if (!(error instanceof AiUnavailableError)) throw error;
+          notes.push(
+            'A IA não respondeu agora: este currículo é a sua base sem adaptação. Tente gerar de novo depois.',
+          );
           aiMeta = { aiUsed: false, aiReason: 'unavailable' };
         }
       }
-      const issues = validateResume(generated.content, document);
+      const built = buildResume(parsedBase, language, plan);
+      notes = [...notes, ...built.notes];
+      const content = built.content;
+      const { issues, coverage } = await check(auth, content, base, analysis.row.id);
+      if (coverage !== null) {
+        notes.push(`Cobertura das palavras-chave da vaga: ${String(coverage.percent)}%.`);
+      }
+
       const name =
         body.name ??
-        [job.title ?? 'Vaga', job.company]
-          .filter((part) => part !== null)
+        [
+          job.title ?? analysis.result.extraction.role.title ?? 'Vaga',
+          job.company ?? analysis.result.extraction.role.company,
+        ]
+          .filter((part): part is string => part !== null && part !== undefined)
           .join(' — ')
           .slice(0, 120);
 
@@ -321,12 +314,12 @@ export const createResumesModule = (): ApiModule => (context) => {
             ownerId: auth.ownerId,
             resumeId: resume.id,
             versionNumber: 1,
-            language: generated.content.language,
-            content: generated.content,
-            contentHash: hashContent(generated.content),
+            language: content.language,
+            content,
+            contentHash: hashContent(content),
             issueErrors: counts(issues).errors,
             issueWarnings: counts(issues).warnings,
-            profileRevisionId: revision.id,
+            profileRevisionId: base.revisionId,
             analysisId: analysis.row.id,
           },
         });
@@ -336,13 +329,16 @@ export const createResumesModule = (): ApiModule => (context) => {
       }
       await audit(auth, req, 'resume.create', resume.id, {
         versionNumber: 1,
-        sections: generated.content.sections.length,
+        sections: content.sections.length,
+        errors: counts(issues).errors,
+        warnings: counts(issues).warnings,
+        coverage: coverage?.percent ?? -1,
         ...aiMeta,
       });
       const response: CreateResumeResponse = {
         resume: resumeDto(resume, [version]),
-        version: await detailDto(auth, version, document),
-        notes: [...aiNotes, ...generated.notes].slice(0, 20),
+        version: await detailDto(auth, version),
+        notes: notes.map((note) => note.slice(0, 300)).slice(0, 20),
       };
       res.status(201).json(response);
     },
@@ -433,17 +429,14 @@ export const createResumesModule = (): ApiModule => (context) => {
     '/resumes/:resumeId/versions/:versionId',
     {
       auth: 'session',
-      description:
-        'One version with its content and the factuality issues (drafts: against the current profile).',
+      description: 'One version with its content, the fact-check issues and the keyword coverage.',
     },
     requireProfileConsent,
     async (req, res) => {
       const auth = requireAuthContext(req);
       const resume = await loadResume(auth, req.params.resumeId);
       const version = await loadVersion(auth, resume.id, req.params.versionId);
-      const response: ResumeVersionResponse = {
-        version: await detailDto(auth, version, await currentDocument(auth)),
-      };
+      const response: ResumeVersionResponse = { version: await detailDto(auth, version) };
       res.json(response);
     },
   );
@@ -465,9 +458,7 @@ export const createResumesModule = (): ApiModule => (context) => {
       }
       const body = parseDto(updateResumeVersionRequestSchema, req.body);
       const content = reconcileOrigins(parseContent(row), body.content);
-      const current = await currentDocument(auth);
-      const document = await validationDocument(auth, row, current);
-      const issues = document === null ? [] : validateResume(content, document);
+      const { issues } = await check(auth, content, await sourcesFor(auth, row), row.analysisId);
       const saved = await auth.db.resumeVersion.update({
         where: { id: row.id },
         data: {
@@ -483,7 +474,7 @@ export const createResumesModule = (): ApiModule => (context) => {
         errors: counts(issues).errors,
         warnings: counts(issues).warnings,
       });
-      const response: ResumeVersionResponse = { version: await detailDto(auth, saved, current) };
+      const response: ResumeVersionResponse = { version: await detailDto(auth, saved) };
       res.json(response);
     },
   );
@@ -493,7 +484,7 @@ export const createResumesModule = (): ApiModule => (context) => {
     {
       auth: 'session',
       description:
-        'Approve a draft: every item must have confirmed, resume-allowed sources in the current profile. Warnings do not block.',
+        'Approve a draft: the fact checks against the current base must have no errors. Warnings do not block.',
     },
     requireProfileConsent,
     async (req, res) => {
@@ -503,29 +494,28 @@ export const createResumesModule = (): ApiModule => (context) => {
       if (row.status === 'approved') {
         throw new HttpError(409, 'VERSION_APPROVED', 'Esta versao ja esta aprovada.');
       }
-      const current = await currentDocument(auth);
-      if (current === null) {
+      const base = await auth.db.profileBase.findFirst({
+        select: { cvMarkdown: true, profileMarkdown: true, revisionId: true },
+      });
+      if (base === null) throw profileRequiredError();
+      const content = parseContent(row);
+      const { issues } = await check(auth, content, base, row.analysisId);
+      if (issues.some((issue) => issue.severity === 'error')) {
         throw new HttpError(
           409,
-          'PROFILE_REQUIRED',
-          'O perfil profissional e necessario para validar o curriculo.',
+          'RESUME_INVALID',
+          'O curriculo tem itens que a base profissional nao sustenta.',
+          {
+            details: issueDetails(issues),
+          },
         );
       }
-      const content = parseContent(row);
-      const issues = validateResume(content, current);
-      if (issues.some((issue) => issue.severity === 'error')) {
-        throw new HttpError(409, 'RESUME_INVALID', 'O curriculo tem itens sem fonte confirmada.', {
-          details: issueDetails(issues),
-        });
-      }
-      // Pin the profile this approval was checked against (reused when unchanged).
-      const { revision } = await store(auth).createRevision({ reason: 'pre_generation' });
       const approved = await auth.db.resumeVersion.update({
         where: { id: row.id },
         data: {
           status: 'approved',
           approvedAt: new Date(),
-          profileRevisionId: revision.id,
+          profileRevisionId: base.revisionId,
           issueErrors: 0,
           issueWarnings: counts(issues).warnings,
         },
@@ -535,7 +525,7 @@ export const createResumesModule = (): ApiModule => (context) => {
         versionNumber: approved.versionNumber,
         warnings: counts(issues).warnings,
       });
-      const response: ResumeVersionResponse = { version: await detailDto(auth, approved, current) };
+      const response: ResumeVersionResponse = { version: await detailDto(auth, approved) };
       res.json(response);
     },
   );
@@ -623,9 +613,7 @@ export const createResumesModule = (): ApiModule => (context) => {
         where: { resumeId: resume.id },
         _max: { versionNumber: true },
       });
-      const current = await currentDocument(auth);
-      const document = await validationDocument(auth, { ...source, status: 'draft' }, current);
-      const issues = document === null ? [] : validateResume(content, document);
+      const { issues } = await check(auth, content, await loadProfileBase(auth), source.analysisId);
       const created = await auth.db.resumeVersion.create({
         data: {
           ownerId: auth.ownerId,
@@ -646,7 +634,7 @@ export const createResumesModule = (): ApiModule => (context) => {
         versionNumber: created.versionNumber,
         fromVersionNumber: source.versionNumber,
       });
-      const response: ResumeVersionResponse = { version: await detailDto(auth, created, current) };
+      const response: ResumeVersionResponse = { version: await detailDto(auth, created) };
       res.status(201).json(response);
     },
   );

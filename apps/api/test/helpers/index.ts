@@ -11,3 +11,11 @@ export {
 } from './two-accounts';
 export type { TestAccount } from './two-accounts';
 export { expectSessionRoutesRejectAnonymous } from './route-gate';
+export {
+  BASE_CV,
+  BASE_PROFILE,
+  JOB_TEXT,
+  scriptedProvider,
+  seedBase,
+  type Scripted,
+} from './scripted-ai';

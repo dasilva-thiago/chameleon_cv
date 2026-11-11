@@ -58,20 +58,12 @@ export function expectNoLeaks(
 }
 
 /**
- * Serializa TUDO que o dono consegue ler pelas camadas internas: ProfileStore (documento, revisoes
- * com snapshot, importacoes, id_map) e `forOwner` em TODOS os modelos privados.
+ * Serializa TUDO que o dono consegue ler pelas camadas internas: `forOwner` em TODOS os modelos privados
+ * (base, revisoes, vagas, avaliacoes, curriculos, versoes, identidade).
  */
 export async function readEverythingAs(world: World, viewer: { ownerId: string }): Promise<string> {
-  const { store, testDb } = world;
+  const { testDb } = world;
   const parts: unknown[] = [];
-  parts.push(await store.loadProfileDocument(viewer.ownerId));
-  const revisions = await store.listRevisions(viewer.ownerId, { limit: 200 });
-  parts.push(revisions);
-  for (const revision of revisions) {
-    parts.push(await store.getRevision(viewer.ownerId, revision.id));
-  }
-  parts.push(await store.listImportRecords(viewer.ownerId, { limit: 200 }));
-  parts.push(await store.getImportIdMap(viewer.ownerId));
   const scoped = testDb.db.forOwner(viewer.ownerId);
   for (const model of PRIVATE_MODELS) {
     const delegate = (scoped as unknown as Record<string, { findMany(): Promise<unknown[]> }>)[

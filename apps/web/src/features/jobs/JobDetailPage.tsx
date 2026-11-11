@@ -1,16 +1,18 @@
 import type { JobDetail, JobStatus } from '@chameleon/contracts';
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
+import { PageHeader } from '../../components/layout/PageHeader';
 import { PageHeading, usePageTitle } from '../../components/layout/PageHeading';
+import { Section } from '../../components/layout/Section';
 import { Alert } from '../../components/ui/Alert';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
+import { ExpandableText } from '../../components/ui/ExpandableText';
 import { LoadingStatus } from '../../components/ui/LoadingStatus';
 import { SelectField } from '../../components/ui/SelectField';
 import { isApiError, messageForError } from '../../lib/api';
 import { ResumesSection } from '../resumes/ResumesSection';
 import { AnalysisSection } from './AnalysisSection';
-import { primaryLinkClass } from './JobsPage';
 import { JOB_STATUS_LABELS, JOB_WORK_MODE_LABELS, STATUS_OPTIONS, UNTITLED_JOB } from './labels';
 import { useDeleteJob, useJob, usePatchJob } from './queries';
 
@@ -34,153 +36,145 @@ function JobView({ job }: { job: JobDetail }) {
     patch.mutate({ id: job.id, input: { status } });
   };
 
+  const context = [
+    job.company,
+    job.location,
+    job.workMode !== null ? JOB_WORK_MODE_LABELS[job.workMode] : null,
+    job.postedOn !== null ? `Publicada em ${formatDate(job.postedOn)}` : null,
+  ].filter((part): part is string => part !== null && part !== '');
+
   return (
-    <div className="flex flex-col gap-5">
-      <div className="flex flex-col gap-2">
-        <PageHeading>{title}</PageHeading>
-        {job.company !== null ? <p className="text-lg text-slate-800">{job.company}</p> : null}
-        <div className="flex flex-wrap gap-2">
-          <Badge tone="info" prefix="Situação">
-            {JOB_STATUS_LABELS[job.status]}
-          </Badge>
-          {job.workMode !== null ? <Badge>{JOB_WORK_MODE_LABELS[job.workMode]}</Badge> : null}
-          {job.location !== null ? <Badge>{job.location}</Badge> : null}
-          {job.postedOn !== null ? (
-            <Badge prefix="Publicada em">{formatDate(job.postedOn)}</Badge>
-          ) : null}
-        </div>
-        {job.url !== null ? (
-          <p className="break-all text-sm">
-            <a
-              href={job.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-blue-800 underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700"
+    <div className="flex flex-col gap-8">
+      <div className="flex flex-col gap-4">
+        <PageHeader
+          back={{ to: '/vagas', label: 'Vagas' }}
+          title={title}
+          meta={
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <Badge tone={archived ? 'neutral' : 'info'}>{JOB_STATUS_LABELS[job.status]}</Badge>
+              {context.length > 0 ? (
+                <p className="text-base text-slate-800">{context.join(' · ')}</p>
+              ) : null}
+              {job.url !== null ? (
+                <a
+                  href={job.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm text-blue-800 underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700"
+                >
+                  Abrir a vaga original (nova aba)
+                </a>
+              ) : null}
+            </div>
+          }
+        />
+
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="min-w-52">
+            <SelectField
+              label="Situação"
+              placeholder={null}
+              options={STATUS_OPTIONS}
+              value={job.status}
+              disabled={patch.isPending}
+              onChange={(event) => {
+                changeStatus(event.target.value as JobStatus);
+              }}
+            />
+          </div>
+          <Link to={`/vagas/${job.id}/editar`} className={secondaryLinkClass}>
+            Editar
+          </Link>
+          <Button
+            variant="secondary"
+            disabled={patch.isPending}
+            onClick={() => {
+              changeStatus(archived ? 'saved' : 'archived');
+            }}
+          >
+            {archived ? 'Desarquivar' : 'Arquivar'}
+          </Button>
+          {confirming ? null : (
+            <button
+              type="button"
+              onClick={() => {
+                setConfirming(true);
+              }}
+              className="ml-auto min-h-11 rounded-md px-2 text-sm font-medium text-red-800 underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700"
             >
-              Abrir a vaga original (nova aba)
-            </a>
-          </p>
+              Excluir…
+            </button>
+          )}
+        </div>
+
+        <div role="status" aria-live="polite">
+          {patch.isSuccess ? <Alert tone="success">Vaga atualizada.</Alert> : null}
+        </div>
+        {patch.isError ? (
+          <Alert tone="error" title="Não foi possível atualizar">
+            {messageForError(patch.error)}
+          </Alert>
+        ) : null}
+
+        {confirming ? (
+          <div
+            role="alertdialog"
+            aria-labelledby="confirm-delete-title"
+            className="flex flex-col gap-3 rounded-md border border-red-700 bg-red-50 p-4"
+          >
+            <p id="confirm-delete-title" className="font-semibold text-red-900">
+              Excluir esta vaga definitivamente?
+            </p>
+            <p className="text-sm text-red-900">
+              O texto e as anotações serão apagados e não poderão ser recuperados. Para só tirar da
+              lista, use &quot;Arquivar&quot;.
+            </p>
+            {remove.isError ? (
+              <Alert tone="error" title="Não foi possível excluir">
+                {messageForError(remove.error)}
+              </Alert>
+            ) : null}
+            <div className="flex flex-wrap gap-3">
+              <Button
+                variant="danger"
+                disabled={remove.isPending}
+                onClick={() => {
+                  remove.mutate(job.id, {
+                    onSuccess: () => {
+                      void navigate('/vagas');
+                    },
+                  });
+                }}
+              >
+                {remove.isPending ? 'Excluindo…' : 'Excluir definitivamente'}
+              </Button>
+              <Button
+                variant="secondary"
+                disabled={remove.isPending}
+                onClick={() => {
+                  setConfirming(false);
+                }}
+              >
+                Cancelar
+              </Button>
+            </div>
+          </div>
         ) : null}
       </div>
 
-      <div className="flex flex-wrap items-end gap-3">
-        <div className="min-w-56">
-          <SelectField
-            label="Situação"
-            placeholder={null}
-            options={STATUS_OPTIONS}
-            value={job.status}
-            disabled={patch.isPending}
-            onChange={(event) => {
-              changeStatus(event.target.value as JobStatus);
-            }}
-          />
-        </div>
-        <Link to={`/vagas/${job.id}/editar`} className={primaryLinkClass}>
-          Editar
-        </Link>
-        <Button
-          variant="secondary"
-          disabled={patch.isPending}
-          onClick={() => {
-            changeStatus(archived ? 'saved' : 'archived');
-          }}
-        >
-          {archived ? 'Desarquivar' : 'Arquivar'}
-        </Button>
-        {confirming ? null : (
-          <Button
-            variant="secondary"
-            onClick={() => {
-              setConfirming(true);
-            }}
-          >
-            Excluir…
-          </Button>
-        )}
-      </div>
-
-      <div role="status" aria-live="polite">
-        {patch.isSuccess ? <Alert tone="success">Vaga atualizada.</Alert> : null}
-      </div>
-      {patch.isError ? (
-        <Alert tone="error" title="Não foi possível atualizar">
-          {messageForError(patch.error)}
-        </Alert>
-      ) : null}
-
-      {confirming ? (
-        <div
-          role="alertdialog"
-          aria-labelledby="confirm-delete-title"
-          className="flex flex-col gap-3 rounded-md border border-red-700 bg-red-50 p-4"
-        >
-          <p id="confirm-delete-title" className="font-semibold text-red-900">
-            Excluir esta vaga definitivamente?
-          </p>
-          <p className="text-sm text-red-900">
-            O texto e as anotações serão apagados e não poderão ser recuperados. Para só tirar da
-            lista, use &quot;Arquivar&quot;.
-          </p>
-          {remove.isError ? (
-            <Alert tone="error" title="Não foi possível excluir">
-              {messageForError(remove.error)}
-            </Alert>
-          ) : null}
-          <div className="flex flex-wrap gap-3">
-            <Button
-              variant="danger"
-              disabled={remove.isPending}
-              onClick={() => {
-                remove.mutate(job.id, {
-                  onSuccess: () => {
-                    void navigate('/vagas');
-                  },
-                });
-              }}
-            >
-              {remove.isPending ? 'Excluindo…' : 'Excluir definitivamente'}
-            </Button>
-            <Button
-              variant="secondary"
-              disabled={remove.isPending}
-              onClick={() => {
-                setConfirming(false);
-              }}
-            >
-              Cancelar
-            </Button>
+      <Section id="job-text" title="Texto original da vaga">
+        <ExpandableText text={job.description} />
+        {job.notes !== null ? (
+          <div className="flex flex-col gap-1 rounded-md border border-slate-300 bg-slate-100 p-3">
+            <h3 className="text-sm font-semibold text-slate-900">Suas anotações</h3>
+            <p className="whitespace-pre-wrap break-words text-sm text-slate-900">{job.notes}</p>
           </div>
-        </div>
-      ) : null}
-
-      {job.notes !== null ? (
-        <section aria-labelledby="job-notes" className="flex flex-col gap-2">
-          <h2 id="job-notes" className="text-lg font-semibold">
-            Anotações
-          </h2>
-          <p className="whitespace-pre-wrap break-words text-base text-slate-900">{job.notes}</p>
-        </section>
-      ) : null}
-
-      <section aria-labelledby="job-text" className="flex flex-col gap-2">
-        <h2 id="job-text" className="text-lg font-semibold">
-          Texto original da vaga
-        </h2>
-        <pre className="whitespace-pre-wrap break-words rounded-md border border-slate-400 bg-white p-4 font-sans text-base text-slate-900">
-          {job.description}
-        </pre>
-      </section>
+        ) : null}
+      </Section>
 
       <AnalysisSection jobId={job.id} />
 
       <ResumesSection jobId={job.id} />
-
-      <div>
-        <Link to="/vagas" className={secondaryLinkClass}>
-          Voltar às vagas
-        </Link>
-      </div>
     </div>
   );
 }

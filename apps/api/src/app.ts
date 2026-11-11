@@ -1,5 +1,4 @@
-import { type Db, type ProfileStore, createProfileStore } from '@chameleon/db';
-import { buildProfileSnapshot } from '@chameleon/domain';
+import type { Db } from '@chameleon/db';
 import express, { type Express, type RequestHandler, type Router } from 'express';
 import helmet from 'helmet';
 import type { Logger } from 'pino';
@@ -21,13 +20,9 @@ import { createAiModule } from './modules/ai';
 import { createJobsModule } from './modules/jobs';
 import { disabledAiService, type AiService } from './ai/service';
 import { createResumesModule } from './modules/resumes';
-import {
-  type ProfilesModuleOptions,
-  createProfilesModule,
-  isLargeBodyRoute,
-} from './modules/profiles';
+import { LARGE_BODY_ROUTES, createProfileModule } from './modules/profile';
 
-/** O que um modulo de dominio recebe para montar suas rotas em `/api` (profiles, imports, ...). */
+/** O que um modulo de dominio recebe para montar suas rotas em `/api` (profile, jobs, resumes, ...). */
 export interface ApiModuleContext {
   /** Roteador `/api`: CSRF, parser JSON e no-store ja aplicados. */
   router: Router;
@@ -38,12 +33,6 @@ export interface ApiModuleContext {
    * automatically; passing it explicitly is accepted (and deduplicated) but no longer required.
    */
   requireAuth: RequestHandler;
-  /**
-   * Profile persistence, built by the composition root. Modules NEVER receive the unrestricted
-   * `Db` (`global`/`unsafeRaw`; ADR-0008 item 2): they use this store or `req.auth.db`, the client
-   * scoped to the authenticated owner.
-   */
-  profileStore: ProfileStore;
   /** AI access (providers, budget, consent). Off unless the composition root passes a configured service. */
   ai: AiService;
   logger: Logger;
@@ -64,9 +53,7 @@ export interface AppDeps {
   sessionPolicy?: Partial<SessionPolicy>;
   /** Modulos de dominio adicionais (as fatias seguintes entram aqui; testes tambem). */
   modules?: readonly ApiModule[];
-  /** Limits of the built-in profile module (preview cache, import quota); defaults in production. */
-  profiles?: ProfilesModuleOptions;
-  /** AI providers (`createAiService`). Default: off (deterministic engine only). */
+  /** AI providers (`createAiService`). Default: off (evaluation and tailoring unavailable). */
   ai?: AiService;
 }
 
@@ -117,26 +104,26 @@ export function createApp(deps: AppDeps): Express {
   api.use(noStore);
   api.use(csrfCookieIssuer(auth.cookies));
   api.use(csrfGuard(config, auth.cookies));
-  // Global JSON limit (JSON_BODY_LIMIT_BYTES). Routes with a larger payload (import preview) declare their own
+  // Global JSON limit (JSON_BODY_LIMIT_BYTES). Routes with a larger payload (the professional base) declare their own
   // parser and are skipped here by exact METHOD + path; every other route keeps the global limit.
   const jsonParser = express.json({ limit: config.JSON_BODY_LIMIT_BYTES, strict: true });
   api.use((req, res, next) =>
-    isLargeBodyRoute(req.method, req.path) ? next() : jsonParser(req, res, next),
+    LARGE_BODY_ROUTES.some((route) => route.method === req.method && route.path === req.path)
+      ? next()
+      : jsonParser(req, res, next),
   );
   const routes = registry.group(api, '/api');
   routes.get('/health', { auth: 'public', description: 'Liveness.' }, health);
   registry.mount(api, '/auth', auth.router);
-  const profileStore = createProfileStore(db, { snapshot: buildProfileSnapshot });
   const moduleContext = {
     router: api,
     routes,
     requireAuth: auth.requireAuth,
-    profileStore,
     ai: deps.ai ?? disabledAiService,
     logger,
     config,
   };
-  createProfilesModule({ now, ...deps.profiles })(moduleContext);
+  createProfileModule()(moduleContext);
   createAiModule()(moduleContext);
   createJobsModule()(moduleContext);
   createResumesModule()(moduleContext);

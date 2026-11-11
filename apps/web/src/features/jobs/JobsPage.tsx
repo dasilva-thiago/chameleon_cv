@@ -1,7 +1,8 @@
 import { JOB_STATUS_FILTERS, type JobSummary } from '@chameleon/contracts';
 import { useDeferredValue, useState } from 'react';
 import { Link } from 'react-router';
-import { PageHeading, usePageTitle } from '../../components/layout/PageHeading';
+import { PageHeader } from '../../components/layout/PageHeader';
+import { usePageTitle } from '../../components/layout/PageHeading';
 import { Alert } from '../../components/ui/Alert';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
@@ -30,25 +31,30 @@ export const primaryLinkClass =
 
 function JobCard({ job }: { job: JobSummary }) {
   const title = job.title ?? UNTITLED_JOB;
+  const context = [
+    job.company,
+    job.location,
+    job.workMode !== null ? JOB_WORK_MODE_LABELS[job.workMode] : null,
+  ].filter((part): part is string => part !== null && part !== '');
   return (
-    <article className="flex flex-col gap-2 rounded-md border border-slate-400 bg-white p-4">
-      <h2 className="text-lg font-semibold text-slate-900">
-        <Link
-          to={`/vagas/${job.id}`}
-          className="text-blue-800 underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700"
-        >
-          {title}
-        </Link>
-      </h2>
-      {job.company !== null ? <p className="text-base text-slate-800">{job.company}</p> : null}
-      <div className="flex flex-wrap gap-2">
-        <Badge tone={job.status === 'saved' ? 'neutral' : 'info'} prefix="Situação">
+    <article className="relative flex flex-col gap-1.5 rounded-md border border-slate-400 bg-white p-4 hover:border-slate-600 hover:bg-slate-50 focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-blue-700">
+      <div className="flex items-start justify-between gap-3">
+        <h2 className="text-base font-semibold text-slate-900">
+          <Link
+            to={`/vagas/${job.id}`}
+            className="after:absolute after:inset-0 hover:underline focus-visible:outline-none"
+          >
+            {title}
+          </Link>
+        </h2>
+        <Badge tone={job.status === 'saved' ? 'neutral' : 'info'}>
           {JOB_STATUS_LABELS[job.status]}
         </Badge>
-        {job.workMode !== null ? <Badge>{JOB_WORK_MODE_LABELS[job.workMode]}</Badge> : null}
-        {job.location !== null ? <Badge>{job.location}</Badge> : null}
       </div>
-      <p className="text-sm text-slate-700">{job.excerpt}</p>
+      {context.length > 0 ? (
+        <p className="text-sm font-medium text-slate-800">{context.join(' · ')}</p>
+      ) : null}
+      <p className="line-clamp-2 text-sm text-slate-700">{job.excerpt}</p>
     </article>
   );
 }
@@ -65,21 +71,17 @@ export function JobsPage() {
   });
 
   return (
-    <div className="flex flex-col gap-5">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="flex flex-col gap-2">
-          <PageHeading>Vagas</PageHeading>
-          <p className="text-base text-slate-800">
-            Cole a descrição de uma vaga para guardá-la, acompanhar a situação e consultar o texto
-            original depois.
-          </p>
-        </div>
-        <Link to="/vagas/nova" className={primaryLinkClass}>
-          Adicionar vaga
-        </Link>
-      </div>
+    <div className="flex flex-col gap-6">
+      <PageHeader
+        title="Vagas"
+        actions={
+          <Link to="/vagas/nova" className={primaryLinkClass}>
+            Adicionar vaga
+          </Link>
+        }
+      />
 
-      <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_14rem]">
+      <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_13rem]">
         <TextField
           label="Buscar"
           type="search"
@@ -118,7 +120,7 @@ export function JobsPage() {
         </div>
       ) : null}
       {list.isSuccess ? (
-        <>
+        <div className="flex flex-col gap-3">
           <p role="status" className="text-sm text-slate-700">
             {list.data.counts.active} em andamento · {list.data.counts.total} no total
           </p>
@@ -137,7 +139,7 @@ export function JobsPage() {
               ))}
             </ul>
           )}
-        </>
+        </div>
       ) : null}
     </div>
   );

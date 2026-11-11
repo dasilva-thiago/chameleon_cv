@@ -1,9 +1,10 @@
 import { z } from 'zod';
 
 /**
- * Currículos por vaga (P3/P4). O conteúdo é um documento estruturado em que TODA afirmação (item/bullet) aponta
- * para os ids dos registros do perfil que a sustentam (`sourceIds`). Uma versão `approved` é imutável: editar
- * gera uma nova versão `draft`. O arquivo exportado (DOCX/PDF) é sempre renderizado do conteúdo aprovado.
+ * Currículos por vaga. O conteúdo é um documento estruturado (cabeçalho + seções) escrito pela IA a partir da base
+ * profissional e da avaliação da vaga, e conferido pelo programa contra a base (números, tecnologias, cargos, ordem,
+ * expressões proibidas), como no career-ops. Uma versão `approved` é imutável: editar gera uma nova versão `draft`.
+ * O arquivo exportado (DOCX/PDF) é sempre renderizado do conteúdo aprovado.
  */
 
 export const RESUME_LIMITS = {
@@ -14,7 +15,6 @@ export const RESUME_LIMITS = {
   bulletsPerEntry: 24,
   entriesPerSection: 30,
   sections: 10,
-  sourcesPerItem: 12,
   contacts: 8,
   id: 40,
 } as const;
@@ -42,7 +42,6 @@ const nullableLine = (max: number) =>
     .transform((value) => (value === '' ? null : value));
 
 const itemId = z.string().regex(/^[a-z0-9][a-z0-9-]{0,39}$/, 'Id inválido.');
-const sourceIds = z.array(z.uuid()).max(RESUME_LIMITS.sourcesPerItem);
 
 export const RESUME_BULLET_ORIGINS = ['generated', 'edited', 'added'] as const;
 
@@ -54,8 +53,6 @@ export const resumeBulletSchema = z.strictObject({
     .min(1, 'O texto não pode ficar vazio.')
     .max(RESUME_LIMITS.bulletText, `Use até ${RESUME_LIMITS.bulletText} caracteres.`)
     .regex(NO_CONTROL, 'Caractere inválido.'),
-  /** Registros do perfil que sustentam a afirmação. */
-  sourceIds,
   origin: z.enum(RESUME_BULLET_ORIGINS),
 });
 export type ResumeBullet = z.infer<typeof resumeBulletSchema>;
@@ -65,10 +62,7 @@ export const resumeEntrySchema = z.strictObject({
   heading: line(RESUME_LIMITS.line),
   subheading: nullableLine(RESUME_LIMITS.line),
   period: nullableLine(RESUME_LIMITS.period),
-  /**
-   * Linha de apoio sob o cabeçalho: local (experiência e formação) ou tecnologias (projeto). Opcional: versões
-   * antigas não têm. Vem dos mesmos registros que sustentam a entrada (`sourceIds`).
-   */
+  /** Linha de apoio sob o cabeçalho: local (experiência e formação) ou tecnologias (projeto). */
   detail: nullableLine(RESUME_LIMITS.line).optional(),
   /** Link público da entrada (projeto publicado, repositório). Só http(s). */
   url: nullableLine(2048)
@@ -77,8 +71,6 @@ export const resumeEntrySchema = z.strictObject({
     })
     .optional(),
   bullets: z.array(resumeBulletSchema).max(RESUME_LIMITS.bulletsPerEntry),
-  /** Registros que sustentam o cabeçalho da entrada (cargo, empresa, curso...). */
-  sourceIds,
 });
 export type ResumeEntry = z.infer<typeof resumeEntrySchema>;
 
@@ -107,14 +99,12 @@ export const resumeContactSchema = z.strictObject({
   kind: z.enum(['email', 'phone', 'link']),
   value: line(2048),
   label: nullableLine(RESUME_LIMITS.line),
-  /** `contact_point` do perfil de onde veio (só contatos públicos/permitidos entram). */
-  sourceId: z.uuid(),
 });
 export type ResumeContact = z.infer<typeof resumeContactSchema>;
 
 export const resumeHeaderSchema = z.strictObject({
   name: line(RESUME_LIMITS.line),
-  /** Título descritivo: o do perfil (`professional_headline`) ou um proposto pela IA e validado (sem senioridade, cargo ou tecnologia que o perfil não sustente). */
+  /** Título descritivo adaptado à vaga (sem senioridade nem tecnologia que a base não sustente). */
   headline: nullableLine(RESUME_LIMITS.line),
   location: nullableLine(RESUME_LIMITS.line),
   contacts: z.array(resumeContactSchema).max(RESUME_LIMITS.contacts),
@@ -122,7 +112,7 @@ export const resumeHeaderSchema = z.strictObject({
 export type ResumeHeader = z.infer<typeof resumeHeaderSchema>;
 
 export const resumeContentSchema = z.strictObject({
-  schemaVersion: z.literal(1),
+  schemaVersion: z.literal(2),
   language: z.string().regex(/^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$/),
   header: resumeHeaderSchema,
   sections: z.array(resumeBodySectionSchema).max(RESUME_LIMITS.sections),
@@ -131,14 +121,29 @@ export type ResumeContent = z.infer<typeof resumeContentSchema>;
 
 // --- Validação de factualidade --------------------------------------------------------------
 
+/**
+ * Checagens do career-ops portadas para o currículo gerado:
+ * - `UNSUPPORTED_NUMBER` (erro): número/métrica que não aparece na base;
+ * - `TITLE_MISMATCH` (erro): cargo diferente do cargo da base para a mesma empresa;
+ * - `SENIORITY_CLAIM` (erro): termo de senioridade (Sênior, Pleno, Líder...) que a base não sustenta;
+ * - `FORBIDDEN_PHRASE` (erro): expressão que o perfil manda evitar;
+ * - `UNSUPPORTED_TERM` (aviso): palavra-chave da vaga que não aparece na base;
+ * - `EXPERIENCE_ORDER` (aviso): experiências fora da ordem da base;
+ * - `UNKNOWN_EXPERIENCE` (aviso): empresa que não está na base;
+ * - `EMPTY_CONTENT` / `DUPLICATE_ID` (erro): estrutura.
+ */
 export const RESUME_ISSUE_CODES = [
-  'NO_SOURCE',
-  'UNKNOWN_SOURCE',
-  'SOURCE_NOT_USABLE',
+  'UNSUPPORTED_NUMBER',
+  'TITLE_MISMATCH',
+  'SENIORITY_CLAIM',
+  'FORBIDDEN_PHRASE',
   'UNSUPPORTED_TERM',
+  'EXPERIENCE_ORDER',
+  'UNKNOWN_EXPERIENCE',
   'EMPTY_CONTENT',
   'DUPLICATE_ID',
 ] as const;
+export type ResumeIssueCode = (typeof RESUME_ISSUE_CODES)[number];
 
 export const resumeIssueSchema = z.strictObject({
   /** `error` impede a aprovação; `warning` pede conferência. */
@@ -174,12 +179,22 @@ export const resumeVersionSummarySchema = z.strictObject({
 });
 export type ResumeVersionSummary = z.infer<typeof resumeVersionSummarySchema>;
 
+/** Cobertura das palavras-chave da vaga no currículo (career-ops, keyword-match). */
+export const keywordCoverageSchema = z.strictObject({
+  percent: z.number().int().min(0).max(100),
+  present: z.array(z.string().max(80)).max(40),
+  missing: z.array(z.string().max(80)).max(40),
+});
+export type KeywordCoverage = z.infer<typeof keywordCoverageSchema>;
+
 export const resumeVersionDetailSchema = resumeVersionSummarySchema.extend({
   content: resumeContentSchema,
   issues: z.array(resumeIssueSchema).max(200),
-  /** Revisão imutável do perfil usada na geração (reprodutibilidade da proveniência). */
+  /** Cobertura das palavras-chave da avaliação; null sem avaliação. */
+  coverage: keywordCoverageSchema.nullable(),
+  /** Revisão da base usada na geração (a checagem de uma versão aprovada usa esta). */
   profileRevisionId: z.uuid().nullable(),
-  /** Análise da vaga que orientou a geração. */
+  /** Avaliação da vaga que orientou a geração. */
   analysisId: z.uuid().nullable(),
 });
 export type ResumeVersionDetail = z.infer<typeof resumeVersionDetailSchema>;

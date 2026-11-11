@@ -65,6 +65,9 @@ function toRequest(values: Values): CreateJobRequest {
   };
 }
 
+/** Campos que não são o essencial para salvar a vaga: ficam em "Mais detalhes". */
+const OPTIONAL_FIELDS = ['url', 'location', 'workMode', 'postedOn', 'status', 'notes'] as const;
+
 export interface JobFormProps {
   job?: JobDetail;
   submitLabel: string;
@@ -78,6 +81,10 @@ export interface JobFormProps {
 export function JobForm({ job, submitLabel, pending, apiError, onSubmit, onCancel }: JobFormProps) {
   const [values, setValues] = useState<Values>(() => initialValues(job));
   const [errors, setErrors] = useState<Partial<Record<FieldName, string>>>({});
+  const hasOptional = OPTIONAL_FIELDS.some(
+    (name) => values[name] !== '' && values[name] !== 'saved',
+  );
+  const [moreOpen, setMoreOpen] = useState(hasOptional);
 
   const set =
     <K extends FieldName>(name: K) =>
@@ -96,6 +103,7 @@ export function JobForm({ job, submitLabel, pending, apiError, onSubmit, onCance
         if (typeof name === 'string' && !(name in next)) next[name as FieldName] = issue.message;
       }
       setErrors(next);
+      if (OPTIONAL_FIELDS.some((name) => name in next)) setMoreOpen(true);
       return;
     }
     setErrors({});
@@ -141,67 +149,82 @@ export function JobForm({ job, submitLabel, pending, apiError, onSubmit, onCance
             set('company')(event.target.value);
           }}
         />
-        <TextField
-          label="Endereço da vaga (URL)"
-          type="url"
-          inputMode="url"
-          autoComplete="off"
-          error={errors.url}
-          value={values.url}
-          maxLength={2048}
-          onChange={(event) => {
-            set('url')(event.target.value);
-          }}
-        />
-        <TextField
-          label="Local"
-          error={errors.location}
-          value={values.location}
-          maxLength={200}
-          onChange={(event) => {
-            set('location')(event.target.value);
-          }}
-        />
-        <SelectField
-          label="Modalidade"
-          options={WORK_MODE_OPTIONS}
-          error={errors.workMode}
-          value={values.workMode}
-          onChange={(event) => {
-            set('workMode')(event.target.value as JobWorkMode | '');
-          }}
-        />
-        <TextField
-          label="Data de publicação"
-          type="date"
-          error={errors.postedOn}
-          value={values.postedOn}
-          onChange={(event) => {
-            set('postedOn')(event.target.value);
-          }}
-        />
-        <SelectField
-          label="Situação"
-          placeholder={null}
-          options={STATUS_OPTIONS}
-          error={errors.status}
-          value={values.status}
-          onChange={(event) => {
-            set('status')(event.target.value as JobStatus);
-          }}
-        />
       </div>
-      <TextAreaField
-        label="Anotações"
-        rows={3}
-        hint="Só para você; não faz parte do texto da vaga."
-        error={errors.notes}
-        value={values.notes}
-        maxLength={5000}
-        onChange={(event) => {
-          set('notes')(event.target.value);
+      <details
+        open={moreOpen}
+        onToggle={(event) => {
+          setMoreOpen(event.currentTarget.open);
         }}
-      />
+        className="rounded-md border border-slate-400 bg-white"
+      >
+        <summary className="cursor-pointer px-4 py-3 text-base font-medium text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700">
+          Mais detalhes <span className="font-normal text-slate-700">(opcional)</span>
+        </summary>
+        <div className="flex flex-col gap-4 border-t border-slate-300 p-4">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <TextField
+              label="Endereço da vaga (URL)"
+              type="url"
+              inputMode="url"
+              autoComplete="off"
+              error={errors.url}
+              value={values.url}
+              maxLength={2048}
+              onChange={(event) => {
+                set('url')(event.target.value);
+              }}
+            />
+            <TextField
+              label="Local"
+              error={errors.location}
+              value={values.location}
+              maxLength={200}
+              onChange={(event) => {
+                set('location')(event.target.value);
+              }}
+            />
+            <SelectField
+              label="Modalidade"
+              options={WORK_MODE_OPTIONS}
+              error={errors.workMode}
+              value={values.workMode}
+              onChange={(event) => {
+                set('workMode')(event.target.value as JobWorkMode | '');
+              }}
+            />
+            <TextField
+              label="Data de publicação"
+              type="date"
+              error={errors.postedOn}
+              value={values.postedOn}
+              onChange={(event) => {
+                set('postedOn')(event.target.value);
+              }}
+            />
+            <SelectField
+              label="Situação"
+              placeholder={null}
+              options={STATUS_OPTIONS}
+              error={errors.status}
+              value={values.status}
+              onChange={(event) => {
+                set('status')(event.target.value as JobStatus);
+              }}
+            />
+          </div>
+          <TextAreaField
+            label="Anotações"
+            rows={3}
+            hint="Só para você; não faz parte do texto da vaga."
+            error={errors.notes}
+            value={values.notes}
+            maxLength={5000}
+            onChange={(event) => {
+              set('notes')(event.target.value);
+            }}
+          />
+        </div>
+      </details>
       <div className="flex flex-wrap gap-3">
         <Button type="submit" disabled={pending}>
           {pending ? 'Salvando…' : submitLabel}

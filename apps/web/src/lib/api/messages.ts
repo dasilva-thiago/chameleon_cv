@@ -25,26 +25,17 @@ const MESSAGES: Record<ApiErrorKind, string> = {
   NOT_FOUND: 'O recurso solicitado não foi encontrado.',
   CONSENT_REQUIRED_FOR_PROFILE:
     'Sua conta ainda não tem a autorização para tratar os dados do perfil profissional. Fale com a pessoa que administra o serviço.',
-  IMPORT_INVALID:
-    'O arquivo não pôde ser importado. Confira se é um YAML ou JSON no formato do perfil e tente novamente.',
-  IMPORT_PREVIEW_EXPIRED:
-    'A prévia desta importação expirou. Envie o arquivo novamente para gerar uma nova prévia.',
-  IMPORT_NOT_APPLICABLE:
-    'Esta importação não pode mais ser aplicada, pois já foi aplicada ou descartada. Gere uma nova prévia.',
-  ID_CONFLICT:
-    'Alguns identificadores do arquivo já pertencem a outro perfil. Você pode importar gerando identificadores novos.',
-  DUPLICATE_SKILL: 'Já existe uma competência equivalente a esta. Use a que já está cadastrada.',
-  CONCURRENT_MODIFICATION:
-    'O perfil foi alterado por outra ação ao mesmo tempo. Recarregue os dados e tente de novo.',
-  RECORD_IN_USE:
-    'Este item não pode ser excluído porque outros itens dependem dele. Remova o vínculo e tente de novo.',
   PROFILE_REQUIRED:
-    'Cadastre ou importe o seu perfil profissional antes de analisar uma vaga ou gerar um currículo.',
+    'Preencha a sua base profissional (CV e perfil) antes de avaliar uma vaga ou gerar um currículo.',
+  AI_REQUIRED:
+    'A avaliação e o currículo precisam da IA. Ative o uso de IA na sua conta (ou configure um provedor).',
+  AI_UNAVAILABLE:
+    'Nenhum provedor de IA respondeu agora (limite diário ou instabilidade). Tente de novo em alguns minutos.',
   VERSION_APPROVED:
     'Esta versão já foi aprovada e não pode ser alterada. Crie uma nova versão para editar.',
   VERSION_NOT_APPROVED: 'Aprove a versão antes de exportar.',
   RESUME_INVALID:
-    'O currículo tem itens sem fonte confirmada no perfil. Corrija os erros indicados antes de aprovar.',
+    'O currículo tem itens que a sua base profissional não sustenta. Corrija os erros indicados antes de aprovar.',
   EXPORT_UNAVAILABLE:
     'Não foi possível gerar o arquivo agora. Para o PDF é preciso ter um navegador (Chromium, Chrome ou Edge) disponível no servidor.',
   INTERNAL_ERROR: 'Ocorreu um erro inesperado. Tente novamente em instantes.',

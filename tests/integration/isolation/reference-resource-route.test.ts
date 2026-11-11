@@ -10,20 +10,22 @@ import { createWorld, type World } from './support/world';
 
 /**
  * Implementacao de REFERENCIA do ciclo completo (README.md): um modulo sintetico com rotas de recurso
- * (`/api/probe/revisions/:revisionId`) sobre o ProfileStore REAL, o caso cruzado A/B que o cobre e o
- * gate verde. Enquanto a S2.1 nao entrega rotas de perfil, e este arquivo que prova que o mecanismo
- * (manifesto -> cobertura -> caso -> rastreio de rotas atingidas -> varredura) funciona de ponta a
- * ponta com uma rota de recurso. O app real nao e alterado.
+ * (`/api/probe/revisions/:revisionId`) sobre o cliente escopado ao dono, o caso cruzado A/B que o cobre e o
+ * gate verde: prova que o mecanismo (manifesto -> cobertura -> caso -> rastreio de rotas atingidas -> varredura)
+ * funciona de ponta a ponta com uma rota de recurso. O app real nao e alterado.
  */
-const probeModule: ApiModule = ({ routes, profileStore: store }) => {
+const UUID = /^[0-9a-f-]{36}$/i;
+const probeModule: ApiModule = ({ routes }) => {
   routes.get('/probe/profile', { auth: 'session' }, async (req, res) => {
     const auth = requireAuthContext(req);
-    const loaded = await store.loadProfileDocument(auth.ownerId);
-    res.json(loaded?.document ?? null);
+    res.json(await auth.db.profileBase.findFirst());
   });
   routes.get('/probe/revisions/:revisionId', { auth: 'session' }, async (req, res) => {
     const auth = requireAuthContext(req);
-    const revision = await store.getRevision(auth.ownerId, String(req.params.revisionId));
+    const id = String(req.params.revisionId);
+    const revision = UUID.test(id)
+      ? await auth.db.profileBaseRevision.findFirst({ where: { id } })
+      : null;
     if (!revision) {
       res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Recurso nao encontrado.' } });
       return;
@@ -51,7 +53,7 @@ const COVERAGE: CoverageMap = {
 const CASES = {
   ...CROSS_CASES,
   [CASE_ID]: {
-    description: 'rotas de referencia sobre o ProfileStore',
+    description: 'rotas de referencia sobre as revisoes da base',
     routes: ['GET /api/probe/profile', 'GET /api/probe/revisions/:revisionId'],
     run: () => Promise.resolve(),
   },

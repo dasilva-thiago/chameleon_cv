@@ -10,71 +10,52 @@ import {
   type AccountExport,
   type ExportClassification,
 } from '../src';
-import type { ProfileStore } from '../src/profile-store';
 import { createTestDb, type TestDb } from '../src/testing';
-import { makeStore, seedOwner, type SeededOwner } from './support/account-seed';
+import { seedOwner, type SeededOwner } from './support/account-seed';
 
 /**
  * Account export (S2.3a, ADR-0014): everything the owner is entitled to, as plain JSON, nothing of
  * another owner and no secrets; every table is classified (included or excluded with a reason).
  */
 let testDb: TestDb;
-let store: ProfileStore;
 let a: SeededOwner;
 let b: SeededOwner;
 let exportA: AccountExport;
 
-const run = (ownerId: string): Promise<AccountExport> =>
-  exportAccountData(testDb.db, ownerId, { store });
+const run = (ownerId: string): Promise<AccountExport> => exportAccountData(testDb.db, ownerId);
 
 beforeAll(async () => {
   testDb = await createTestDb();
-  store = makeStore(testDb);
 }, 120_000);
 afterAll(async () => {
   await testDb.drop();
 });
 beforeEach(async () => {
   await testDb.truncateAll();
-  a = await seedOwner(testDb, store, 'export-a', 'private-heavy');
-  b = await seedOwner(testDb, store, 'export-b', 'freelancer-confidential-clients');
+  a = await seedOwner(testDb, 'export-a');
+  b = await seedOwner(testDb, 'export-b');
   exportA = await run(a.ownerId);
 });
 
 describe('exportAccountData: content', () => {
-  it("contains the owner's profile document, revisions with snapshots, imports, consent and audit", async () => {
+  it("contains the owner's professional base, its revisions, jobs, consent and audit", () => {
     expect(exportA.format).toBe('chameleon.account-export');
-    expect(exportA.version).toBe(1);
+    expect(exportA.version).toBe(2);
     expect(exportA.account).toMatchObject({
       id: a.ownerId,
       email: a.email,
       displayName: 'export-a',
     });
 
-    expect(exportA.profiles).toHaveLength(1);
-    const [profile] = exportA.profiles;
-    expect(profile!.profileId).toBe(a.profileId);
-    const loaded = await store.loadProfileDocument(a.ownerId);
-    expect(profile!.document).toEqual(JSON.parse(JSON.stringify(loaded!.document)));
-
-    expect(exportA.revisions.map((r) => r.id).sort()).toEqual([...a.revisionIds].sort());
-    expect(exportA.revisions.map((r) => r.revisionNumber)).toEqual([1, 2]);
-    for (const revision of exportA.revisions) {
+    expect(exportA.profileBase).toMatchObject({ id: a.baseId, revisionId: a.revisionIds[1] });
+    expect(exportA.profileRevisions.map((r) => r.id).sort()).toEqual([...a.revisionIds].sort());
+    for (const revision of exportA.profileRevisions) {
       expect(revision.contentHash).toMatch(/^[0-9a-f]{64}$/);
-      expect(typeof (revision.snapshot as { schema_version?: unknown }).schema_version).toBe(
-        'string',
-      );
+      expect(revision.cvMarkdown).toContain('# CV --');
     }
-
-    expect(exportA.imports).toHaveLength(1);
-    expect(exportA.imports[0]).toMatchObject({
-      id: a.importRecordId,
-      sourceFormat: 'markdown',
-      status: 'applied',
-      revisionId: a.revisionIds[0],
-    });
-    expect(JSON.stringify(exportA.imports[0]!.unmapped)).toContain(a.auditCanary);
-    expect(Object.keys(exportA.imports[0]!.idMap as Record<string, string>)).toEqual(['LOCAL-1']);
+    expect(exportA.jobs).toHaveLength(1);
+    expect(exportA.jobAnalyses).toHaveLength(1);
+    expect(exportA.resumeVersions).toHaveLength(1);
 
     expect(exportA.consents).toEqual([
       expect.objectContaining({
@@ -98,10 +79,10 @@ describe('exportAccountData: content', () => {
 
   it('includes every canary of the owner fixture and none of another owner', () => {
     const text = JSON.stringify(exportA);
-    expect(a.canaries.length).toBeGreaterThan(5);
+    expect(a.canaries.length).toBe(2);
     for (const canary of a.canaries) expect(text, canary).toContain(canary);
     for (const canary of b.canaries) expect(text, canary).not.toContain(canary);
-    for (const needle of [b.ownerId, b.email, b.auditCanary, b.profileId, ...b.revisionIds]) {
+    for (const needle of [b.ownerId, b.email, b.auditCanary, b.baseId, ...b.revisionIds]) {
       expect(text, needle).not.toContain(needle);
     }
     expect(text).not.toContain(b.inviteIds.used);
@@ -145,10 +126,9 @@ describe('exportAccountData: content', () => {
     });
     const bareExport = await run(bare.id);
     expect(bareExport.account.id).toBe(bare.id);
+    expect(bareExport.profileBase).toBeNull();
     for (const key of [
-      'profiles',
-      'revisions',
-      'imports',
+      'profileRevisions',
       'jobs',
       'jobAnalyses',
       'resumes',
@@ -170,7 +150,7 @@ describe('exportAccountData: content', () => {
 
   it('uses the injected clock', async () => {
     const fixed = new Date('2030-01-02T03:04:05.000Z');
-    const result = await exportAccountData(testDb.db, a.ownerId, { store, now: () => fixed });
+    const result = await exportAccountData(testDb.db, a.ownerId, { now: () => fixed });
     expect(result.generatedAt).toBe('2030-01-02T03:04:05.000Z');
   });
 });
@@ -207,8 +187,8 @@ describe('export registry against the live catalog', () => {
     invitations: (e: AccountExport) => e.invitations,
     consents: (e: AccountExport) => e.consents,
     auditEvents: (e: AccountExport) => e.auditEvents,
-    revisions: (e: AccountExport) => e.revisions,
-    imports: (e: AccountExport) => e.imports,
+    profileBase: (e: AccountExport) => (e.profileBase === null ? [] : [e.profileBase]),
+    profileRevisions: (e: AccountExport) => e.profileRevisions,
     jobs: (e: AccountExport) => e.jobs,
     jobAnalyses: (e: AccountExport) => e.jobAnalyses,
     resumes: (e: AccountExport) => e.resumes,
@@ -217,7 +197,7 @@ describe('export registry against the live catalog', () => {
 
   it('table columns = exported fields + withheld columns + ownerId (a new column must be classified)', async () => {
     for (const [model, entry] of Object.entries(registry)) {
-      if (entry.status !== 'exported' || entry.section === 'profiles') continue;
+      if (entry.status !== 'exported') continue;
       const rows = SECTION_ROWS[entry.section](exportA);
       expect(rows.length, `${model} has no exported row in the fixture`).toBeGreaterThan(0);
       const exported = Object.keys(rows[0] as object);

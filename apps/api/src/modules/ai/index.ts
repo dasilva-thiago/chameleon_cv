@@ -1,7 +1,7 @@
 import { setAiConsentRequestSchema } from '@chameleon/contracts';
 import type { ApiModule } from '../../app';
 import { requireAuthContext } from '../../auth/context';
-import { parseDto } from '../profiles/errors';
+import { parseDto } from '../../http/params';
 
 /**
  * `/api/ai`: whether AI is configured and consented, today's usage against the caps, and the consent switch.

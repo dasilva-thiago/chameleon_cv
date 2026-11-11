@@ -1,7 +1,7 @@
 import type { ResumeContent } from '@chameleon/contracts';
 
 /**
- * Pre-visualizacao do documento: so o conteudo (nome, contatos, secoes), sem fontes nem avisos.
+ * Pre-visualizacao do documento: so o conteudo (nome, contatos, secoes), sem avisos.
  * E o que o arquivo exportado contem. HTML semantico e estilos de impressao simples.
  */
 export function ResumePreview({ content }: { content: ResumeContent }) {

@@ -4,7 +4,7 @@ import {
   listJobsResponseSchema,
   type JobDetail,
 } from '@chameleon/contracts';
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { violations } from './helpers/axe';
 import { FakeApi, errorResponse, jsonResponse, makeSession } from './helpers/fake-api';
@@ -99,8 +99,10 @@ describe('vagas: painel', () => {
     const { user, container } = renderApp('/vagas');
     const link = await screen.findByRole('link', { name: 'Dev Backend' });
     expect(link).toHaveAttribute('href', `/vagas/${JOB_ID}`);
-    expect(screen.getByText('Acme')).toBeInTheDocument();
-    expect(screen.getByText('Situação:')).toBeInTheDocument();
+    expect(screen.getByText('Acme · Brasil · Remoto')).toBeInTheDocument();
+    expect(
+      within(screen.getByRole('list', { name: 'Vagas salvas' })).getByText('Salva'),
+    ).toBeInTheDocument();
     expect(screen.getByText('1 em andamento · 1 no total')).toBeInTheDocument();
     expect(await violations(container)).toEqual([]);
 
@@ -122,12 +124,29 @@ describe('vagas: painel', () => {
     expect(screen.getByRole('button', { name: 'Tentar novamente' })).toBeInTheDocument();
   });
 
-  it('o menu principal e a Home levam às vagas', async () => {
+  it('a Home mostra as vagas em andamento com a situação e leva ao detalhe', async () => {
+    const fake = loggedIn();
+    fake.on('GET /api/jobs?status=active', listBody([detail()]));
+    fake.on(`GET /api/jobs/${JOB_ID}`, jsonResponse(200, { job: detail() }));
+    const { user } = renderApp('/');
+    const section = (await screen.findByRole('heading', { name: 'Vagas em andamento' })).closest(
+      'section',
+    )!;
+    expect(within(section).getAllByText(/Salva/).length).toBeGreaterThan(0);
+    await user.click(within(section).getByRole('link', { name: /Dev Backend — Acme/ }));
+    expect(await screen.findByRole('heading', { level: 1, name: 'Dev Backend' })).toBeVisible();
+  });
+
+  it('o menu principal leva às vagas', async () => {
     const fake = loggedIn();
     fake.on('GET /api/jobs?status=active', listBody([]));
     const { user } = renderApp('/');
     await screen.findByRole('heading', { level: 1, name: 'Início' });
-    await user.click(screen.getByRole('link', { name: 'Ver minhas vagas' }));
+    await user.click(
+      within(screen.getByRole('navigation', { name: 'Principal' })).getByRole('link', {
+        name: 'Vagas',
+      }),
+    );
     expect(await screen.findByRole('heading', { level: 1, name: 'Vagas' })).toBeInTheDocument();
   });
 });
@@ -171,6 +190,20 @@ describe('vagas: adicionar', () => {
     await user.click(screen.getByRole('button', { name: 'Salvar vaga' }));
     expect(await screen.findByText(/endereço http:\/\/ ou https:\/\/ válido/)).toBeInTheDocument();
     expect(fake.requestsTo('POST /api/jobs')).toHaveLength(0);
+  });
+
+  it('os campos opcionais ficam recolhidos e abrem sozinhos quando há erro neles', async () => {
+    loggedIn();
+    const { user } = renderApp('/vagas/nova');
+    await screen.findByRole('heading', { level: 1, name: 'Adicionar vaga' });
+    const more = screen.getByText(/Mais detalhes/).closest('details')!;
+    expect(more).not.toHaveAttribute('open');
+    await user.click(screen.getByLabelText(/Descrição da vaga/));
+    await user.paste('texto');
+    await user.type(screen.getByLabelText(/Endereço da vaga/), 'javascript:alert(1)');
+    await user.click(screen.getByRole('button', { name: 'Salvar vaga' }));
+    await screen.findByText(/endereço http:\/\/ ou https:\/\/ válido/);
+    expect(more).toHaveAttribute('open');
   });
 
   it('erro da API é mostrado e o texto digitado é preservado', async () => {

@@ -102,26 +102,21 @@ describe('DateTime gravado pelo Prisma coincide com SQL cru', () => {
     const user = await testDb.db.global.user.create({
       data: { email: `tz-${randomUUID().slice(0, 8)}@example.test` },
     });
-    const profileId = randomUUID();
-    const factId = randomUUID();
     const scoped = testDb.db.forOwner(user.id);
-    await scoped.professionalProfile.create({
-      data: { id: profileId, ownerId: user.id, schemaVersion: '2.1.0' },
+    const job = await scoped.jobPosting.create({
+      data: {
+        ownerId: user.id,
+        description: 'vaga',
+        descriptionHash: '0'.repeat(64),
+        postedOn: new Date('2004-01-01T00:00:00.000Z'),
+      },
     });
-    await testDb
-      .sql(
-        `INSERT INTO "ProfileFact" ("id", "ownerId", "profileId", "kind", "updatedAt") VALUES ($1, $2, $3, 'education', now());
-       INSERT INTO "Education" ("id", "ownerId", "startDate", "startPrecision") VALUES ($1, $2, '2004-01-01', 'year');`,
-        [factId, user.id, profileId],
-      )
-      .catch(async () => {
-        // statements multiplos nao aceitam parametros: refaz sem eles
-        await testDb.sql(
-          `INSERT INTO "ProfileFact" ("id", "ownerId", "profileId", "kind", "updatedAt") VALUES ('${factId}', '${user.id}', '${profileId}', 'education', now());
-         INSERT INTO "Education" ("id", "ownerId", "startDate", "startPrecision") VALUES ('${factId}', '${user.id}', '2004-01-01', 'year');`,
-        );
-      });
-    const row = await scoped.education.findFirst({ where: { id: factId } });
-    expect(row?.startDate?.toISOString()).toBe('2004-01-01T00:00:00.000Z');
+    const { rows } = await testDb.sql<{ d: string }>(
+      `SELECT "postedOn"::text AS d FROM "JobPosting" WHERE id = $1`,
+      [job.id],
+    );
+    expect(rows[0]?.d).toBe('2004-01-01');
+    const row = await scoped.jobPosting.findFirst({ where: { id: job.id } });
+    expect(row?.postedOn?.toISOString()).toBe('2004-01-01T00:00:00.000Z');
   });
 });

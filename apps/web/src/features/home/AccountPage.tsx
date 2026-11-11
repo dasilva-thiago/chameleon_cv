@@ -1,5 +1,7 @@
 import { useState } from 'react';
-import { PageHeading, usePageTitle } from '../../components/layout/PageHeading';
+import { PageHeader } from '../../components/layout/PageHeader';
+import { usePageTitle } from '../../components/layout/PageHeading';
+import { Section } from '../../components/layout/Section';
 import { Alert } from '../../components/ui/Alert';
 import { Button } from '../../components/ui/Button';
 import { messageForError } from '../../lib/api';
@@ -12,6 +14,8 @@ function formatDate(iso: string): string {
   return Number.isNaN(date.getTime()) ? iso : dateFormatter.format(date);
 }
 
+const listClass = 'grid grid-cols-1 gap-x-6 gap-y-1 text-base sm:grid-cols-[10rem_1fr]';
+
 export function AccountPage() {
   usePageTitle('Conta');
   const { data } = useSession();
@@ -22,33 +26,34 @@ export function AccountPage() {
 
   return (
     <div className="flex flex-col gap-8">
-      <PageHeading>Conta</PageHeading>
+      <PageHeader title="Conta" />
 
-      <section aria-labelledby="dados-da-conta" className="flex flex-col gap-3">
-        <h2 id="dados-da-conta" className="text-lg font-semibold">
-          Dados da conta
-        </h2>
-        <dl className="grid grid-cols-1 gap-x-6 gap-y-3 text-base sm:grid-cols-[12rem_1fr]">
-          <dt className="font-medium text-slate-700">Nome</dt>
-          <dd>{user.displayName ?? 'Não informado'}</dd>
-          <dt className="font-medium text-slate-700">E-mail</dt>
-          <dd className="break-all">{user.email}</dd>
+      <Section id="dados-da-conta" title="Dados da conta">
+        <dl className={listClass}>
+          <dt className="text-slate-700">Nome</dt>
+          <dd className="font-medium">{user.displayName ?? 'Não informado'}</dd>
+          <dt className="text-slate-700">E-mail</dt>
+          <dd className="break-all font-medium">{user.email}</dd>
         </dl>
-      </section>
+      </Section>
 
-      <section aria-labelledby="seguranca" className="flex flex-col gap-3">
-        <h2 id="seguranca" className="text-lg font-semibold">
-          Segurança da sessão
-        </h2>
-        <dl className="grid grid-cols-1 gap-x-6 gap-y-3 text-base sm:grid-cols-[12rem_1fr]">
-          <dt className="font-medium text-slate-700">Sessão válida até</dt>
-          <dd>{formatDate(session.expiresAt)}</dd>
-          <dt className="font-medium text-slate-700">Limite máximo</dt>
-          <dd>{formatDate(session.absoluteExpiresAt)}</dd>
+      <Section id="seguranca" title="Segurança da sessão">
+        <dl className={listClass}>
+          <dt className="text-slate-700">Sessão válida até</dt>
+          <dd className="font-medium">{formatDate(session.expiresAt)}</dd>
         </dl>
-        <p className="text-sm text-slate-700">
-          A validade da sessão é renovada enquanto você usa o serviço, até o limite máximo.
-        </p>
+        <details className="text-sm text-slate-700">
+          <summary className="w-fit cursor-pointer underline decoration-dotted">
+            Detalhes da validade
+          </summary>
+          <dl className={`${listClass} mt-2`}>
+            <dt>Limite máximo</dt>
+            <dd>{formatDate(session.absoluteExpiresAt)}</dd>
+          </dl>
+          <p className="mt-1">
+            A validade é renovada enquanto você usa o serviço, até o limite máximo.
+          </p>
+        </details>
 
         {logoutAll.isError ? (
           <Alert tone="error" title="Não foi possível encerrar as sessões">
@@ -102,7 +107,7 @@ export function AccountPage() {
             </Button>
           </div>
         )}
-      </section>
+      </Section>
     </div>
   );
 }

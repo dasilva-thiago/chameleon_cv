@@ -4,11 +4,9 @@ import {
   deleteJobResponseSchema,
   jobResponseSchema,
   listJobsResponseSchema,
-  patchAnalysisReviewRequestSchema,
   patchJobRequestSchema,
   runAnalysisRequestSchema,
   runAnalysisResponseSchema,
-  type AnalysisReview,
   type AnalysisStateResponse,
   type CreateJobRequest,
   type DeleteJobResponse,
@@ -23,8 +21,8 @@ import { validated } from './validated';
 
 const BASE = '/api/jobs';
 
-/** Com IA a análise espera um provedor externo (e pode tentar mais de um): bem acima do padrão. */
-const AI_TIMEOUT_MS = 120_000;
+/** A avaliação faz duas chamadas de IA (e pode tentar mais de um provedor): bem acima do padrão. */
+export const AI_TIMEOUT_MS = 180_000;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function idPath(id: string): string {
@@ -40,7 +38,6 @@ export interface JobsApi {
   remove(id: string): Promise<DeleteJobResponse>;
   getAnalysis(id: string, signal?: AbortSignal): Promise<AnalysisStateResponse>;
   runAnalysis(id: string, force?: boolean): Promise<RunAnalysisResponse>;
-  saveReview(id: string, review: AnalysisReview): Promise<AnalysisStateResponse>;
 }
 
 export function createJobsApi(client: ApiClient): JobsApi {
@@ -71,13 +68,6 @@ export function createJobsApi(client: ApiClient): JobsApi {
         body,
         schema: runAnalysisResponseSchema,
         timeoutMs: AI_TIMEOUT_MS,
-      });
-    },
-    saveReview(id, review) {
-      const body = validated(patchAnalysisReviewRequestSchema, { review });
-      return client.patch(`${BASE}/${idPath(id)}/analysis/review`, {
-        body,
-        schema: analysisStateResponseSchema,
       });
     },
   };

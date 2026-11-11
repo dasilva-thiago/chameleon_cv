@@ -136,7 +136,7 @@ export default tseslint.config(
     files: ['packages/contracts/src/**'],
     rules: restrictImports(
       forbidInternal(
-        ['api', 'web', 'domain', 'profile-io', 'db', 'ai', 'documents', 'test-fixtures'],
+        ['api', 'web', 'domain', 'db', 'ai', 'documents'],
         'contracts nao importa nenhum outro pacote interno.',
       ),
       NODE_BUILTIN_PATTERN,
@@ -147,7 +147,7 @@ export default tseslint.config(
     files: ['packages/domain/src/**'],
     rules: restrictImports(
       forbidInternal(
-        ['api', 'web', 'profile-io', 'db', 'ai', 'documents', 'test-fixtures'],
+        ['api', 'web', 'db', 'ai', 'documents'],
         'domain so pode importar @chameleon/contracts.',
       ),
       { group: ['express', 'pg', 'pino'], message: 'domain e puro: sem frameworks nem IO.' },
@@ -155,19 +155,10 @@ export default tseslint.config(
     ),
   },
   {
-    files: ['packages/profile-io/src/**'],
-    rules: restrictImports(
-      forbidInternal(
-        ['api', 'web', 'db', 'ai', 'documents', 'test-fixtures'],
-        'profile-io so importa contracts e domain.',
-      ),
-    ),
-  },
-  {
     files: ['packages/ai/src/**', 'packages/documents/src/**'],
     rules: restrictImports(
       forbidInternal(
-        ['api', 'web', 'db', 'profile-io', 'test-fixtures'],
+        ['api', 'web', 'db'],
         'ai/documents so importam contracts e domain (e nao importam db nem uma a outra).',
       ),
       forbidInternal(['ai', 'documents'], 'ai e documents sao independentes entre si.'),
@@ -181,7 +172,7 @@ export default tseslint.config(
         {
           patterns: [
             forbidInternal(
-              ['api', 'web', 'domain', 'profile-io', 'ai', 'documents'],
+              ['api', 'web', 'domain', 'ai', 'documents'],
               'db so pode importar @chameleon/contracts.',
             ),
           ],
@@ -194,19 +185,15 @@ export default tseslint.config(
     files: ['apps/web/src/**'],
     rules: restrictImports(
       forbidInternal(
-        ['api', 'db', 'domain', 'profile-io', 'ai', 'documents', 'test-fixtures'],
+        ['api', 'db', 'domain', 'ai', 'documents'],
         'apps/web so pode importar @chameleon/contracts.',
       ),
     ),
   },
-  // test-fixtures so e importavel por arquivos de teste (src de producao da api nao importa).
   {
     files: ['apps/api/src/**'],
     ignores: ['**/*.test.{ts,tsx}'],
-    rules: restrictImports(
-      forbidInternal(['test-fixtures'], 'test-fixtures e importavel apenas por arquivos de teste.'),
-      forbidInternal(['web'], 'api nao importa apps/web.'),
-    ),
+    rules: restrictImports(forbidInternal(['web'], 'api nao importa apps/web.')),
   },
 
   // React (apps/web): hooks + acessibilidade.

@@ -10,8 +10,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
-    "@chameleon/contracts": "workspace:*",
-    "uuid": "14.0.3"
+    "@chameleon/contracts": "workspace:*"
   },
   "devDependencies": {}
 }
