@@ -20,17 +20,12 @@ export const API_ERROR_CODES = [
   'CONSENT_INVALID',
   'RATE_LIMITED',
   'NOT_FOUND',
-  // Perfil (S2.1a)
+  // Base profissional
   'CONSENT_REQUIRED_FOR_PROFILE',
-  'IMPORT_INVALID',
-  'IMPORT_PREVIEW_EXPIRED',
-  'IMPORT_NOT_APPLICABLE',
-  'ID_CONFLICT',
-  'DUPLICATE_SKILL',
-  'CONCURRENT_MODIFICATION',
-  'RECORD_IN_USE',
-  // Analise de vagas (P2)
+  // Avaliacao de vagas (IA)
   'PROFILE_REQUIRED',
+  'AI_REQUIRED',
+  'AI_UNAVAILABLE',
   // Currículos (P3/P4)
   'VERSION_APPROVED',
   'VERSION_NOT_APPROVED',

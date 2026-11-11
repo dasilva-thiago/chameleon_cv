@@ -1,28 +1,32 @@
-import type { AnalysisResult, ProfileDocument, ResumeContent } from '@chameleon/contracts';
+import type { AnalysisResult, JobExtraction } from '@chameleon/contracts';
+import { finalizeAnalysis, verifyExtraction, type TailoredPlan } from '@chameleon/domain';
 import {
-  ANALYSIS_PROMPT_VERSION,
-  buildAiAnalysis,
-  buildAnalysisMessages,
-  parseAnalysisOutput,
-} from './analysis';
-import { buildFactCatalog } from './catalog';
-import {
-  RESUME_PROMPT_VERSION,
-  applyResumePlan,
-  buildResumeMessages,
-  parseResumePlan,
-  type AppliedResumePlan,
-} from './resume';
+  EVALUATION_PROMPT_VERSION,
+  EXTRACTION_PROMPT_VERSION,
+  buildEvaluationMessages,
+  buildExtractionMessages,
+  parseEvaluation,
+  parseExtraction,
+} from './evaluate';
 import type { AiRouter, Attempt } from './router';
+import { buildTailorMessages, parseTailoredPlan } from './tailor';
 import type { TokenUsage } from './types';
 
 export const PACKAGE_NAME = '@chameleon/ai' as const;
 
-export { ANALYSIS_PROMPT_VERSION, buildAiAnalysis, buildAnalysisMessages, parseAnalysisOutput };
-export { RESUME_PROMPT_VERSION, applyResumePlan, buildResumeMessages, parseResumePlan };
-export type { AppliedResumePlan };
-export { buildFactCatalog, type CatalogEntry, type FactCatalog } from './catalog';
+export {
+  EVALUATION_PROMPT_VERSION,
+  EXTRACTION_PROMPT_VERSION,
+  MAX_JOB_CHARS,
+  buildEvaluationMessages,
+  buildExtractionMessages,
+  languageName,
+  parseEvaluation,
+  parseExtraction,
+} from './evaluate';
+export { TAILOR_PROMPT_VERSION, buildTailorMessages, parseTailoredPlan } from './tailor';
 export { parseJsonLoose } from './json';
+export { redactContacts } from './redact';
 export { classifyFailure, createOpenAiCompatibleProvider } from './openai-compatible';
 export {
   DEFAULT_PROVIDER_ORDER,
@@ -56,6 +60,9 @@ export {
   type TokenUsage,
 } from './types';
 
+/** Version of the whole evaluation (both prompts): part of the evaluation cache key. */
+export const EVALUATION_ENGINE_VERSION = `${EXTRACTION_PROMPT_VERSION}+${EVALUATION_PROMPT_VERSION}`;
+
 /** Which provider and model answered, what it cost, and what the other providers did (no content). */
 export interface AiRunInfo {
   provider: string;
@@ -64,93 +71,102 @@ export interface AiRunInfo {
   attempts: readonly Attempt[];
 }
 
-/**
- * One call: extract the requirements and link them to the profile facts. Throws `AiUnavailableError` when no
- * provider answers with a valid result; the caller then keeps the local, deterministic analysis.
- */
-export async function analyzeJobWithAi(
-  router: AiRouter,
-  input: { jobText: string; document: ProfileDocument },
-  signal?: AbortSignal,
-): Promise<{ result: AnalysisResult; run: AiRunInfo }> {
-  const catalog = buildFactCatalog(input.document);
-  const run = await router.run(
-    {
-      messages: buildAnalysisMessages(input.jobText, catalog),
-      maxTokens: 6000,
-      parse: parseAnalysisOutput,
-    },
-    signal,
-  );
-  const result = buildAiAnalysis({
-    jobText: input.jobText,
-    document: input.document,
-    output: run.value,
-    catalog,
-    provider: run.provider,
-    model: run.model,
-  });
-  return {
-    result,
-    run: { provider: run.provider, model: run.model, usage: run.usage, attempts: run.attempts },
-  };
+const runInfo = (run: {
+  provider: string;
+  model: string;
+  usage: TokenUsage;
+  attempts: readonly Attempt[];
+}): AiRunInfo => ({
+  provider: run.provider,
+  model: run.model,
+  usage: run.usage,
+  attempts: run.attempts,
+});
+
+export interface EvaluateJobInput {
+  jobText: string;
+  cvMarkdown: string;
+  profileMarkdown: string;
+  language: string;
+  /** A previous extraction of the same posting text (same prompt version): skips the first call. */
+  previousExtraction?: JobExtraction | null;
 }
 
-const record = (value: unknown): Record<string, unknown> =>
-  typeof value === 'object' && value !== null && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : {};
-const strings = (value: unknown): string[] =>
-  Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
-
 /**
- * One call: headline, summary, key skills and the choice and order of experience and project items, applied on
- * top of the deterministic resume. What the AI gets wrong or cannot support is dropped by `applyResumePlan`.
+ * Evaluates a job like career-ops `oferta`: (1) reads the posting alone, (2) judges it against the base, then the
+ * program applies its rules (`finalizeAnalysis`). Throws `AiUnavailableError` when no provider answers validly.
  */
-export async function tailorResumeWithAi(
+export async function evaluateJob(
   router: AiRouter,
-  input: {
-    content: ResumeContent;
-    document: ProfileDocument;
-    analysis: AnalysisResult;
-    jobTitle: string | null;
-  },
+  input: EvaluateJobInput,
   signal?: AbortSignal,
-): Promise<{ applied: AppliedResumePlan; run: AiRunInfo }> {
-  const catalog = buildFactCatalog(input.document);
-  const prefs = record(record(input.document.profile).resume_preferences);
-  const career = record(record(input.document.profile).career_preferences);
-  const avoid = strings(prefs.expressions_to_avoid);
-  const notes =
-    typeof prefs.additional_style_notes === 'string' ? prefs.additional_style_notes : null;
+): Promise<{ result: AnalysisResult; runs: AiRunInfo[] }> {
+  const runs: AiRunInfo[] = [];
+  let extraction = input.previousExtraction ?? null;
+  if (extraction?.promptVersion !== EXTRACTION_PROMPT_VERSION) {
+    const run = await router.run(
+      {
+        messages: buildExtractionMessages(input.jobText, input.language),
+        maxTokens: 4000,
+        temperature: 0.1,
+        parse: parseExtraction,
+      },
+      signal,
+    );
+    extraction = run.value;
+    runs.push(runInfo(run));
+  }
+  const checked = verifyExtraction(extraction, input.jobText);
+
   const run = await router.run(
     {
-      messages: buildResumeMessages({
-        catalog,
-        analysis: input.analysis,
-        jobTitle: input.jobTitle,
-        language: input.content.language,
-        style: {
-          tone: typeof prefs.tone === 'string' ? prefs.tone : null,
-          avoid,
-          notes,
-          seniority: strings(career.target_seniority_levels),
-        },
+      messages: buildEvaluationMessages({
+        jobText: input.jobText,
+        extraction: checked.extraction,
+        cvMarkdown: input.cvMarkdown,
+        profileMarkdown: input.profileMarkdown,
+        language: input.language,
       }),
-      maxTokens: 3000,
-      parse: parseResumePlan,
+      maxTokens: 6000,
+      temperature: 0.2,
+      parse: parseEvaluation,
     },
     signal,
   );
-  const applied = applyResumePlan({
-    content: input.content,
-    plan: run.value,
-    catalog,
-    document: input.document,
-    avoid,
+  runs.push(runInfo(run));
+  const result = finalizeAnalysis({
+    extraction: checked.extraction,
+    draft: run.value,
+    jobText: input.jobText,
+    baseText: `${input.cvMarkdown}\n${input.profileMarkdown}`,
+    ai: { provider: run.provider, model: run.model, promptVersion: EVALUATION_ENGINE_VERSION },
+    warnings: checked.warnings,
   });
-  return {
-    applied,
-    run: { provider: run.provider, model: run.model, usage: run.usage, attempts: run.attempts },
-  };
+  return { result, runs };
+}
+
+export interface TailorResumeInput {
+  analysis: AnalysisResult;
+  jobTitle: string | null;
+  cvMarkdown: string;
+  profileMarkdown: string;
+  language: string;
+}
+
+/** One call: the tailoring plan (career-ops `pdf` steps 7-15). The program builds and checks the resume from it. */
+export async function tailorResume(
+  router: AiRouter,
+  input: TailorResumeInput,
+  signal?: AbortSignal,
+): Promise<{ plan: TailoredPlan; run: AiRunInfo }> {
+  const run = await router.run(
+    {
+      messages: buildTailorMessages(input),
+      maxTokens: 5000,
+      temperature: 0.3,
+      parse: parseTailoredPlan,
+    },
+    signal,
+  );
+  return { plan: run.value, run: runInfo(run) };
 }
