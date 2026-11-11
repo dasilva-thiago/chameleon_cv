@@ -222,7 +222,7 @@ export function JobsPage() {
         ) : (
           <div
             className={cx(
-              'overflow-hidden rounded-panel border border-line bg-surface shadow-xs',
+              'overflow-clip rounded-panel border border-line bg-surface shadow-xs',
               list.isPlaceholderData ? 'opacity-60' : '',
               transition,
             )}

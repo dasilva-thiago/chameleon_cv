@@ -69,6 +69,12 @@ Em ponteiro grosso (`pointer-coarse:`) os controles crescem para 40-44px.
 Layout (`components/layout`): `ShellFrame` (larguras `read` 44rem, `work` 80rem, `full` 110rem), `AuthenticatedLayout`
 (barra lateral recolhível, gaveta abaixo de 1024px, busca `Ctrl/Cmd+K`), `PublicLayout`, `PageHeader`, `Section`.
 
+## Verificação visual
+
+`e2e/visual-themes.spec.ts` abre as telas principais (Início, Vagas, Vaga, Editor, Base, Conta) nos temas claro e escuro
+em 1366×768, roda o axe **com contraste real** no Chromium, confere que não há rolagem horizontal em 390px e salva capturas
+em `e2e/.tmp/screens` (nunca versionadas; só dados sintéticos). Roda com `pnpm test:e2e`.
+
 ## Fluidez
 
 - `staleTime` padrão de 15 s: voltar a uma tela já vista não mostra carregamento.

@@ -38,7 +38,7 @@ export function Badge({
       )}
     >
       {icon}
-      {prefix !== undefined ? <span className="font-normal opacity-80">{prefix}:</span> : null}
+      {prefix !== undefined ? <span className="font-normal">{prefix}:</span> : null}
       {children}
     </span>
   );
