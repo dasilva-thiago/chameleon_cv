@@ -1,6 +1,6 @@
 # Plano de identidade visual, UI/UX e layouts — Chameleon CV
 
-**Status:** em implementação desde 11/11/2026 (branch `feat/visual-identity`). Referência de uso: [design-system.md](design-system.md) e [ADR-0016](decisions/ADR-0016-design-system-temas.md).
+**Status:** implementado em 11/11/2026. Resultados, desvios e pendências: [RELATORIO_IDENTIDADE_VISUAL.md](RELATORIO_IDENTIDADE_VISUAL.md). Referência de uso: [design-system.md](design-system.md) e [ADR-0016](decisions/ADR-0016-design-system-temas.md).
 **Data:** 10/11/2026 (revisão 3: cor de marca, tema claro e escuro, estados de interação e fluidez; versões anteriores no
 histórico do git).
 **Escopo:** todo o `apps/web`. Fontes de verdade: `docs/REDEFINICAO_PRODUTO_PESSOAL.md`, a

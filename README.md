@@ -16,8 +16,33 @@ the program against that knowledge.
    avoided expressions and terms your base does not support. You edit, approve (immutable) and export DOCX/PDF.
 
 Product definition: [`docs/REDEFINICAO_PRODUTO_PESSOAL.md`](docs/REDEFINICAO_PRODUTO_PESSOAL.md) · architecture:
-[`docs/architecture.md`](docs/architecture.md) · decision:
-[`ADR-0015`](docs/decisions/ADR-0015-fluxo-career-ops-base-markdown.md).
+[`docs/architecture.md`](docs/architecture.md) · decisions:
+[`ADR-0015`](docs/decisions/ADR-0015-fluxo-career-ops-base-markdown.md) (flow),
+[`ADR-0016`](docs/decisions/ADR-0016-design-system-temas.md) (design system and themes).
+
+## Screenshots
+
+Synthetic data (scripted AI and a sample base). More screens, both themes, and the full report of the redesign
+(including what went wrong and what is still missing): [`docs/RELATORIO_IDENTIDADE_VISUAL.md`](docs/RELATORIO_IDENTIDADE_VISUAL.md).
+
+| Job: score, evidence rail, next action, requirement matrix     | Resume editor: form and A4 sheet side by side                       |
+| -------------------------------------------------------------- | ------------------------------------------------------------------- |
+| ![Job page, light theme](docs/images/interface/light-vaga.png) | ![Resume editor, dark theme](docs/images/interface/dark-editor.png) |
+
+| Home: work queue                                             | Base: "how the program read it"                          |
+| ------------------------------------------------------------ | -------------------------------------------------------- |
+| ![Home, light theme](docs/images/interface/light-inicio.png) | ![Base, dark theme](docs/images/interface/dark-base.png) |
+
+## Interface
+
+- **Light, dark and system themes**, applied before the first paint (no flash). Switch in the sidebar, on the login page or
+  in Account, or press `Ctrl/Cmd+Shift+L`.
+- **Color carries meaning:** indigo is for what you click; green only for what your base proves (good score, "apply",
+  strong match, approved); amber asks for attention; red blocks. The A4 preview stays white in both themes because it is
+  the exported file.
+- **Shortcuts:** `Ctrl/Cmd+K` search jobs · `Ctrl/Cmd+S` save (Base and resume editor) · `Esc` close menus and dialogs.
+- Collapsible sidebar (a drawer on phones), skeletons while loading, jobs prefetched on hover, Base and editor loaded on
+  demand (initial JS: 165 KB gzip). Reference for new screens: [`docs/design-system.md`](docs/design-system.md).
 
 ## Structure
 
@@ -52,18 +77,20 @@ Create the first account with an invite: `pnpm --filter @chameleon/api admin:inv
 
 ## Commands
 
-| Command                 | What it does                                                                                       |
-| ----------------------- | -------------------------------------------------------------------------------------------------- |
-| `pnpm dev`              | API and web in development mode                                                                    |
-| `pnpm check`            | formatting, lint, types and unit/component tests (no database, no network)                         |
-| `pnpm test:integration` | tests against a real local PostgreSQL                                                              |
-| `pnpm test:e2e`         | Playwright on the real stack with a scripted AI: base → job → evaluation → resume → approve → file |
-| `pnpm ai:check`         | validate the configured AI keys and models                                                         |
-| `pnpm build`            | build the API and the web app                                                                      |
+| Command                 | What it does                                                                                                                                                                                                       |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `pnpm dev`              | API and web in development mode                                                                                                                                                                                    |
+| `pnpm check`            | formatting, lint, types and unit/component tests (no database, no network)                                                                                                                                         |
+| `pnpm test:integration` | tests against a real local PostgreSQL                                                                                                                                                                              |
+| `pnpm test:e2e`         | Playwright on the real stack with a scripted AI: base → job → evaluation → resume → approve → file; plus every main screen in both themes with axe's real color-contrast check (screenshots in `e2e/.tmp/screens`) |
+| `pnpm ai:check`         | validate the configured AI keys and models                                                                                                                                                                         |
+| `pnpm build`            | build the API and the web app                                                                                                                                                                                      |
 
 ## Rules enforced automatically
 
 - `@prisma/*` only in `packages/db`; `apps/web` only imports `@chameleon/contracts` (ESLint + `tests/architecture`).
+- `apps/web` colors only through the design tokens of `apps/web/src/index.css`: a raw Tailwind palette class or a hex
+  color in a component fails `tests/architecture/design-tokens.test.ts`.
 - Every private table is scoped to its owner (`forOwner`, composite FKs, immutable `ownerId`); the isolation suite in
   `tests/integration/isolation` fails if a new route has no cross-owner test.
 

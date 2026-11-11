@@ -67,7 +67,24 @@ Sessão por cookie `__Host-` + CSRF, rate limit de login (ADR-0009); consentimen
 que lê a base; 404 idêntico para recurso alheio, inexistente ou malformado; suíte `tests/integration/isolation` com o gate
 de rotas (toda rota com sessão precisa de um caso cruzado A × B). Exportação e exclusão de conta (ADR-0014).
 
-## 7. Testes
+## 7. Interface (`apps/web`)
 
-`pnpm check` (unitários e de componentes), `pnpm test:integration` (Postgres local real, um banco por worker),
-`pnpm test:e2e` (Playwright com provedor de IA roteirizado). Testes de integração e e2e recusam bancos que não sejam locais.
+Design system com tokens semânticos em `apps/web/src/index.css` (tema claro e escuro por `data-theme`, aplicado antes da
+primeira pintura por `public/theme-init.js`), receitas de estado em `components/ui/styles.ts` e componentes em
+`components/ui` ([design-system.md](design-system.md), [ADR-0016](decisions/ADR-0016-design-system-temas.md)).
+
+- A lista de vagas recebe o resumo da avaliação mais recente (`JobSummary.evaluation`: nota, recomendação, regra quebrada,
+  contagem do trilho de evidência, desatualizada), calculado numa consulta só por página.
+- A Base usa `POST /api/profile/reading`: o mesmo `parseBaseCv` das checagens lê o texto (salvo ou não) e devolve cargos,
+  períodos, habilidades e expressões a evitar, sem gravar nada e sem IA.
+- React Query com `staleTime` de 15 s, pré-carregamento da vaga no hover/foco, `keepPreviousData` nos filtros e as rotas
+  Base e Editor sob demanda (`React.lazy`).
+
+Resultado, números e pendências do redesenho: [RELATORIO_IDENTIDADE_VISUAL.md](RELATORIO_IDENTIDADE_VISUAL.md).
+
+## 8. Testes
+
+`pnpm check` (unitários e de componentes, incluindo o teste que proíbe cores fora dos tokens), `pnpm test:integration`
+(Postgres local real, um banco por worker), `pnpm test:e2e` (Playwright com provedor de IA roteirizado: o fluxo completo e
+as telas principais nos dois temas com o axe e contraste real). Testes de integração e e2e recusam bancos que não sejam
+locais.
